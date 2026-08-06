@@ -64,7 +64,7 @@ public hostnames, tunnel as sole ingress. Procedure:
 - [x] **G0 · Tunnel-hostile assumptions in the code** *(2026-08-06)* — an audit found five places where "internal", "public" and "what the browser uses" had been collapsed into one address. Two were blockers: the OIDC `redirect_uri` and the callback URL were built from `http://localhost:${env.port}`, so sign-in would have redirected users to a host that does not exist. Fixed via `PUBLIC_API_URL`, which also drives the session cookie's `Secure` flag.
 - [x] **G2 · Public origin config** *(2026-08-06)* — `infra/docker/build.sh` already takes the two `NEXT_PUBLIC_*` values as build args; the runbook records that the web image is therefore environment-specific and cannot be promoted across deployments.
 - [x] **G3 · Media without a CDN** *(2026-08-06)* — decided in favour of exposing MinIO as `media.angy.<domain>`, a fifth public hostname (ADR 0007 amendment). This required the `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` split: SigV4 signs the Host header, so presigning must happen against the public origin while all SDK traffic stays internal.
-- [ ] **G1 · Prove the WebSocket tier survives the tunnel** — the one gate that cannot be closed from here. Hocuspocus's server `timeout` is 60s and the provider's `messageReconnectTimeout` is 30s; a proxy that closes idle upgrades sooner turns collaboration into a reconnect loop that looks like a CRDT bug. Verification procedure: runbooks/homelab.md §5.1. **Blocked on the home server being stood up.**
+- [x] **G1 · WebSocket tier survives the tunnel** *(2026-08-06, verified against the live deployment)* — upgrade completes in 0.24s; an idle connection held 60s and was then closed by Hocuspocus itself with `4408 Connection Timeout`. The close **code** is the evidence, not the duration: a proxy reaping an idle upgrade produces `1006` with no close frame, so a clean application-level 4408 proves the tunnel carried the connection for its full lifetime. Procedure: runbooks/homelab.md §5.1.
 - [ ] **G4 · Persistence and backup** — volume inventory and the Postgres dump procedure are in runbooks/homelab.md §6; Postgres PITR and a *tested* restore drill are still open.
 - [ ] **G5 · Does terraform earn its place** — leaning no. `infra/compose.prod.yml` covers the homelab, and `infra/k8s/rehearse.sh` covers the k8s path. Revisit only if a second deployment target appears.
 
@@ -84,7 +84,10 @@ the dashboard rather than scripted.
 
 **Critical path:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E~~ → G.
 
-Waves A through F are done. **Wave G is all that remains.** Its code half is
-now closed: G0's origin split, G2's build-time inlining and G3's media
-decision are in. What is left needs the home server to exist — G1 is a
-measurement, not a change, and G4 is a drill.
+Waves A through F are done, and **Wave G is deployed and serving** on the
+homelab behind the tunnel: all five hostnames route, OIDC discovery and the
+sign-in redirect work end to end, and G1 is measured rather than assumed.
+
+What remains is operational, not architectural: G4's *tested* restore drill
+(the dump procedure exists; an untested backup is a hypothesis) and the G5
+call on terraform, which is leaning no.

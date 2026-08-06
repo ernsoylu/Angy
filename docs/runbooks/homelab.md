@@ -241,9 +241,16 @@ npx wscat -c "wss://rt.angy.<domain>/" &
 sleep 75 && echo "still connected?"
 ```
 
-If it drops early, raise the idle timeout on the `rt.` resource in Pangolin.
-Do **not** compensate by shortening the client timeout — that trades a visible
-failure for a constant reconnect churn that quietly degrades editing.
+**Read the close code, not the elapsed time.** Observed on the live
+deployment: upgrade in 0.24s, idle for 60s, then `code=4408 reason="Connection
+Timeout"` — Hocuspocus's own application-level close at its timeout, which is
+the pass condition. A proxy reaping the connection gives `1006` (abnormal
+closure, no close frame) at whatever its idle limit is. Same symptom in an
+editor, opposite cause.
+
+If it closes early with 1006, raise the idle timeout on the `rt.` resource in
+Pangolin. Do **not** compensate by shortening the client timeout — that trades
+a visible failure for constant reconnect churn that quietly degrades editing.
 
 ### 5.2 Sign-in
 
