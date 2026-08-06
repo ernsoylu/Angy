@@ -11,7 +11,7 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `MEILISEARCH_URL` | ✅ | api, worker | — |
 | `MEILISEARCH_API_KEY` | ✅ | api, worker | Master/admin key. Server-side only — clients receive short-lived tenant tokens (ADR 0009) |
 | `S3_ENDPOINT` | ✅ | api, realtime, worker, web | **Internal** object-storage address — every SDK call (Y.Doc blobs, revisions, thumbnails) goes here. MinIO locally, AWS S3 in prod |
-| `S3_PUBLIC_ENDPOINT` | — | api, worker, web | **Browser-facing** object-storage origin; defaults to `S3_ENDPOINT`. Set it whenever the two differ — e.g. a tunnelled homelab where MinIO answers on `http://minio:9000` internally and `https://media.angy.snc.ad` publicly. Bare media URLs *and presigning* use it; SigV4 signs the Host header, so a URL signed against the internal address is rejected at the public one |
+| `S3_PUBLIC_ENDPOINT` | — | api, worker, web | **Browser-facing** object-storage origin; defaults to `S3_ENDPOINT`. Set it whenever the two differ — e.g. a tunnelled homelab where MinIO answers on `http://minio:9000` internally and `https://media.angy.<domain>` publicly. Bare media URLs *and presigning* use it; SigV4 signs the Host header, so a URL signed against the internal address is rejected at the public one |
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | ✅ | api, realtime, worker | — |
 | `S3_BUCKET` | ✅ | api, realtime, worker | Y.Doc blobs, revision blobs, media, thumbnails |
 | `S3_REGION` | ✅ | api, realtime, worker | — |

@@ -4,8 +4,13 @@ Standing up Angy on a home server, published through a self-hosted Pangolin
 instance. Topology and rationale: [ADR 0012](../adr/0012-homelab-tunnel-topology.md).
 
 **Nothing in this file contains a secret.** Every credential is referenced by
-variable name and lives in `/opt/angy/.env` on the home server, `chmod 600`,
+variable name and lives in `$ANGY_HOME/.env` on the home server, `chmod 600`,
 never committed.
+
+`$ANGY_HOME` is wherever you put the deployment. `/opt/angy` is conventional
+but needs root; a home directory works identically and needs nothing, since
+membership of the `docker` group is the only privilege the stack requires.
+Examples below use `~/angy`.
 
 ---
 
@@ -87,27 +92,36 @@ docker load`).
 
 ---
 
-## 3. Write `/opt/angy/.env`
+## 3. Write `~/angy/.env`
 
 ```bash
-sudo install -d -m 755 /opt/angy
-sudo touch /opt/angy/.env && sudo chmod 600 /opt/angy/.env
+mkdir -p ~/angy/backup && chmod 700 ~/angy
 ```
+
+Generate the secrets **on the server**, so they never exist anywhere else — not
+in your shell history on another machine, not in a terminal scrollback:
+
+```bash
+cd ~/angy && umask 077
+{ echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+  echo "MEILI_MASTER_KEY=$(openssl rand -hex 24)"
+  echo "MINIO_ROOT_USER=angy$(openssl rand -hex 6)"
+  echo "MINIO_ROOT_PASSWORD=$(openssl rand -hex 24)"
+  echo "JWT_SECRET=$(openssl rand -hex 32)"
+  echo "AUTHENTIK_SECRET_KEY=$(openssl rand -hex 32)"
+  echo "AUTHENTIK_POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+  echo "OIDC_CLIENT_SECRET=$(openssl rand -hex 32)"; } > .env
+chmod 600 .env
+```
+
+Then append the non-secret settings:
 
 Every variable in `infra/compose.prod.yml` is required and has no inline
 default, so a missing one fails at `up` rather than silently starting with a
 dev password. Generate each secret fresh — `openssl rand -hex 32`:
 
 ```
-POSTGRES_PASSWORD=
-MEILI_MASTER_KEY=
-MINIO_ROOT_USER=
-MINIO_ROOT_PASSWORD=
-JWT_SECRET=
-AUTHENTIK_SECRET_KEY=
-AUTHENTIK_POSTGRES_PASSWORD=
-OIDC_CLIENT_ID=
-OIDC_CLIENT_SECRET=
+OIDC_CLIENT_ID=angy-web
 WEB_HOST=angy.<domain>
 API_HOST=api.angy.<domain>
 ID_HOST=id.<domain>
@@ -120,8 +134,8 @@ TAG=homelab
 ## 4. Bring it up
 
 ```bash
-cd /opt/angy
-docker compose --env-file /opt/angy/.env -f infra/compose.prod.yml up -d
+cd ~/angy
+docker compose --env-file .env -f infra/compose.prod.yml up -d
 docker compose -f infra/compose.prod.yml exec api node -e "…"   # see §4.1
 ```
 

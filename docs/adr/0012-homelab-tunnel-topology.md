@@ -7,7 +7,7 @@
 Angy's first real deployment is not a cloud region. It is a home server on a
 residential connection, published to the internet through an existing
 self-hosted [Pangolin](https://docs.fossorial.io/) instance on a VPS
-(`snc.ad`). Pangolin is a tunnelled reverse proxy: Traefik terminates TLS on
+(`<domain>`). Pangolin is a tunnelled reverse proxy: Traefik terminates TLS on
 the VPS, Gerbil runs a WireGuard endpoint, and a `newt` client on the home
 server dials *outbound* to it. Nothing listens for inbound connections on the
 home network.
@@ -29,13 +29,13 @@ public address at all.
 **Deploy behind the tunnel with five public hostnames, and make every
 public-facing origin explicitly configurable.**
 
-| Hostname | Target | Serves |
+| Hostname | Newt target | Serves |
 |---|---|---|
-| `angy.snc.ad` | `web:3000` | Next.js reader + editor |
-| `api.angy.snc.ad` | `api:3001` | NestJS REST |
-| `rt.angy.snc.ad` | `realtime:3002` | Hocuspocus WebSocket |
-| `id.snc.ad` | `authentik-server:9000` | Authentik (ADR 0011) |
-| `media.angy.snc.ad` | `minio:9000` | Object storage (ADR 0007 amendment) |
+| `angy.<domain>` | `127.0.0.1:3000` | Next.js reader + editor |
+| `api.angy.<domain>` | `127.0.0.1:3001` | NestJS REST |
+| `rt.angy.<domain>` | `127.0.0.1:3002` | Hocuspocus WebSocket |
+| `id.<domain>` | `127.0.0.1:9010` | Authentik (ADR 0011) |
+| `media.angy.<domain>` | `127.0.0.1:9000` | Object storage (ADR 0007 amendment) |
 
 Three principles follow:
 
@@ -57,10 +57,10 @@ Three principles follow:
 
 ## Consequences
 
-- **`SameSite=Lax` still works, and that is not an accident.** `snc.ad` is the
+- **`SameSite=Lax` still works, and that is not an accident.** `<domain>` is the
   registrable domain, so all five hostnames are same-site siblings.
-  Credentialed XHR from `angy.snc.ad` to `api.angy.snc.ad` is a same-site
-  request, and the top-level redirect back from `id.snc.ad` carries the session
+  Credentialed XHR from `angy.<domain>` to `api.angy.<domain>` is a same-site
+  request, and the top-level redirect back from `id.<domain>` carries the session
   cookie. Moving any component to a different registrable domain would force
   `SameSite=None`, which in turn hard-requires `Secure` and re-opens CSRF
   questions this design does not currently have to answer.
@@ -84,7 +84,7 @@ Three principles follow:
   `systemctl {status,restart} newt` is the control surface.
 - **The VPS becomes a single point of failure** for external access. Local
   access does not depend on it, which is worth preserving: nothing in the stack
-  should require reaching `snc.ad` to function on the LAN.
+  should require reaching `<domain>` to function on the LAN.
 
 ## Alternatives rejected
 

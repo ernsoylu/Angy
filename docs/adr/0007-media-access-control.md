@@ -26,7 +26,7 @@ Attachment access inherits the containing page's permission, enforced at the CDN
 
 The homelab target (behind a Pangolin tunnel, ADR 0012) has no CloudFront in
 front of object storage. MinIO itself is published as a fifth public hostname,
-`media.angy.snc.ad`, and takes the CDN's place.
+`media.angy.<domain>`, and takes the CDN's place.
 
 The decision above survives intact because it was written in terms of *URL
 form*, not *which product serves it*:
@@ -49,4 +49,4 @@ Two consequences specific to this topology:
   traffic must stay internal, while URLs handed to browsers must be public.
   Hence `S3_PUBLIC_ENDPOINT` (docs/env.md), used for bare URLs *and* for
   presigning — SigV4 covers the Host header, so a URL signed against
-  `http://minio:9000` is rejected when presented to `media.angy.snc.ad`.
+  `http://minio:9000` is rejected when presented to `media.angy.<domain>`.
