@@ -133,8 +133,19 @@ export const attachmentSchema = z.object({
   url: z.string(),
   thumbnailUrl: z.string().nullable(),
   signed: z.boolean(),
+  /**
+   * Stable src for embedding in documents: bare CDN URL for public spaces,
+   * app-relative /media/... (signed per request at serve time) for private —
+   * never a signed URL, which would expire inside the stored document.
+   */
+  docSrc: z.string(),
 });
 export type AttachmentDto = z.infer<typeof attachmentSchema>;
+
+export const renamePageSchema = z.object({
+  title: z.string().min(1).max(200),
+});
+export type RenamePageDto = z.infer<typeof renamePageSchema>;
 
 export const movePageSchema = z.object({
   parentId: z.uuid().nullable(),

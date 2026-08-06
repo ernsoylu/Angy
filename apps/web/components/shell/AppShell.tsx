@@ -26,7 +26,7 @@ import { cx } from "../../lib/cx";
 import type { TreeNode } from "../../lib/tree";
 import { NewPageDialog } from "../pageops/NewPageDialog";
 import { ShareDialog } from "../share/ShareDialog";
-import { Avatar } from "../ui/Avatar";
+import { UserMenu } from "./UserMenu";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { SearchField } from "../ui/SearchField";
@@ -34,7 +34,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import styles from "./shell.module.css";
 
 interface AppShellProps {
-  user: { name: string };
+  user: { name: string; email: string };
   space: { id: string; key: string; name: string };
   tree: TreeNode[];
   children: ReactNode;
@@ -144,7 +144,7 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
             <Bell size={15} />
           </IconButton>
           <ThemeToggle />
-          <Avatar name={user.name} size={30} />
+          <UserMenu name={user.name} email={user.email} />
         </div>
       </header>
 

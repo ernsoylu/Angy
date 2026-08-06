@@ -31,7 +31,7 @@ import {
   type AttachmentDto,
 } from "@angy/shared";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
-import { mediaUrl, putMediaObject } from "../media";
+import { bareMediaUrl, mediaUrl, putMediaObject } from "../media";
 import {
   PagePermissionGuard,
   RequirePageLevel,
@@ -70,6 +70,7 @@ async function toDto(
       ? await mediaUrl(attachment.thumbnailS3Key, isPrivate)
       : null,
     signed: isPrivate,
+    docSrc: isPrivate ? `/media/${attachment.s3Key}` : bareMediaUrl(attachment.s3Key),
   };
 }
 

@@ -18,7 +18,7 @@ export default async function SpaceLayout({
 
   return (
     <AppShell
-      user={{ name: me.displayName }}
+      user={{ name: me.displayName, email: me.email }}
       space={{ id: space.id, key: space.key, name: space.name }}
       tree={buildTree(pages, space.key)}
     >

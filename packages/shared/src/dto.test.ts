@@ -87,6 +87,7 @@ describe("dto schemas", () => {
         url: "http://x/y",
         thumbnailUrl: null,
         signed: false,
+        docSrc: "/media/media-private/ab",
       }),
     ).not.toThrow();
     expect(() =>

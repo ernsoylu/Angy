@@ -4,6 +4,7 @@ import {
   Code2,
   Heading2,
   Heading3,
+  Image as ImageIcon,
   Info,
   List,
   ListOrdered,
@@ -12,6 +13,9 @@ import {
   TextQuote,
   Type,
 } from "lucide-react";
+
+/** Fired at the editor DOM when the Image slash item needs a file picked. */
+export const IMAGE_REQUEST_EVENT = "angy:image-request";
 
 export interface SlashItem {
   title: string;
@@ -92,6 +96,16 @@ export const SLASH_ITEMS: SlashItem[] = [
           content: [{ type: "paragraph" }],
         })
         .run(),
+  },
+  {
+    title: "Image",
+    description: "Upload and embed",
+    icon: ImageIcon,
+    keywords: "image picture photo upload media",
+    command: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      editor.view.dom.dispatchEvent(new CustomEvent(IMAGE_REQUEST_EVENT, { bubbles: true }));
+    },
   },
   {
     title: "Table",

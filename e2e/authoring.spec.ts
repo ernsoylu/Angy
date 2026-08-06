@@ -47,6 +47,19 @@ test.describe("authoring: new page + slash commands", () => {
     await page.keyboard.type("Slash heading");
     await expect(editor.locator("h2").last()).toContainText("Slash heading");
 
+    // Image block: "/image" opens the picker; the upload embeds the stable src.
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/image");
+    await expect(page.getByTestId("slash-menu")).toBeVisible();
+    await page.keyboard.press("Enter");
+    await page
+      .getByTestId("editor-image-input")
+      .setInputFiles("e2e/fixtures/pixel.png");
+    await expect(editor.locator("img")).toHaveAttribute("src", /angy-docs\/media\//, {
+      timeout: 15_000,
+    });
+
     // Done → checkpoint; the reader serves the projected blocks.
     await page.waitForTimeout(2500); // store debounce
     await page.getByRole("button", { name: "Done" }).click();
@@ -61,6 +74,10 @@ test.describe("authoring: new page + slash commands", () => {
       )
       .toContain("Slash-inserted hard rule");
     await expect(page.locator(".article-prose aside.callout")).toBeVisible();
+    await expect(page.locator(".article-prose img")).toHaveAttribute(
+      "src",
+      /angy-docs\/media\//,
+    );
 
     // Cleanup.
     const pages = await api<{ id: string; title: string }[]>("e2e-eren", "/spaces/1/pages");

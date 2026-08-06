@@ -7,9 +7,10 @@ test.describe("page move + trash/restore", () => {
   }) => {
     test.setTimeout(90_000);
     // A dedicated page so the seeded tree stays intact for other tests.
+    const movableTitle = `Movable ${Date.now()}`;
     const created = await api<{ id: string }>("e2e-eren", "/pages", {
       method: "POST",
-      body: JSON.stringify({ spaceId: "1", title: `Movable ${Date.now()}` }),
+      body: JSON.stringify({ spaceId: "1", title: movableTitle }),
     });
 
     const context = await sessionContext(browser, "e2e-eren");
@@ -32,12 +33,12 @@ test.describe("page move + trash/restore", () => {
 
     // It shows in the trash with a 30-day countdown; restore brings it back.
     await page.goto("/s/eng/trash");
-    const row = page.getByText(/Movable /).first();
-    await expect(row).toBeVisible();
+    const row = page.locator("main > div > div").filter({ hasText: movableTitle }).last();
+    await expect(row.getByText(movableTitle)).toBeVisible();
     await expect(page.getByText(/30 days|29 days/).first()).toBeVisible();
-    await page.getByRole("button", { name: "Restore" }).first().click();
+    await row.getByRole("button", { name: "Restore" }).click();
     // Scope to the listing — the restored page reappears in the sidebar tree.
-    await expect(page.locator("main").getByText(/Movable /)).toHaveCount(0);
+    await expect(page.locator("main").getByText(movableTitle)).toHaveCount(0);
 
     // Back in the tree, still under Runbooks.
     const detail = await api<{ breadcrumb: { title: string }[] }>(

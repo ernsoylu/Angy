@@ -12,6 +12,8 @@
     "@angy/blocks": "workspace:*",
     "@angy/db": "workspace:*",
     "@angy/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1104.0",
+    "@aws-sdk/s3-request-presigner": "^3.1104.0",
     "@hocuspocus/provider": "^4.5.0",
     "@tiptap/core": "^3.29.2",
     "@tiptap/extension-collaboration": "^3.29.2",

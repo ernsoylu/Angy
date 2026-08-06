@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { Collaboration } from "@tiptap/extension-collaboration";
@@ -10,6 +10,7 @@ import { Bold, Code, Italic, Strikethrough, UnderlineIcon } from "lucide-react";
 import { editorExtensions } from "@angy/blocks";
 import { cx } from "../../lib/cx";
 import { IconButton } from "../ui/IconButton";
+import { IMAGE_REQUEST_EVENT } from "./slash-items";
 import { SlashCommand } from "./SlashMenu";
 import styles from "./editor.module.css";
 
@@ -81,6 +82,38 @@ export function Editor({ pageId, token, user, onPresenceChange }: EditorProps) {
 
   useEffect(() => () => provider.destroy(), [provider]);
 
+  // "/image" flow: the slash item asks for a file; we upload it as a page
+  // attachment and embed the stable docSrc (never an expiring signed URL).
+  const imageInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const open = () => imageInput.current?.click();
+    dom.addEventListener(IMAGE_REQUEST_EVENT, open);
+    return () => dom.removeEventListener(IMAGE_REQUEST_EVENT, open);
+  }, [editor]);
+
+  async function uploadImage(file: File) {
+    if (!editor) return;
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/pages/${pageId}/attachments`,
+      { method: "POST", credentials: "include", body: form },
+    );
+    const body = await res.json();
+    if (body.success) {
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "image",
+          attrs: { src: body.data.docSrc as string, alt: body.data.fileName as string },
+        })
+        .run();
+    }
+  }
+
   if (!editor) return null;
 
   return (
@@ -123,6 +156,18 @@ export function Editor({ pageId, token, user, onPresenceChange }: EditorProps) {
         </IconButton>
       </BubbleMenu>
       <EditorContent editor={editor} />
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/*"
+        hidden
+        data-testid="editor-image-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void uploadImage(file);
+          e.target.value = "";
+        }}
+      />
     </>
   );
 }

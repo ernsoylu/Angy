@@ -46,7 +46,7 @@ const mockTree = [
 export default function DesignPage() {
   return (
     <AppShell
-      user={{ name: "Eren Soylu" }}
+      user={{ name: "Eren Soylu", email: "eren@acme.io" }}
       space={{ id: "1", key: "eng", name: "Engineering" }}
       tree={mockTree}
     >

@@ -4,6 +4,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -14,11 +15,14 @@ import { createPage, getBreadcrumb, getEffectiveSpaceLevel, getPrisma } from "@a
 import {
   createPageSchema,
   JOB_PROJECTION_INIT,
+  JOB_PROJECTION_REBUILD,
   ok,
+  renamePageSchema,
   satisfies,
   type ApiOk,
   type CreatePageDto,
   type PageDetailDto,
+  type RenamePageDto,
 } from "@angy/shared";
 import { ForbiddenException } from "@nestjs/common";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
@@ -94,6 +98,25 @@ export class PagesController {
       .setIssuedAt()
       .sign(new TextEncoder().encode(env.jwtSecret()));
     return ok({ token });
+  }
+
+  /** Rename — the slug stays stable so links keep working. */
+  @Patch(":id")
+  @RequirePageLevel("EDIT")
+  async rename(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(renamePageSchema)) body: RenamePageDto,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<{ title: string }>> {
+    const page = await getPrisma().page.findFirst({ where: { id, deletedAt: null } });
+    if (!page) throw new NotFoundException("Page not found");
+    await getPrisma().page.update({
+      where: { id },
+      data: { title: body.title, updatedBy: req.user.id },
+    });
+    // The title lives in projections and the search index too.
+    await projectionsQueue().add(JOB_PROJECTION_REBUILD, { pageId: id });
+    return ok({ title: body.title });
   }
 
   @Post()
