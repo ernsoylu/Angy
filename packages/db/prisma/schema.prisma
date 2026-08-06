@@ -1,0 +1,178 @@
+// Angy V1 schema — follows docs/schema.md table inventory.
+// Hard rules (CLAUDE.md): no Yjs blobs in Postgres (only ydoc_s3_key + small
+// state vector), no block tables, closure table over pages only.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["typedSql"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PermLevel {
+  VIEW
+  EDIT
+  FULL
+  ADMIN
+
+  @@map("perm_level")
+}
+
+enum SpaceVisibility {
+  PUBLIC
+  PRIVATE
+
+  @@map("space_visibility")
+}
+
+model Space {
+  id               BigInt          @id @default(autoincrement())
+  key              String          @unique
+  name             String
+  description      String?
+  visibility       SpaceVisibility @default(PUBLIC)
+  defaultPermLevel PermLevel       @default(VIEW) @map("default_perm_level")
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  members SpaceMember[]
+  pages   Page[]
+
+  @@map("space")
+}
+
+/// Local mirror of OIDC identities. Dense bigint ids are required by the
+/// permission-bitmap cache (ADR 0004: bit offset = user id).
+model AppUser {
+  id            BigInt    @id @default(autoincrement())
+  oidcSubject   String    @unique @map("oidc_subject")
+  email         String    @unique
+  displayName   String    @map("display_name")
+  deactivatedAt DateTime? @map("deactivated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  memberships SpaceMember[]
+  permissions PagePermission[]
+
+  @@map("app_user")
+}
+
+model SpaceMember {
+  spaceId   BigInt    @map("space_id")
+  userId    BigInt    @map("user_id")
+  permLevel PermLevel @default(VIEW) @map("perm_level")
+  addedAt   DateTime  @default(now()) @map("added_at")
+
+  space Space   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user  AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([spaceId, userId])
+  @@map("space_member")
+}
+
+/// The primitive (ADR 0001). One row per page; blocks live in document_json
+/// and the Y.Doc in S3 — never in relational rows.
+model Page {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  spaceId             BigInt    @map("space_id")
+  parentId            String?   @map("parent_id") @db.Uuid
+  title               String
+  slug                String
+  ydocS3Key           String?   @map("ydoc_s3_key")
+  ydocStateVector     Bytes?    @map("ydoc_state_vector")
+  documentJson        Json?     @map("document_json")
+  renderedHtml        String?   @map("rendered_html")
+  textExtract         String?   @map("text_extract")
+  projectionUpdatedAt DateTime? @map("projection_updated_at")
+  createdBy           BigInt    @map("created_by")
+  updatedBy           BigInt?   @map("updated_by")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at")
+
+  space       Space            @relation(fields: [spaceId], references: [id])
+  parent      Page?            @relation("PageTree", fields: [parentId], references: [id])
+  children    Page[]           @relation("PageTree")
+  ancestors   PageAncestor[]   @relation("Descendant")
+  descendants PageAncestor[]   @relation("Ancestor")
+  permissions PagePermission[]
+  revisions   PageRevision[]
+  attachments Attachment[]
+
+  @@unique([spaceId, slug])
+  @@index([spaceId])
+  @@index([parentId])
+  @@map("page")
+}
+
+/// Closure table over pages only — never blocks (hard rule 2).
+model PageAncestor {
+  ancestorId   String @map("ancestor_id") @db.Uuid
+  descendantId String @map("descendant_id") @db.Uuid
+  depth        Int
+
+  ancestor   Page @relation("Ancestor", fields: [ancestorId], references: [id], onDelete: Cascade)
+  descendant Page @relation("Descendant", fields: [descendantId], references: [id], onDelete: Cascade)
+
+  @@id([ancestorId, descendantId])
+  @@index([descendantId])
+  @@map("page_ancestor")
+}
+
+/// Additive page-level grants above the space baseline. Notion rule: grants
+/// only widen access, never reduce it.
+model PagePermission {
+  pageId    String    @map("page_id") @db.Uuid
+  userId    BigInt    @map("user_id")
+  permLevel PermLevel @map("perm_level")
+  grantedBy BigInt    @map("granted_by")
+  grantedAt DateTime  @default(now()) @map("granted_at")
+
+  page Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, userId])
+  @@map("page_permission")
+}
+
+/// Revision pointers — blobs are full Y.Doc states in S3 (ADR 0006).
+model PageRevision {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pageId        String   @map("page_id") @db.Uuid
+  version       Int
+  revisionS3Key String   @map("revision_s3_key")
+  stateVector   Bytes?   @map("state_vector")
+  label         String?
+  sizeBytes     BigInt?  @map("size_bytes")
+  createdBy     BigInt   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, version])
+  @@index([pageId, createdAt])
+  @@map("page_revision")
+}
+
+model Attachment {
+  id             BigInt    @id @default(autoincrement())
+  pageId         String?   @map("page_id") @db.Uuid
+  fileName       String    @map("file_name")
+  sha256         String
+  mimeType       String    @map("mime_type")
+  sizeBytes      BigInt    @map("size_bytes")
+  width          Int?
+  height         Int?
+  s3Key          String    @map("s3_key")
+  thumbnailS3Key String?   @map("thumbnail_s3_key")
+  uploadedBy     BigInt    @map("uploaded_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  page Page? @relation(fields: [pageId], references: [id])
+
+  @@index([sha256])
+  @@map("attachment")
+}

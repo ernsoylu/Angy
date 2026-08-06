@@ -1,0 +1,33 @@
+{
+  "name": "@angy/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "prisma generate --sql && tsc -p tsconfig.build.json",
+    "generate": "prisma generate --sql",
+    "migrate": "prisma migrate dev",
+    "seed": "node --env-file-if-exists=../../.env.local --import tsx src/seed.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@angy/shared": "workspace:*",
+    "@prisma/client": "^6",
+    "bullmq": "^5.81.3",
+    "ioredis": "^5.11.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "prisma": "^6",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  }
+}
