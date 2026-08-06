@@ -1,0 +1,7 @@
+
+/* Same for the destination tree: an empty list needs a reason. */
+.noMatches {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--text-3);
+}

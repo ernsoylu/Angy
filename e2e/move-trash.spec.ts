@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, sessionContext } from "./helpers";
+import { api, pageIdBySlug, sessionContext } from "./helpers";
 
 test.describe("page move + trash/restore", () => {
   test("move dialog reparents; trash and restore round-trip through the UI", async ({
@@ -52,6 +52,43 @@ test.describe("page move + trash/restore", () => {
     // Cleanup: trash + hard delete.
     await api("e2e-eren", `/pages/${created.id}/trash`, { method: "POST" });
     await api("e2e-eren", `/pages/${created.id}/hard-delete`, { method: "POST" });
+    await context.close();
+  });
+
+  test("both dialogs' search fields narrow, and say so when nothing matches", async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const pageId = await pageIdBySlug("e2e-eren", "storage-model");
+    const context = await sessionContext(browser, "e2e-eren");
+    const page = await context.newPage();
+
+    // Move dialog (frame 10): filtering keeps the space header that still has
+    // a match, and drops the ones that do not.
+    await page.goto(`/s/eng/${pageId}`);
+    await page.getByRole("button", { name: "Move page" }).click();
+    const dialog = page.getByRole("dialog", { name: "Move page" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByPlaceholder("Search spaces and pages...").fill("runbook");
+    await expect(dialog.getByRole("button", { name: /Runbooks/ })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /Onboarding/ })).toHaveCount(0);
+    await expect(dialog.getByRole("button", { name: /^Product$/ })).toHaveCount(0);
+
+    await dialog.getByPlaceholder("Search spaces and pages...").fill("zzz-nothing");
+    await expect(dialog.getByText(/No space or page matches/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+
+    // Trash (frame 9): the field searches the whole row, not just titles.
+    await api("e2e-eren", `/pages/${pageId}/trash`, { method: "POST" });
+    await page.goto("/s/eng/trash");
+    const search = page.getByPlaceholder("Search trash");
+    await expect(page.getByText("Storage Model")).toBeVisible();
+    await search.fill("Eren");           // trashed-by, not a title
+    await expect(page.getByText("Storage Model")).toBeVisible();
+    await search.fill("zzz-nothing");
+    await expect(page.getByText(/Nothing in the trash matches/)).toBeVisible();
+
+    await api("e2e-eren", `/pages/${pageId}/restore`, { method: "POST" });
     await context.close();
   });
 });

@@ -168,6 +168,22 @@ export function MoveDialog({
 
   const destinationRow = rows.find(isSelected);
 
+  // Filtering has to keep space headers, or matching pages lose the context
+  // that tells you which space you would be moving into — but only the headers
+  // that still have something under them. Keeping every space made a search
+  // read as "no matches" surrounded by noise.
+  const needle = query.trim().toLowerCase();
+  const matches = (row: Row) => row.title.toLowerCase().includes(needle);
+  const visibleRows = !needle
+    ? rows
+    : rows.filter((row) => {
+        if (row.kind === "page") return matches(row);
+        return (
+          matches(row) ||
+          rows.some((other) => other.kind === "page" && other.spaceId === row.spaceId && matches(other))
+        );
+      });
+
   return (
     <div className={share.overlay} onClick={onClose}>
       <div className={share.dialog} role="dialog" aria-label="Move page" onClick={(e) => e.stopPropagation()}>
@@ -193,14 +209,7 @@ export function MoveDialog({
         />
         <div className="t-caption">Move to</div>
         <div className={styles.tree}>
-          {rows
-            .filter(
-              (row) =>
-                !query.trim() ||
-                row.title.toLowerCase().includes(query.trim().toLowerCase()) ||
-                row.kind === "space",
-            )
-            .map((row) => (
+          {visibleRows.map((row) => (
             <button
               key={`${row.spaceId}:${row.id ?? "root"}`}
               className={cx(
@@ -217,7 +226,10 @@ export function MoveDialog({
               {row.isCurrent && <Badge hue="neutral">current</Badge>}
               {isSelected(row) && <Badge hue="accent">destination</Badge>}
             </button>
-            ))}
+          ))}
+          {visibleRows.length === 0 && (
+            <p className={styles.noMatches}>No space or page matches “{query.trim()}”.</p>
+          )}
         </div>
 
         <div className={share.warning}>

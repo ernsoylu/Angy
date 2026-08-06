@@ -2,7 +2,7 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (80 unit/integration tests, 34 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–F (see § Open gaps for what was closed and what remains).
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (80 unit/integration tests, 35 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–F (see § Open gaps for what was closed and what remains).
 
 ## Design inputs
 
@@ -134,7 +134,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~**Search over attachments**~~ — **done (2026-08-06)**: an `attachments` index carrying space_id/page_id, so one tenant token's read filter covers both indexes; the Attachments tab is a real filter.
 - **Space administration** — the API half is **done (2026-08-06)**: space create/update, member list/invite/change-level/remove, all ADMIN-gated, each ending in a space-wide bitmap invalidation (a new operation — nothing in the closure table expresses "the whole space"). The settings screen (frame 12) and both dead buttons are **done** too; the create-space dialog (frame 13) has an API but no UI yet.
 - ~~**Editor block affordances**~~ — **done (2026-08-06)**: bubble-menu link editor, a table-structure toolbar shown while the caret is in a table, and the `⠿`/`+` gutter (`@tiptap/extension-drag-handle-react`, with `+` opening the same `SLASH_ITEMS` palette).
-- **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash". The only frame-level gap left.
+- ~~**Dialog search fields**~~ — **both already existed**; the gap line was stale. What was actually wrong is fixed: the move dialog kept every space header regardless of matches (so a search read as noise around no result), and the trash field searched titles only. Both now report an empty filter instead of showing a bare header.
 - ~~**Mobile**~~ — **done (2026-08-06)**: every tab-bar entry routes, with Me rendering the profile, both personal lists, and sign-out. (The full-width "Edit this page" button was already built in Phase 3.)
 - ~~**Frame D interaction spec**~~ — **done (2026-08-06)**: page-tree roving-tabindex traversal (↑↓ → ← Enter/Home/End) and the compact density preference join the ⌘K binding, skip link, and Esc handling.
 - **Misc** — second IdP button is decorative (single issuer), the last open product question; ~~attachment "Used on N pages"~~ now lists every page sharing the blob's sha256.
@@ -167,7 +167,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~Runtime images carry the whole workspace~~ — **done (2026-08-06)**: `infra/docker/prune.sh` deploys each app prod-only and regenerates the Prisma client in the pruned tree; ~1.5 GB → 578–602 MB (web 509 MB via Next standalone).
 - ~~No clean-deploy rehearsal~~ — **done (2026-08-06)**: `infra/k8s/rehearse.sh` stands `angy.yaml` up on a throwaway kind cluster with a real `angy-env` Secret and smoke-tests all four workloads plus the SSR read path. It caught two real deploy bugs on the first run: `angy.yaml` had no `imagePullPolicy`, so `:latest` defaulted to `Always` and every pod hit `ErrImagePull`; and `NEXT_PUBLIC_*` are inlined by Next at build time, so the Secret's copies never reached the browser — they are build args on `Dockerfile.web` now.
 
-The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–D and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); the collaborative title, and the search surfaces (tags, attachment search). What is left is space administration — now designed, but holding four open questions on frames 12–13 — the multi-IdP call, cloud ops, and a few small standalone items (dialog search fields, revoked-editor state, TOC scroll-spy, search-token guardrail).
+The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–D and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); the collaborative title, and the search surfaces (tags, attachment search). Every design-frame feature and robustness item in this audit is now closed. What remains needs a decision rather than an implementation: whether multi-IdP is a real requirement (E4), and which cloud provider terraform and the CDN target (Wave G).
 
 ## V2 sequencing (dependency-ordered, planned 2026-08-06)
 

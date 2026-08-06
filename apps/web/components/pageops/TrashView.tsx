@@ -28,6 +28,16 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
   const { toast } = useToast();
   const [query, setQuery] = useState("");
 
+  // "Search trash" (frame 9) covers the whole row, not just the title: you are
+  // usually hunting by where something was or who trashed it.
+  const needle = query.trim().toLowerCase();
+  const visible = needle
+    ? items.filter((item) =>
+        [item.title, item.parentTitle, item.spaceName, item.trashedByName]
+          .some((field) => field?.toLowerCase().includes(needle)),
+      )
+    : items;
+
   async function act(path: string, removeId: string) {
     setBusy(true);
     try {
@@ -117,9 +127,10 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
             <span>Deleted in</span>
             <span>Actions</span>
           </div>
-          {items
-            .filter((i) => !query.trim() || i.title.toLowerCase().includes(query.trim().toLowerCase()))
-            .map((item, index) => {
+          {visible.length === 0 && (
+            <p className={styles.noMatches}>Nothing in the trash matches “{query.trim()}”.</p>
+          )}
+          {visible.map((item, index) => {
             const days = daysLeft(item.hardDeleteAt);
             return (
               <div key={item.id} className={styles.row}>

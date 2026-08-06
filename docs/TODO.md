@@ -1,6 +1,6 @@
 # TODO — Remaining Work Tracker
 
-> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–F (all but E4) shipped as of 2026-08-06 — 80 unit/integration + 34 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
+> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–F (all but E4) shipped as of 2026-08-06 — 80 unit/integration + 35 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
 
 ## Decision gates (answer before the dependent wave starts)
 
@@ -67,4 +67,10 @@
 - Tag admin lives in *space* settings even though tags are workspace-wide — it is the only admin surface there is. A workspace-settings screen would be its proper home if one is ever designed.
 - Unused tags are swept by the GC rather than kept: freeform authoring means the vocabulary only grows otherwise, and an orphan name blocks renaming onto it.
 
-**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E1–E3~~ → E4 → G. Two things are left and **both are waiting on you**: **E4** (is multi-IdP real, or should the second sign-in button go?) and **Wave G** (which cloud provider?). The only unblocked item remaining is the dialog search fields in frames 9 and 10.
+**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E1–E3~~ → E4 → G.
+
+**Nothing unblocked is left.** The two remaining items are both decisions, not
+implementations:
+
+- **E4** — is multi-IdP a real requirement? If yes it is a small config-driven change (`?provider=` on `/auth/login`); if no, the second sign-in button should be deleted rather than left decorative.
+- **Wave G** — which cloud provider? Terraform (bucket/CDN/DNS) and the CloudFront signed-cookie work both hang off that one answer.

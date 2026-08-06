@@ -176,3 +176,11 @@
   outline: none;
   border-color: var(--accent);
 }
+
+/* Filter came up empty — say so inside the table rather than showing a bare
+   header with nothing under it. */
+.noMatches {
+  padding: 18px 16px;
+  font-size: 13px;
+  color: var(--text-3);
+}
