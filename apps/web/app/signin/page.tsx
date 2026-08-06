@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { History, KeyRound, Search, ShieldCheck, Users } from "lucide-react";
+import { History, Search, ShieldCheck, Users } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Callout } from "../../components/ui/Callout";
 import shell from "../../components/shell/shell.module.css";
@@ -52,13 +52,11 @@ export default function SignInPage() {
           <p className={styles.subtitle}>
             Angy uses your workspace identity provider. There are no local passwords.
           </p>
+          {/* One provider, one button (ADR 0011). The design showed a second
+              one, but both pointed at this same URL — a choice that was not a
+              choice. Multi-IdP is a config change if it ever becomes real. */}
           <a href={`${API_URL}/auth/login`}>
             <Button icon={<ShieldCheck size={15} />} style={{ width: "100%" }}>
-              Continue with Keycloak
-            </Button>
-          </a>
-          <a href={`${API_URL}/auth/login`}>
-            <Button variant="secondary" icon={<KeyRound size={15} />} style={{ width: "100%" }}>
               Continue with Authentik
             </Button>
           </a>

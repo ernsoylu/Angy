@@ -14,7 +14,7 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | ✅ | api, realtime, worker | — |
 | `S3_BUCKET` | ✅ | api, realtime, worker | Y.Doc blobs, revision blobs, media, thumbnails |
 | `S3_REGION` | ✅ | api, realtime, worker | — |
-| `OIDC_ISSUER_URL` | ✅ | api | Keycloak/Authentik realm URL |
+| `OIDC_ISSUER_URL` | ✅ | api | Authentik application issuer — `<host>/application/o/<app-slug>/` (ADR 0011). Must match the `issuer` claim in the discovery document, so the provider needs `issuer_mode: per_provider` |
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | ✅ | api | — |
 | `JWT_SECRET` | ✅ | api, realtime | Signs **short-lived realtime connect tokens and media access tokens** (ADR 0007/0008) — *not* user authentication, which is OIDC + Redis sessions. Random, ≥32 chars |
 | `NEXT_PUBLIC_API_URL` | ✅ | web | Public API endpoint. **Build-time**: Next inlines it into the client bundle, so pass it to `infra/docker/build.sh` — setting it in `angy-env` does nothing for the browser |

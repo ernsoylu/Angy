@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+#
+# Dev-only Authentik configuration for Angy — the equivalent of the Keycloak
+# realm import it replaces. Mounted read-only at /blueprints and applied on
+# every worker start, so `pnpm docker:up` gives a signable-in stack with no
+# clicking through the admin UI.
+#
+# The client secret and the seed passwords are deliberately the well-known dev
+# values from .env.example. Nothing here belongs in a real deployment.
+version: 1
+
+metadata:
+  name: angy-dev
+  labels:
+    blueprints.goauthentik.io/description: "Angy local development: OIDC provider, app, and seed users"
+
+entries:
+  # ---------------------------------------------------------------- provider
+  - model: authentik_providers_oauth2.oauth2provider
+    id: angy-provider
+    identifiers:
+      name: angy-web
+    attrs:
+      # Implicit consent: a local dev login should not stop to ask whether you
+      # meant it. Real deployments use the explicit-consent flow.
+      authorization_flow:
+        !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: angy-web
+      client_secret: changeme
+      # per_provider, not global: the discovery document lives under
+      # /application/o/<slug>/, and openid-client validates that the `issuer`
+      # claim matches the URL it discovered from. `global` issues
+      # http://host/ against a document at http://host/application/o/angy/ and
+      # the mismatch fails discovery outright.
+      issuer_mode: per_provider
+      # Angy identifies users by the OIDC subject (app_user.oidc_subject), so
+      # the subject must be stable per user — never per session.
+      sub_mode: hashed_user_id
+      redirect_uris:
+        - matching_mode: strict
+          url: http://localhost:3001/auth/callback
+          redirect_uri_type: authorization
+      grant_types:
+        - authorization_code
+        - refresh_token
+      # Exactly the scopes OidcService asks for: openid profile email.
+      property_mappings:
+        - !Find [
+            authentik_providers_oauth2.scopemapping,
+            [managed, goauthentik.io/providers/oauth2/scope-openid],
+          ]
+        - !Find [
+            authentik_providers_oauth2.scopemapping,
+            [managed, goauthentik.io/providers/oauth2/scope-profile],
+          ]
+        - !Find [
+            authentik_providers_oauth2.scopemapping,
+            [managed, goauthentik.io/providers/oauth2/scope-email],
+          ]
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+
+  - model: authentik_core.application
+    identifiers:
+      slug: angy
+    attrs:
+      name: Angy
+      provider: !KeyOf angy-provider
+      meta_description: Company knowledge, one page at a time.
+
+  # ------------------------------------------------------------------- group
+  # The claim Angy and Forgejo will both read once group mapping lands. It
+  # exists now so the shape is fixed before anything depends on it.
+  - model: authentik_core.group
+    id: angy-engineering
+    identifiers:
+      name: eng
+    attrs:
+      is_superuser: false
+
+  # ------------------------------------------------------------------- users
+  # Emails match packages/db seed users, so an OIDC sign-in links to the seeded
+  # account by verified email rather than creating a duplicate (see
+  # AuthController.callback).
+  - model: authentik_core.user
+    identifiers:
+      username: eren
+    attrs:
+      name: Eren Soylu
+      email: eren@acme.io
+      is_active: true
+      path: users
+      # Dev-only shared password, mirroring the Keycloak realm this replaces.
+      password: angy
+      groups:
+        - !KeyOf angy-engineering
+
+  - model: authentik_core.user
+    identifiers:
+      username: mira
+    attrs:
+      name: Mira Kalvo
+      email: mira@acme.io
+      is_active: true
+      path: users
+      # Dev-only shared password, mirroring the Keycloak realm this replaces.
+      password: angy
+      groups:
+        - !KeyOf angy-engineering
+
+  - model: authentik_core.user
+    identifiers:
+      username: rana
+    attrs:
+      name: Rana Terzi
+      email: rana@acme.io
+      is_active: true
+      path: users
+      # Dev-only shared password, mirroring the Keycloak realm this replaces.
+      password: angy
+      groups:
+        - !KeyOf angy-engineering

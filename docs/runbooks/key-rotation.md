@@ -34,7 +34,7 @@ rotation is cheap:
 
 ## OIDC client secret (`OIDC_CLIENT_SECRET`)
 
-Rotate in the IdP (Keycloak/Authentik) first with dual-secret support if
+Rotate in the IdP (Authentik) first with dual-secret support if
 available, update the api env, restart. Active Redis sessions are unaffected
 — the secret is used only during the code exchange.
 

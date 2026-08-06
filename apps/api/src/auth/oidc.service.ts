@@ -22,7 +22,7 @@ export class OidcService {
       env.oidc.clientId(),
       env.oidc.clientSecret(),
       undefined,
-      // Keycloak/Authentik run over plain http in local dev only.
+      // Authentik runs over plain http in local dev only (ADR 0011).
       env.oidc.issuerUrl().startsWith("http://") ? { execute: [oidc.allowInsecureRequests] } : {},
     );
     return this.config;

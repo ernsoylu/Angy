@@ -21,7 +21,7 @@ Built for teams that need to **document, collaborate, and search at speed** — 
 | Block editor (paragraph, heading, list, code, image, table, etc.) | V1 | Tiptap 3 + ProseMirror |
 | SSR-fast read path (<100ms TTFB budget) | V1 | Next.js RSC, zero editor JS for readers |
 | Media attachments + CDN | V1 | S3/MinIO, Sharp thumbnails, signed URLs for private spaces |
-| OIDC SSO | V1 | Keycloak/Authentik compatible |
+| OIDC SSO | V1 | Authentik/Authentik compatible |
 | SCIM provisioning | V2 | Directory sync, after OIDC login ships |
 | Confluence macros (Jira, TOC, etc.) | V2 | Planned |
 | Confluence/Notion importer | V2 | Migration path for existing wikis |
@@ -45,7 +45,7 @@ Nothing in this table is built yet — see the status banner above.
 | **Object Storage** | S3 / MinIO | Y.Doc blobs, revision blobs, attachments, thumbnails |
 | **CDN** | CloudFront / Cloudflare | Immutable sha256-keyed media URLs; signed for private spaces |
 | **Collab CRDT** | Yjs + y-prosemirror + Hocuspocus | One Y.Doc per page, CRDT convergence, offline-tolerant editing |
-| **Auth** | OIDC (Keycloak/Authentik) | SSO with Redis sessions; SCIM directory sync in V2 |
+| **Auth** | OIDC (Authentik/Authentik) | SSO with Redis sessions; SCIM directory sync in V2 |
 
 ## Quick Start
 

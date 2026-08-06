@@ -43,7 +43,7 @@ Port the .pen tokens to CSS custom properties on `:root[data-theme]` (light/dark
 
 ## Phase 2 — Data layer & auth (`packages/db`, `apps/api`)
 
-Prisma schema for V1 tables: `user`, `space`, `page` (with `ydoc_s3_key`, `ydoc_state_vector`, projection columns + timestamps), `page_ancestor` closure table, `page_permission`, `page_revision` (`revision_s3_key`), `attachment`, plus space membership. Naming per conventions (snake_case DB, uuid pages, bigint spaces/users). TypedSQL for closure-table insert/subtree queries. OIDC login (Keycloak in compose for dev) with Redis sessions; sign-in screen (frame 6). Zod DTOs in `packages/shared`; NestJS error shape `{ success:false, error:{ code, message } }`. Seeders for dev spaces/pages/users.
+Prisma schema for V1 tables: `user`, `space`, `page` (with `ydoc_s3_key`, `ydoc_state_vector`, projection columns + timestamps), `page_ancestor` closure table, `page_permission`, `page_revision` (`revision_s3_key`), `attachment`, plus space membership. Naming per conventions (snake_case DB, uuid pages, bigint spaces/users). TypedSQL for closure-table insert/subtree queries. OIDC login (Authentik in compose for dev, ADR 0011) with Redis sessions; sign-in screen (frame 6). Zod DTOs in `packages/shared`; NestJS error shape `{ success:false, error:{ code, message } }`. Seeders for dev spaces/pages/users.
 
 **Exit:** integration tests (testcontainers) cover closure-table ops and auth guard; `pnpm db:migrate && pnpm db:seed` produces a browsable dataset via REST.
 
@@ -137,7 +137,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~**Dialog search fields**~~ — **both already existed**; the gap line was stale. What was actually wrong is fixed: the move dialog kept every space header regardless of matches (so a search read as noise around no result), and the trash field searched titles only. Both now report an empty filter instead of showing a bare header.
 - ~~**Mobile**~~ — **done (2026-08-06)**: every tab-bar entry routes, with Me rendering the profile, both personal lists, and sign-out. (The full-width "Edit this page" button was already built in Phase 3.)
 - ~~**Frame D interaction spec**~~ — **done (2026-08-06)**: page-tree roving-tabindex traversal (↑↓ → ← Enter/Home/End) and the compact density preference join the ⌘K binding, skip link, and Esc handling.
-- **Misc** — second IdP button is decorative (single issuer), the last open product question; ~~attachment "Used on N pages"~~ now lists every page sharing the blob's sha256.
+- ~~**Misc**~~ — the second IdP button is **gone**: Authentik is the single identity provider (ADR 0011) and there was only ever one issuer behind both buttons. ~~attachment "Used on N pages"~~ now lists every page sharing the blob's sha256.
 
 ### Frame-11 mandate only half-wired
 
@@ -167,7 +167,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~Runtime images carry the whole workspace~~ — **done (2026-08-06)**: `infra/docker/prune.sh` deploys each app prod-only and regenerates the Prisma client in the pruned tree; ~1.5 GB → 578–602 MB (web 509 MB via Next standalone).
 - ~~No clean-deploy rehearsal~~ — **done (2026-08-06)**: `infra/k8s/rehearse.sh` stands `angy.yaml` up on a throwaway kind cluster with a real `angy-env` Secret and smoke-tests all four workloads plus the SSR read path. It caught two real deploy bugs on the first run: `angy.yaml` had no `imagePullPolicy`, so `:latest` defaulted to `Always` and every pod hit `ErrImagePull`; and `NEXT_PUBLIC_*` are inlined by Next at build time, so the Secret's copies never reached the browser — they are build args on `Dockerfile.web` now.
 
-The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–D and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); the collaborative title, and the search surfaces (tags, attachment search). Every design-frame feature and robustness item in this audit is now closed. What remains needs a decision rather than an implementation: whether multi-IdP is a real requirement (E4), and which cloud provider terraform and the CDN target (Wave G).
+The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–D and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); the collaborative title, and the search surfaces (tags, attachment search). Every design-frame feature and robustness item in this audit is now closed, and so is every wave except G. Deployment is the last chapter — and it is a homelab behind Pangolin tunnels rather than a cloud, which changes what ADR 0007's media story and ADR 0008's sticky-session requirement have to survive. See docs/TODO.md § Wave G.
 
 ## V2 sequencing (dependency-ordered, planned 2026-08-06)
 

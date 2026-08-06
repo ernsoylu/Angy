@@ -15,7 +15,7 @@ Wiki KMS — company knowledge management system. A Confluence-class, blazing-fa
 - **Blob storage**: S3 / MinIO (Y.Doc blobs, revision blobs, media, thumbnails)
 - **CDN**: CloudFront / Cloudflare (immutable sha256-keyed media URLs; signed for private spaces — ADR 0007)
 - **CRDT**: Yjs + y-prosemirror + Hocuspocus (one Y.Doc per page)
-- **Auth**: OIDC (Keycloak/Authentik); sessions in Redis. SCIM is V2.
+- **Auth**: OIDC via **Authentik**, a single identity provider (ADR 0011); sessions in Redis. SCIM is V2 and rides Authentik's outbound provider.
 - **Package manager**: pnpm workspaces
 
 Exact version pins live in README → Prerequisites and, once scaffolded, in package.json/.nvmrc — never in this file.
@@ -133,7 +133,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - Page-level permissions + Redis bitfield cache + space baseline
 - Meilisearch full-text search over text_extract, tenant-token authz
 - S3 attachments + Sharp thumbnails + CDN (signed URLs for private spaces)
-- OIDC auth (Keycloak/Authentik) — login only
+- OIDC auth (Authentik) — login only
 - Page revision history (full-state blobs, ADR 0006) with visual diff and non-destructive restore
 - Page move/trash/restore (30-day soft delete)
 - REST API only
@@ -166,6 +166,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/adr/0008-realtime-auth-scaling.md — WS auth, live revocation, V1 topology
 - docs/adr/0009-search-authz-tenant-tokens.md — Meilisearch tenant-token filters
 - docs/adr/0010-live-editing-vs-publish.md — live-by-default, no draft state in V1
+- docs/adr/0011-authentik-single-idp.md — Authentik as the one IdP; why not multi-IdP
 - docs/architecture.md — system narrative, data flow, consistency & backup model
 - docs/schema.md — table inventory (DDL TODO)
 - docs/env.md + .env.example — canonical environment variables

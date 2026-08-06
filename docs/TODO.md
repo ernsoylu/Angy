@@ -1,12 +1,12 @@
 # TODO — Remaining Work Tracker
 
-> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–F (all but E4) shipped as of 2026-08-06 — 80 unit/integration + 35 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
+> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–F shipped as of 2026-08-06 — 80 unit/integration + 35 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
 
 ## Decision gates (answer before the dependent wave starts)
 
 - [x] ~~**Space-settings screen design**~~ — frames 12 (Space Settings) and 13 (Create Space) now exist in frontend.pen, light and dark. Four things in them still need a human's yes/no before E2/E3 can be built: whether the space key is immutable, whether deleting a space is a real soft-delete state, whether an Owner tier above Admin exists, and whether member edits apply instantly while identity/visibility are staged behind Save
 - [x] ~~**Tag semantics**~~ — freeform authoring with admin cleanup, workspace-wide namespace (Wave D shipped on this)
-- [ ] **Multi-IdP** — real requirement, or remove the decorative Authentik button? (gates E4)
+- [x] ~~**Multi-IdP**~~ — **not a requirement**: one IdP, and it is Authentik (ADR 0011). The second sign-in button is gone rather than wired up
 - [ ] **Cloud provider** — for terraform + CDN (gates Wave G)
 
 ## Wave A — Foundations ✅ *(2026-08-06)*
@@ -39,24 +39,31 @@
 - [x] D1-admin · Rename and merge, each requiring **ADMIN on every space the tag appears in** — the namespace is shared, so anything looser would let one space's admin rewrite a label another space depends on. API-only for now; the UI lands with E3's settings screen, which is where it has a designed home
 - [x] D2 · `attachments` Meilisearch index (space_id/page_id/kind filterable); one tenant token now carries the same read filter for **both** indexes — an attachment is exactly as readable as the page it hangs off. Functional Attachments tab, with the guardrailed proxy path saying so rather than silently returning nothing
 
-## Wave E — Administration & auth *(E1–E3 done; E4 needs the IdP call)*
+## Wave E — Administration & auth ✅ *(2026-08-06)*
 
 **Gates answered:** members apply instantly while identity/access stage behind Save; deleting a space is a 30-day soft delete; there is **no Owner tier** — ADMIN is the top, and the settings screen itself is the restricted surface.
 
 - [x] E1 · Space-wide permission-bitmap invalidation. The published event names the **space**, not its pages: a space holds thousands while the realtime tier only cares about the handful currently open, so realtime resolves it against the open document set. Keeps the message size and the work proportional to live sessions, not to the space
 - [x] E2 · Space CRUD + member management (ADMIN-gated): create (creator becomes first admin), update name/description/visibility/baseline, list/invite/change-level/remove members. Visibility and baseline changes trigger E1; a rename does not. Two guards worth keeping: a space can never lose its last admin, and inviting an unknown email explains that SCIM is V2 rather than failing silently
 - [x] E3 · Space-settings screen (frame 12), ADMIN-gated with frame 11's restricted state as the whole-screen answer. Identity and access stage behind Save; member changes apply on click — pretending otherwise would misreport what the server has already done. Space soft-delete lands with it (`space.deleted_at`, 30 days, mirroring page trash): the space leaves every listing and its pages leave both search indexes immediately, while its own pages keep their `deleted_at` untouched so a restore returns exactly what was live. Both space-home buttons are wired
-- [ ] E4 · Config-driven multi-IdP (`?provider=` on `/auth/login`) — or remove the second button
+- [x] E4 · Authentik replaces Keycloak as the single IdP (ADR 0011). `infra/authentik/blueprints/angy.yaml` is the declarative dev config the realm import used to be — provider, application, group and seed users, reapplied on every worker start. The sign-in screen shows one button, because there was only ever one provider behind both
 - [x] E3-follow-up · Create-space dialog (frame 13) with a key derived from the name; tag rename/merge now lives in the settings screen
 
 ## Wave F — Deep editor ✅ *(2026-08-06)*
 
 - [x] F1 · Collaborative title: a `title` Y.Text beside the body in the same Y.Doc; the editor input binds to it through `applyTextDiff` (prefix/suffix matching, so concurrent edits survive); `onStoreDocument` copies it into `page.title`; `PATCH /pages/:id` publishes a `rename` doc command instead of writing the row. Docs predating the field are seeded once from `page.title` on load, and an emptied title never reaches Postgres
 
-## Wave G — Cloud *(last; after A3 + provider gate)*
+## Wave G — Homelab deployment *(reshaped 2026-08-06: homelab + Pangolin, not cloud)*
 
-- [ ] G1 · Terraform: bucket, CDN, DNS
-- [ ] G2 · CloudFront edge-signed cookies for `media-private/*` (ADR 0007), replacing S3 presigning in production config (rotation already covered in runbooks/key-rotation.md)
+The original wave assumed a cloud provider, terraform for bucket/CDN/DNS, and
+CloudFront signed cookies. None of that applies to a self-hosted homelab
+reached through Pangolin tunnels. What the goal actually decomposes into:
+
+- [ ] G1 · Ingress: Pangolin/newt tunnel to the three HTTP tiers, with the realtime WebSocket tier proven to survive it (ADR 0008 needs sticky sessions and long-lived upgrades — the thing most likely to break through a tunnel)
+- [ ] G2 · Public origin config: `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_REALTIME_URL` are baked at image build (see docs/env.md), so the tunnel hostnames must be known before the web image is built
+- [ ] G3 · Private-space media without a CDN: ADR 0007 assumed CloudFront edge-signed cookies. Behind a tunnel the options are S3/MinIO presigning (already implemented) or serving through the app — needs an ADR amendment either way
+- [ ] G4 · Persistence and backup on the homelab: Postgres PITR, MinIO durability, and where the Y.Doc blobs actually live
+- [ ] G5 · Whether terraform earns its place at all here, or whether compose/k8s manifests plus the existing `infra/k8s/rehearse.sh` are the honest tool
 
 ## Accepted deviations (not TODO — recorded so they aren't re-litigated)
 
@@ -67,10 +74,9 @@
 - Tag admin lives in *space* settings even though tags are workspace-wide — it is the only admin surface there is. A workspace-settings screen would be its proper home if one is ever designed.
 - Unused tags are swept by the GC rather than kept: freeform authoring means the vocabulary only grows otherwise, and an orphan name blocks renaming onto it.
 
-**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E1–E3~~ → E4 → G.
+**Critical path:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E~~ → G.
 
-**Nothing unblocked is left.** The two remaining items are both decisions, not
-implementations:
-
-- **E4** — is multi-IdP a real requirement? If yes it is a small config-driven change (`?provider=` on `/auth/login`); if no, the second sign-in button should be deleted rather than left decorative.
-- **Wave G** — which cloud provider? Terraform (bucket/CDN/DNS) and the CloudFront signed-cookie work both hang off that one answer.
+Waves A through F are done. **Wave G is all that remains**, and it is now a
+homelab-and-tunnel problem rather than a cloud one — G1 (does the WebSocket
+tier survive Pangolin) and G3 (private media without a CDN) are the two that
+could force real code changes; the rest is configuration.

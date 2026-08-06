@@ -44,7 +44,7 @@ jobs:
     # The suite needs the whole stack (Postgres, Redis, Meilisearch, MinIO) plus
     # all four apps, so it runs the compose file rather than Actions `services:`
     # — MinIO needs its entrypoint overridden to pre-create the bucket, which a
-    # service container cannot express. Keycloak stays down: e2e plants session
+    # service container cannot express. Authentik stays down: e2e plants session
     # cookies straight into Redis (e2e/global-setup.ts), never touching OIDC.
     steps:
       - uses: actions/checkout@v4

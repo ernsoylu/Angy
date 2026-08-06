@@ -65,25 +65,89 @@ services:
       timeout: 3s
       retries: 10
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.0
-    command: start-dev --import-realm
+  # ---------------------------------------------------------------- Authentik
+  # The workspace identity provider (ADR 0011). Server + worker is Authentik's
+  # required split: the worker applies blueprints and runs background tasks,
+  # the server only serves HTTP.
+  #
+  # It gets its own Postgres — Authentik owns its schema and runs its own
+  # migrations, and sharing a database with Angy's Prisma migrations invites a
+  # collision nobody wants to debug. Redis is shared on a separate DB index:
+  # one fewer container, and `noeviction` suits both.
+  authentik-postgres:
+    image: postgres:17-alpine
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-    ports:
-      - "8080:8080"
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik
+      POSTGRES_DB: authentik
     volumes:
-      - ./keycloak:/opt/keycloak/data/import:ro
+      - authentikdb:/var/lib/postgresql/data
     healthcheck:
-      # The keycloak image ships no curl/wget; bash /dev/tcp probes the port.
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
       interval: 5s
       timeout: 3s
-      retries: 40
+      retries: 10
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2025.8
+    command: server
+    environment: &authentik-env
+      AUTHENTIK_SECRET_KEY: dev-only-secret-key-change-me-in-any-real-deployment
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_REDIS__DB: 1
+      # Local dev is plain http; without this the login cookie is dropped.
+      AUTHENTIK_COOKIE_SECURE: "false"
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    ports:
+      # 9000 is MinIO's and 8080 is a common local collision, so the IdP takes
+      # 9010. OIDC_ISSUER_URL in .env.example matches.
+      - "9010:9000"
+    volumes:
+      - ./authentik/blueprints:/blueprints/custom:ro
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2025.8
+    command: worker
+    environment:
+      <<: *authentik-env
+      # Applied only on the very first start; afterwards the akadmin password
+      # is whatever you set in the UI.
+      AUTHENTIK_BOOTSTRAP_PASSWORD: admin
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@acme.io
+    volumes:
+      - ./authentik/blueprints:/blueprints/custom:ro
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 
 volumes:
   pgdata:
+  authentikdb:
   redisdata:
   meilidata:
   miniodata:

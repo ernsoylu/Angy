@@ -11,7 +11,7 @@
 - Page-level permissions + space baseline + Redis bitmap cache
 - Meilisearch full-text search (tenant-token authz)
 - S3 attachments + Sharp thumbnails + CDN (signed URLs for private spaces)
-- OIDC SSO (Keycloak/Authentik) — login only
+- OIDC SSO (Authentik, ADR 0011) — login only
 - Page revision history (full-state blobs — ADR 0006) with visual diff and non-destructive restore
 - Page move/trash/restore (30-day soft delete)
 - REST API only
