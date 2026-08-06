@@ -7,7 +7,7 @@
 - [x] ~~**Space-settings screen design**~~ — frames 12 (Space Settings) and 13 (Create Space) now exist in frontend.pen, light and dark. Four things in them still need a human's yes/no before E2/E3 can be built: whether the space key is immutable, whether deleting a space is a real soft-delete state, whether an Owner tier above Admin exists, and whether member edits apply instantly while identity/visibility are staged behind Save
 - [x] ~~**Tag semantics**~~ — freeform authoring with admin cleanup, workspace-wide namespace (Wave D shipped on this)
 - [x] ~~**Multi-IdP**~~ — **not a requirement**: one IdP, and it is Authentik (ADR 0011). The second sign-in button is gone rather than wired up
-- [ ] **Cloud provider** — for terraform + CDN (gates Wave G)
+- [x] ~~**Cloud provider**~~ — **moot**: Wave G went to the homelab behind a Pangolin tunnel (ADR 0012), so there is no cloud region, no CDN and no terraform to choose a provider for. Revisit only if a second deployment target appears
 
 ## Wave A — Foundations ✅ *(2026-08-06)*
 
