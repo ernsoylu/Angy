@@ -24,10 +24,12 @@ Exact version pins live in README → Prerequisites and, once scaffolded, in pac
 
 ```bash
 pnpm install                  # install all workspace deps
-pnpm dev                      # start web + api + realtime + worker concurrently
+pnpm dev                      # start web :3000 + api :3001 + realtime :3002 + worker concurrently
 pnpm build                    # build all apps for production
 pnpm test                     # run unit + integration tests (vitest)
-pnpm test:e2e                 # run playwright e2e suite
+pnpm test path/to/file.test.ts       # run a single vitest file (path filters)
+pnpm test:e2e                 # run playwright e2e suite (needs docker stack up)
+pnpm test:e2e -- --grep "<title>"    # run a single playwright test by title
 pnpm lint                     # eslint across all packages
 pnpm typecheck                # tsc --noEmit across all packages
 pnpm db:migrate               # apply pending migrations (prisma)
@@ -36,6 +38,8 @@ pnpm db:seed                  # seed dev spaces/pages/users
 pnpm docker:up                # bring up postgres/redis/meilisearch/minio locally
 pnpm docker:down              # tear down local stack
 ```
+
+First-time setup order: `pnpm install` → `pnpm docker:up` → `cp .env.example .env.local` (fill in values per docs/env.md) → `pnpm db:migrate && pnpm db:seed` → `pnpm dev`.
 
 ## Monorepo Structure
 
@@ -110,7 +114,11 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **Projections can silently go stale** if the worker dies after an S3 write: a reconciliation job compares page.updated_at vs projection timestamps and rebuilds idempotently.
 - **Attachment GC**: after the 30-day trash hard-delete, sweep orphaned S3 objects and thumbnails.
 - **Page move** = closure-table delete+insert in one transaction under a pg advisory lock with a cycle check.
-- **Enforce a single yjs copy** via pnpm overrides — duplicate yjs instances in the workspace break CRDT editing silently.
+- **Enforce a single yjs copy** via pnpm overrides — duplicate yjs instances in the workspace break CRDT editing silently. The CJS/ESM boundary is a second instance vector: apps/api (CommonJS) must never import yjs or construct Y.Docs — convert doc bytes only through @angy/blocks helpers (mixing the two builds makes y-prosemirror throw "Unexpected case").
+- **BullMQ custom job ids must not contain ":"** — it's reserved for key namespacing.
+- **Compaction candidacy compares state vectors, never timestamps** — compaction itself touches page.updated_at, so a timestamp check re-enqueues every page forever.
+- **Crashed browser tabs reap at Hocuspocus's ~30s health timeout** (no WS close frame), so idle-cutoff checkpoints from them arrive late — the Done button's explicit checkpoint is the deterministic save path.
+- **pg_advisory_xact_lock returns void** — cast it (`::text`) under Prisma $queryRaw or deserialization fails.
 
 ## V1 Scope (Ship the Core Editing Experience)
 
@@ -158,8 +166,15 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/schema.md — table inventory (DDL TODO)
 - docs/env.md + .env.example — canonical environment variables
 - docs/roadmap.md — V1/V2/V3 sequencing
+- docs/implementation-plan.md — phased V1 build plan mapping frontend.pen screens to workstreams
 - docs/runbooks/compaction.md — operating the Y.Doc compaction worker
 - docs/runbooks/dev-debugging.md — local debugging recipes
+- docs/runbooks/alerts.md — log-based alert signals ([alert] lines) and responses
+
+## UI Design Source
+
+- frontend.pen — Pencil design file, the source of truth for all V1 screens (reader, editor, search, history & diff, space home, sign-in, share & permissions, attachments, trash, move page, system states) plus design-system frames (foundations, components, responsive, interaction & density), each in light and dark. Build apps/web to match these frames.
+- screenshots/ — PNG renders of every frontend.pen frame (`NN-name-{light,dark}.png`); read these instead of parsing the 2.5MB .pen JSON.
 
 ---
 

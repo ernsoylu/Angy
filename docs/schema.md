@@ -6,6 +6,7 @@
 |-------|---------|-------------|
 | `space` | Top-level container + permission baseline | `id` bigint PK, `key` (short slug), `name`, `visibility` (public/private), `default_perm_level` |
 | `app_user` | Local mirror of OIDC identities (dense bigint ids required by ADR 0004) | `id` bigint PK, `oidc_subject` unique, `email`, `display_name`, `deactivated_at` |
+| `space_member` | Space membership + per-member baseline level (drives the share dialog's member list) | `space_id`, `user_id`, `perm_level`, `added_at`; PK (space_id, user_id) |
 | `page` | The primitive (ADR 0001). One row per page; blocks live in JSONB/Y.Doc | `id` uuid PK, `space_id`, `parent_id`, `title`, `slug`, `ydoc_s3_key`, `ydoc_state_vector` bytea (small), `document_json` jsonb, `rendered_html` text, `text_extract` text, `projection_updated_at`, `created_at`, `updated_at`, `deleted_at` (30-day trash) |
 | `page_ancestor` | Closure table over **pages only** (never blocks) | `ancestor_id`, `descendant_id`, `depth`; PK (ancestor_id, descendant_id) |
 | `page_permission` | Additive page-level grants above the space baseline (never reduce — Notion rule) | `page_id`, `user_id` (or `group_id`, V2), `perm_level`, `granted_by`, `granted_at` |

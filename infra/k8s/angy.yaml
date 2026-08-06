@@ -1,0 +1,150 @@
+# Angy V1 deployment topology. Secrets/config come from the `angy-env` Secret
+# (one key per variable in docs/env.md) — create it out of band.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: angy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: angy
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: angy/web:latest
+          ports: [{ containerPort: 3000 }]
+          envFrom: [{ secretRef: { name: angy-env } }]
+          readinessProbe:
+            httpGet: { path: /signin, port: 3000 }
+            initialDelaySeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: angy
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: api }
+  template:
+    metadata:
+      labels: { app: api }
+    spec:
+      containers:
+        - name: api
+          image: angy/api:latest
+          ports: [{ containerPort: 3001 }]
+          envFrom: [{ secretRef: { name: angy-env } }]
+          readinessProbe:
+            httpGet: { path: /health, port: 3001 }
+            initialDelaySeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime
+  namespace: angy
+spec:
+  # ADR 0008: a single realtime replica in V1 — one Y.Doc must live in exactly
+  # one process. Do NOT scale this out without the Hocuspocus Redis extension;
+  # the ingress below pins sticky sessions for the same reason.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: realtime }
+  template:
+    metadata:
+      labels: { app: realtime }
+    spec:
+      containers:
+        - name: realtime
+          image: angy/realtime:latest
+          ports: [{ containerPort: 3002 }]
+          envFrom: [{ secretRef: { name: angy-env } }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: angy
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: worker }
+  template:
+    metadata:
+      labels: { app: worker }
+    spec:
+      containers:
+        - name: worker
+          image: angy/worker:latest
+          envFrom: [{ secretRef: { name: angy-env } }]
+          resources:
+            # Compaction can transiently need ~75× doc size (runbook) — give
+            # the worker real headroom and keep its concurrency bounded.
+            requests: { memory: 512Mi }
+            limits: { memory: 2Gi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: web, namespace: angy }
+spec:
+  selector: { app: web }
+  ports: [{ port: 80, targetPort: 3000 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: api, namespace: angy }
+spec:
+  selector: { app: api }
+  ports: [{ port: 80, targetPort: 3001 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: realtime, namespace: angy }
+spec:
+  selector: { app: realtime }
+  ports: [{ port: 80, targetPort: 3002 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: angy
+  namespace: angy
+  annotations:
+    # Sticky sessions for the realtime WebSocket tier (ADR 0008).
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "angy-rt"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  rules:
+    - host: angy.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: web, port: { number: 80 } } }
+    - host: api.angy.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: api, port: { number: 80 } } }
+    - host: rt.angy.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: realtime, port: { number: 80 } } }
