@@ -23,6 +23,7 @@ import {
   type SpaceVisibility,
 } from "@angy/db";
 import {
+  JOB_ATTACHMENT_REINDEX,
   JOB_THUMBNAIL,
   ok,
   QUEUE_MAINTENANCE,
@@ -122,6 +123,9 @@ export class AttachmentsController {
     if (file.mimetype.startsWith("image/")) {
       await maintenanceQueue().add(JOB_THUMBNAIL, { attachmentId: attachment.id.toString() });
     }
+    await maintenanceQueue().add(JOB_ATTACHMENT_REINDEX, {
+      attachmentId: attachment.id.toString(),
+    });
     return ok(
       await toDto(attachment, page.space.visibility, req.user.displayName, [
         { id: page.id, title: page.title },
@@ -199,6 +203,10 @@ export class AttachmentsController {
     await prisma.attachment.update({
       where: { id: attachment.id },
       data: { deletedAt: new Date() },
+    });
+    // Soft-deleted files must leave search immediately, not at the 30-day sweep.
+    await maintenanceQueue().add(JOB_ATTACHMENT_REINDEX, {
+      attachmentId: attachment.id.toString(),
     });
     return ok({ deleted: true });
   }

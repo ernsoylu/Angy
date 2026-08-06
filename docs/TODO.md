@@ -1,11 +1,11 @@
 # TODO — Remaining Work Tracker
 
-> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus three burn-down waves shipped as of 2026-08-06 — 58 unit/integration + 18 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
+> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–D and F shipped as of 2026-08-06 — 79 unit/integration + 25 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
 
 ## Decision gates (answer before the dependent wave starts)
 
-- [ ] **Space-settings screen design** — no frame exists in frontend.pen (gates Wave E)
-- [ ] **Tag semantics** — freeform vs curated vocabulary (gates Wave D)
+- [x] ~~**Space-settings screen design**~~ — frames 12 (Space Settings) and 13 (Create Space) now exist in frontend.pen, light and dark. Four things in them still need a human's yes/no before E2/E3 can be built: whether the space key is immutable, whether deleting a space is a real soft-delete state, whether an Owner tier above Admin exists, and whether member edits apply instantly while identity/visibility are staged behind Save
+- [x] ~~**Tag semantics**~~ — freeform authoring with admin cleanup, workspace-wide namespace (Wave D shipped on this)
 - [ ] **Multi-IdP** — real requirement, or remove the decorative Authentik button? (gates E4)
 - [ ] **Cloud provider** — for terraform + CDN (gates Wave G)
 
@@ -31,10 +31,13 @@
 - [x] C2 · Recent + Starred as space-scoped routes off the sidebar's existing nav rows, sharing one list component with the design-system empty state
 - [x] C3 · Mobile "Me" tab: profile, both lists, sign-out — frame E's tab bar is now fully wired
 
-## Wave D — Search surfaces *(after tag-semantics gate; D1/D2 adjacent — both edit tenant-token searchRules)*
+## Wave D — Search surfaces ✅ *(2026-08-06)*
 
-- [ ] D1 · Tags: `tag` + `page_tag` migration → EDIT-gated assignment UI (reader byline chips, frame 1) → `tags` index field → Tags facet (frame 3)
-- [ ] D2 · Attachment search: `attachments` Meilisearch index (space_id/page_id filterable) → token searchRules across both indexes → functional Attachments tab (frame 3)
+**Gate answered:** tags are **freeform with admin cleanup**, in a **workspace-wide** namespace.
+
+- [x] D1 · `tag` + `page_tag`; names normalised on write (`normalizeTag` in shared — case-folded, hyphenated, unicode-preserving, filter-literal-safe) so near-misses collapse instead of accumulating. EDIT-gated chips on the reader byline with typeahead; `tags` indexed as searchable *and* facetable; Tags facet in the rail (frame 3 order: Spaces → Updated → Tags)
+- [x] D1-admin · Rename and merge, each requiring **ADMIN on every space the tag appears in** — the namespace is shared, so anything looser would let one space's admin rewrite a label another space depends on. API-only for now; the UI lands with E3's settings screen, which is where it has a designed home
+- [x] D2 · `attachments` Meilisearch index (space_id/page_id/kind filterable); one tenant token now carries the same read filter for **both** indexes — an attachment is exactly as readable as the page it hangs off. Functional Attachments tab, with the guardrailed proxy path saying so rather than silently returning nothing
 
 ## Wave E — Administration & auth *(after settings-design + IdP gates)*
 
@@ -59,4 +62,4 @@
 - The pruned runtime tree keeps `typescript` and the full `@prisma/client` engine set (~97 MB of the 602 MB). Both arrive as optional peers of production dependencies; trimming them means pruning inside the store, which is more fragile than the size is worth.
 - Recent and Starred are **space-scoped routes**, not expanding sidebar trays. No frame specifies either surface; routing matches the sibling rows in the same nav group (Home, Attachments, Trash) and gives the Me tab something to link to.
 
-**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → D → E → G, with ~~A2 → A3~~ done alongside. Everything not behind a gate is now done: **Wave D** needs the tag-semantics answer, **Wave E** the space-settings design and the IdP decision, **Wave G** the cloud provider. Nothing else is unblocked.
+**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → E → G, with ~~A2 → A3~~ done alongside. **Wave E** is next: E1 (space-wide bitmap invalidation) needs no design and can start now; E2/E3 need the four frame-12 decisions answered, and E4 needs the multi-IdP call. **Wave G** still waits on the cloud provider.

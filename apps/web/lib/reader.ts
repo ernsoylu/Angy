@@ -23,6 +23,10 @@ export interface ReaderPage {
   contributors: number;
   /** Whether the caller has starred this page (Wave C). */
   starred: boolean;
+  /** Workspace-wide tag names, in the order they were added (Wave D). */
+  tags: string[];
+  /** The caller's effective level — the reader shows EDIT-gated affordances. */
+  level: PermLevelDto | null;
   updatedAt: string;
 }
 
@@ -42,7 +46,7 @@ export async function getReaderPage(
   const level = await getEffectivePageLevel(prisma, userId, pageId);
   if (!satisfies(level, required)) return "forbidden";
 
-  const [breadcrumb, latestRevision, contributors, editor, starred] = await Promise.all([
+  const [breadcrumb, latestRevision, contributors, editor, starred, tags] = await Promise.all([
     getBreadcrumb(prisma, page.id),
     prisma.pageRevision.findFirst({ where: { pageId: page.id }, orderBy: { version: "desc" } }),
     prisma.pageRevision.findMany({
@@ -52,6 +56,11 @@ export async function getReaderPage(
     }),
     prisma.appUser.findUnique({ where: { id: page.updatedBy ?? page.createdBy } }),
     isPageStarred(prisma, userId, pageId),
+    prisma.pageTag.findMany({
+      where: { pageId },
+      select: { tag: { select: { name: true } } },
+      orderBy: { addedAt: "asc" },
+    }),
   ]);
 
   return {
@@ -63,6 +72,8 @@ export async function getReaderPage(
     updatedByName: editor?.displayName ?? null,
     contributors: Math.max(contributors.length, 1),
     starred,
+    tags: tags.map((row) => row.tag.name),
+    level,
     updatedAt: page.updatedAt.toISOString(),
   };
 }

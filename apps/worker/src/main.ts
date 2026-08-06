@@ -1,20 +1,24 @@
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import {
+  JOB_ATTACHMENT_REINDEX,
   JOB_COMPACT_PAGE,
   JOB_GC_PAGE,
   JOB_MEDIA_REEMIT,
   JOB_PROJECTION_INIT,
   JOB_PROJECTION_REBUILD,
   JOB_REVISION_CHECKPOINT,
+  JOB_SEARCH_REINDEX,
   JOB_THUMBNAIL,
   QUEUE_MAINTENANCE,
   QUEUE_PROJECTIONS,
+  type AttachmentReindexJobData,
   type CompactPageJobData,
   type GcPageJobData,
   type MediaReemitJobData,
   type ProjectionJobData,
   type RevisionCheckpointJobData,
+  type SearchReindexJobData,
   type ThumbnailJobData,
 } from "@angy/shared";
 import { env } from "./env.js";
@@ -65,6 +69,11 @@ const worker = new Worker<ProjectionJobData | Record<string, never>>(
       await initYdoc((job.data as ProjectionJobData).pageId);
     } else if (job.name === JOB_PROJECTION_REBUILD) {
       await rebuildProjection((job.data as ProjectionJobData).pageId);
+    } else if (job.name === JOB_SEARCH_REINDEX) {
+      // Tag edits change what search knows, not what the page says — no need
+      // to re-render the Y.Doc.
+      const { indexPage } = await import("./search.js");
+      await indexPage((job.data as SearchReindexJobData).pageId);
     } else if (job.name === RECONCILE_JOB) {
       const stale = await findStalePageIds();
       if (stale.length > 0) {
@@ -85,10 +94,15 @@ const worker = new Worker<ProjectionJobData | Record<string, never>>(
 
 worker.on("ready", async () => {
   console.log("[worker] projections queue ready");
-  const { ensureSearchIndex, indexAllPages } = await import("./search.js");
+  const { ensureAttachmentIndex, ensureSearchIndex, indexAllAttachments, indexAllPages } =
+    await import("./search.js");
   await ensureSearchIndex();
+  await ensureAttachmentIndex();
   const indexed = await indexAllPages();
-  console.log(`[worker] search index ready (${indexed} pages backfilled)`);
+  const attachments = await indexAllAttachments();
+  console.log(
+    `[worker] search indexes ready (${indexed} page(s), ${attachments} attachment(s) backfilled)`,
+  );
   const { ensurePublicMediaPolicy } = await import("./thumbnails.js");
   await ensurePublicMediaPolicy();
   console.log("[worker] public media bucket policy ensured");
@@ -115,7 +129,10 @@ worker.on("failed", (job, err) => {
 const maintenanceWorker = new Worker(
   QUEUE_MAINTENANCE,
   async (job) => {
-    if (job.name === JOB_REVISION_CHECKPOINT) {
+    if (job.name === JOB_ATTACHMENT_REINDEX) {
+      const { indexAttachment } = await import("./search.js");
+      await indexAttachment(BigInt((job.data as AttachmentReindexJobData).attachmentId));
+    } else if (job.name === JOB_REVISION_CHECKPOINT) {
       const data = job.data as RevisionCheckpointJobData;
       let author = data.createdBy ? BigInt(data.createdBy) : null;
       if (author === null) {

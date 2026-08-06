@@ -8,6 +8,7 @@ import { PageOpsController } from "./pages/page-ops.controller";
 import { PagePermissionsController } from "./pages/page-permissions.controller";
 import { PagesController } from "./pages/pages.controller";
 import { PersonalController } from "./pages/personal.controller";
+import { TagsController } from "./pages/tags.controller";
 import { RevisionsController } from "./pages/revisions.controller";
 import { PagePermissionGuard } from "./permissions/page-permission.guard";
 import { SearchController } from "./search/search.controller";
@@ -25,6 +26,7 @@ import { SpacesController } from "./spaces/spaces.controller";
     AttachmentsController,
     PageOpsController,
     PersonalController,
+    TagsController,
   ],
   providers: [OidcService, SessionGuard, PagePermissionGuard],
 })

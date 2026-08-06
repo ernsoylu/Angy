@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TAG_MAX_LENGTH } from "./tags.js";
 
 /** Permission levels — dense bigint user ids index the Redis bitmaps (ADR 0004). */
 export const permLevelSchema = z.enum(["VIEW", "EDIT", "FULL", "ADMIN"]);
@@ -54,6 +55,31 @@ export const pageDetailSchema = z.object({
   updatedAt: z.iso.datetime(),
 });
 export type PageDetailDto = z.infer<typeof pageDetailSchema>;
+
+/** A tag as the UI sees it: canonical name plus how widely it is used. */
+export const tagSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  pageCount: z.number().int(),
+});
+export type TagDto = z.infer<typeof tagSchema>;
+
+/** Replace a page's tags wholesale — names are normalised server-side. */
+export const setPageTagsSchema = z.object({
+  tags: z.array(z.string().min(1).max(80)).max(25),
+});
+export type SetPageTagsDto = z.infer<typeof setPageTagsSchema>;
+
+export const renameTagSchema = z.object({
+  name: z.string().min(1).max(80),
+});
+export type RenameTagDto = z.infer<typeof renameTagSchema>;
+
+export const mergeTagSchema = z.object({
+  /** The tag this one is folded into; the source tag is deleted. */
+  intoId: z.string().regex(/^\d+$/, "intoId is a numeric string"),
+});
+export type MergeTagDto = z.infer<typeof mergeTagSchema>;
 
 /** A row in the sidebar's Recent or Starred list — per-user, space-scoped. */
 export const pageListItemSchema = z.object({
@@ -189,6 +215,7 @@ export const searchQuerySchema = z.object({
   q: z.string().max(200),
   spaceIds: z.array(z.string().regex(/^\d+$/)).max(50).optional(),
   updatedAfter: z.number().int().optional(),
+  tags: z.array(z.string().max(TAG_MAX_LENGTH)).max(10).optional(),
 });
 export type SearchQueryDto = z.infer<typeof searchQuerySchema>;
 

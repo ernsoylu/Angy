@@ -104,6 +104,7 @@ model Page {
   attachments Attachment[]
   visits      PageVisit[]
   stars       PageStar[]
+  tags        PageTag[]
 
   @@unique([spaceId, slug])
   @@index([spaceId])
@@ -126,6 +127,35 @@ model PageVisit {
   @@id([userId, pageId])
   @@index([userId, visitedAt(sort: Desc)])
   @@map("page_visit")
+}
+
+/// Freeform labels, workspace-wide: the name is the identity and is shared
+/// across every space. Names are normalised before they get here
+/// (`normalizeTag` in @angy/shared), so the unique index is the real
+/// deduplication — admins rename and merge whatever still drifts.
+model Tag {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @unique
+  createdBy BigInt   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  pages PageTag[]
+
+  @@map("tag")
+}
+
+model PageTag {
+  pageId  String   @map("page_id") @db.Uuid
+  tagId   BigInt   @map("tag_id")
+  addedBy BigInt   @map("added_by")
+  addedAt DateTime @default(now()) @map("added_at")
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, tagId])
+  @@index([tagId])
+  @@map("page_tag")
 }
 
 /// Per-user bookmarks behind the sidebar's Starred list.

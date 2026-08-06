@@ -29,6 +29,24 @@ export interface CompactPageJobData {
   pageId: string;
 }
 
+/**
+ * Re-index one page without rebuilding its projections. Tag edits change what
+ * search knows about a page but nothing about its content, so the expensive
+ * Y.Doc → HTML pass would be pure waste.
+ */
+export const JOB_SEARCH_REINDEX = "search-reindex";
+
+export interface SearchReindexJobData {
+  pageId: string;
+}
+
+/** Re-index one attachment after an upload or delete. */
+export const JOB_ATTACHMENT_REINDEX = "attachment-reindex";
+
+export interface AttachmentReindexJobData {
+  attachmentId: string;
+}
+
 export const JOB_THUMBNAIL = "thumbnail";
 
 export interface ThumbnailJobData {

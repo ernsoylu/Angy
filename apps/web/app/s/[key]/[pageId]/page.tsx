@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { FileClock, Globe, Pencil, ShieldCheck, Users } from "lucide-react";
 import { Avatar } from "../../../../components/ui/Avatar";
 import { Button } from "../../../../components/ui/Button";
+import { satisfies } from "@angy/shared";
 import { PageActions } from "../../../../components/pageops/PageActions";
+import { PageTags } from "../../../../components/reader/PageTags";
 import { StarButton } from "../../../../components/reader/StarButton";
 import { Toc } from "../../../../components/reader/Toc";
 import { RestrictedState } from "../../../../components/ui/SystemState";
@@ -57,6 +59,12 @@ export default async function ReaderPage({
             {timeAgo(page.updatedAt)}
             {page.version !== null && ` · v${page.version}`}
           </span>
+          <PageTags
+            pageId={pageId}
+            spaceKey={key}
+            initial={page.tags}
+            canEdit={satisfies(page.level, "EDIT")}
+          />
         </div>
         <hr className={styles.divider} />
         <div className="article-prose" dangerouslySetInnerHTML={{ __html: html }} />

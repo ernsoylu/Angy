@@ -110,3 +110,8 @@
   border-color: var(--accent);
   color: var(--on-accent);
 }
+
+/* Divider between the page hits and the attachment hits on the All tab. */
+.sectionCaption {
+  margin: 14px 0 2px;
+}

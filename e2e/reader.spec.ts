@@ -21,7 +21,8 @@ test.describe("reader SSR + edit-on-click", () => {
     await expect(page.locator('a[href="#the-ydoc-lifecycle"]')).toBeVisible();
 
     // Edit-on-click: the editor exists only behind the explicit Edit action.
-    await page.getByRole("button", { name: "Edit" }).click();
+    // exact: the byline's "Edit tags" button also matches a loose "Edit".
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/s/eng/${pageId}/edit$`));
     await expect(page.locator(".tiptap[contenteditable]")).toBeVisible();
     await expect(page.getByText("Live editing", { exact: false })).toBeVisible();

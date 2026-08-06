@@ -52,7 +52,14 @@ export const getStarredPages = (spaceId: string) =>
   apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/starred`);
 export const getSearchToken = () =>
   apiFetch<
-    | { mode: "direct"; token: string; host: string; indexUid: string; expiresAt: string }
+    | {
+        mode: "direct";
+        token: string;
+        host: string;
+        indexUid: string;
+        attachmentIndexUid: string;
+        expiresAt: string;
+      }
     | { mode: "proxy" }
   >("/search/token");
 export const getRevisionContent = (id: string, version: number) =>

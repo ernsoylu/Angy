@@ -2,13 +2,20 @@ import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import { MeiliSearch } from "meilisearch";
 import { generateTenantToken } from "meilisearch/token";
 import { getPrisma } from "@angy/db";
-import { ok, searchQuerySchema, type ApiOk, type SearchQueryDto } from "@angy/shared";
+import {
+  normalizeTags,
+  ok,
+  searchQuerySchema,
+  type ApiOk,
+  type SearchQueryDto,
+} from "@angy/shared";
 import { env } from "../env";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
 import { ZodValidationPipe } from "../zod.pipe";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000;
 const SEARCH_INDEX = "pages";
+const ATTACHMENT_INDEX = "attachments";
 
 /**
  * ADR 0009 guardrail: past this many explicit page grants, the filter is too
@@ -76,7 +83,14 @@ export class SearchController {
   @Get("token")
   async token(@Req() req: AuthedRequest): Promise<
     ApiOk<
-      | { mode: "direct"; token: string; host: string; indexUid: string; expiresAt: string }
+      | {
+          mode: "direct";
+          token: string;
+          host: string;
+          indexUid: string;
+          attachmentIndexUid: string;
+          expiresAt: string;
+        }
       | { mode: "proxy" }
     >
   > {
@@ -88,7 +102,12 @@ export class SearchController {
     const token = await generateTenantToken({
       apiKey: key.key,
       apiKeyUid: key.uid,
-      searchRules: { [SEARCH_INDEX]: { filter } },
+      // Both indexes carry space_id/page_id, so one read filter covers both —
+      // an attachment is exactly as readable as the page it hangs off.
+      searchRules: {
+        [SEARCH_INDEX]: { filter },
+        [ATTACHMENT_INDEX]: { filter },
+      },
       expiresAt,
     });
     return ok({
@@ -96,6 +115,7 @@ export class SearchController {
       token,
       host: env.meilisearch.url,
       indexUid: SEARCH_INDEX,
+      attachmentIndexUid: ATTACHMENT_INDEX,
       expiresAt: expiresAt.toISOString(),
     });
   }
@@ -112,6 +132,8 @@ export class SearchController {
       extra.push(`space_id IN [${body.spaceIds.map((id) => `"${id}"`).join(", ")}]`);
     }
     if (body.updatedAfter) extra.push(`updated_at >= ${body.updatedAfter}`);
+    // Normalised on write, so no quote/bracket characters can reach the filter.
+    for (const tag of normalizeTags(body.tags ?? [])) extra.push(`tags = "${tag}"`);
 
     const result = await masterClient()
       .index(SEARCH_INDEX)
@@ -119,7 +141,7 @@ export class SearchController {
         limit: 20,
         // The read-set filter is non-negotiable; UI facets AND on top of it.
         filter: [`(${filter})`, ...extra],
-        facets: ["space_id"],
+        facets: ["space_id", "tags"],
         attributesToHighlight: ["title", "text"],
         highlightPreTag: "__HL__",
         highlightPostTag: "__/HL__",

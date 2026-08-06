@@ -45,9 +45,11 @@ export async function rebuildProjection(pageId: string): Promise<void> {
   const prisma = getPrisma();
   const page = await prisma.page.findUnique({ where: { id: pageId } });
   if (!page || page.deletedAt) {
-    // Trashed or gone — search must not keep serving it.
-    const { removeFromIndex } = await import("./search.js");
+    // Trashed or gone — search must not keep serving it, and its attachments
+    // lose the space_id the read filter scopes them by.
+    const { indexAttachmentsForPage, removeFromIndex } = await import("./search.js");
     await removeFromIndex(pageId);
+    await indexAttachmentsForPage(pageId);
     return;
   }
 
@@ -73,9 +75,11 @@ export async function rebuildProjection(pageId: string): Promise<void> {
       projectionUpdatedAt: new Date(),
     },
   });
-  // Keep search in lockstep with projections (ADR 0009).
-  const { indexPage } = await import("./search.js");
+  // Keep search in lockstep with projections (ADR 0009). Attachments ride
+  // along: a move changes their space, a restore brings them back.
+  const { indexAttachmentsForPage, indexPage } = await import("./search.js");
   await indexPage(pageId);
+  await indexAttachmentsForPage(pageId);
 }
 
 /**

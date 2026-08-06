@@ -14,6 +14,8 @@
 | `attachment` | Uploaded media; content-addressed objects | `id` bigint PK, `page_id`, `sha256`, `mime_type`, `size_bytes`, `s3_key`, `thumbnail_s3_key`, `uploaded_by`, `created_at`, `deleted_at` |
 | `page_visit` | Per-user reading history behind the sidebar's Recent list. Written from the reader render through a throttled conditional upsert (`prisma/sql/recordPageVisit.sql`), so reloads and prefetches don't each cost a write | `user_id`, `page_id`, `visited_at`, `visits`; PK (user_id, page_id) |
 | `page_star` | Per-user bookmarks behind the sidebar's Starred list | `user_id`, `page_id`, `starred_at`; PK (user_id, page_id) |
+| `tag` | Freeform labels, **workspace-wide**: the name is the identity across every space. Normalised on write (`normalizeTag` in @angy/shared), so the unique index is the real deduplication; admins rename/merge what still drifts | `id` bigint PK, `name` unique, `created_by`, `created_at` |
+| `page_tag` | Tag assignment. Written by anyone with EDIT on the page | `page_id`, `tag_id`, `added_by`, `added_at`; PK (page_id, tag_id), index on tag_id |
 
 Deferred to V2: `block_index` (projection of actionable blocks — tasks, mentions, macros, embeds — worker-UPSERTed; not a Postgres MATERIALIZED VIEW), group/team principals for permissions.
 

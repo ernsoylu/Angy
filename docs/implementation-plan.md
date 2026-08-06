@@ -2,11 +2,11 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (73 unit/integration tests, 21 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–C and F (see § Open gaps for what was closed and what remains).
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (79 unit/integration tests, 25 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–D and F (see § Open gaps for what was closed and what remains).
 
 ## Design inputs
 
-`frontend.pen` contains 11 product screens and 5 design-system frames, each in light and dark (theme axis `mode: light|dark`):
+`frontend.pen` contains 13 product screens and 5 design-system frames, each in light and dark (theme axis `mode: light|dark`). Frames 12–13 were added after V1 to unblock Wave E:
 
 | Frame | Screen | Built in phase |
 |---|---|---|
@@ -21,6 +21,8 @@
 | 9 | Trash & Restore | 9 |
 | 10 | Move Page | 9 |
 | 11 | System States (loading/empty/restricted/error) | 1 |
+| 12 | Space Settings (identity, visibility, members, danger zone) | E *(added 2026-08-06)* |
+| 13 | Create Space dialog | E *(added 2026-08-06)* |
 | A–E | Foundations, Components ×2, Interaction & Density, Responsive | 1 |
 
 Design tokens: 31 variables in the .pen file — warm neutral surfaces (`bg/surface/sidebar/elevated`), border pair, 3-step text scale, blue `accent` triple (+hover, +on-accent), four pastel semantic hues (`sage/clay/amber/lilac`, each with `-soft`), focus ring, disabled triple, and fonts `Inter` (UI) / `Source Serif 4` (body) / `JetBrains Mono` (code). These become the single CSS custom-property theme in Phase 1.
@@ -127,9 +129,9 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 ### Design-frame features not built
 
 - ~~**Cross-space move**~~ — **done (2026-08-06)**: `movePage` carries the subtree's `space_id` under dual advisory locks with slug de-duplication; the dialog lists every space; moving requires EDIT in the destination space.
-- **Tags** — no tag model; frames 1 (byline chips) and 3 (search facet) both show them.
+- ~~**Tags**~~ — **done (2026-08-06)**: workspace-wide `tag` + `page_tag`, freeform to write and normalised on the way in, with ADMIN-gated rename/merge as the cleanup half. Byline chips (frame 1), a searchable+facetable `tags` index field, and the Tags facet (frame 3).
 - ~~**Recent / Starred**~~ — **done (2026-08-06)**: `page_visit` + `page_star`, a throttled conditional upsert written straight from the reader's RSC render, a star toggle in the page-info rail, and space-scoped list routes behind the sidebar's two nav rows.
-- **Search over attachments** — frame 3's Attachments tab is decorative; only pages are indexed (Phase 7 text also promised attachment metadata).
+- ~~**Search over attachments**~~ — **done (2026-08-06)**: an `attachments` index carrying space_id/page_id, so one tenant token's read filter covers both indexes; the Attachments tab is a real filter.
 - **Space administration** — no create-space flow or member management; space-home "New page" header button and "Space settings" are unwired.
 - ~~**Editor block affordances**~~ — **done (2026-08-06)**: bubble-menu link editor, a table-structure toolbar shown while the caret is in a table, and the `⠿`/`+` gutter (`@tiptap/extension-drag-handle-react`, with `+` opening the same `SLASH_ITEMS` palette).
 - **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash".
@@ -165,7 +167,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~Runtime images carry the whole workspace~~ — **done (2026-08-06)**: `infra/docker/prune.sh` deploys each app prod-only and regenerates the Prisma client in the pruned tree; ~1.5 GB → 578–602 MB (web 509 MB via Next standalone).
 - ~~No clean-deploy rehearsal~~ — **done (2026-08-06)**: `infra/k8s/rehearse.sh` stands `angy.yaml` up on a throwaway kind cluster with a real `angy-env` Secret and smoke-tests all four workloads plus the SSR read path. It caught two real deploy bugs on the first run: `angy.yaml` had no `imagePullPolicy`, so `:latest` defaulted to `Always` and every pod hit `ErrImagePull`; and `NEXT_PUBLIC_*` are inlined by Next at build time, so the Secret's copies never reached the browser — they are build args on `Dockerfile.web` now.
 
-The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–C and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); and the collaborative title. Everything still open is either behind a decision gate (tags, attachment search, space administration, the cloud provider) or a small standalone item (dialog search fields, revoked-editor state, TOC scroll-spy, search-token guardrail).
+The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–D and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); the collaborative title, and the search surfaces (tags, attachment search). What is left is space administration — now designed, but holding four open questions on frames 12–13 — the multi-IdP call, cloud ops, and a few small standalone items (dialog search fields, revoked-editor state, TOC scroll-spy, search-token guardrail).
 
 ## V2 sequencing (dependency-ordered, planned 2026-08-06)
 
