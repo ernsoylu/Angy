@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FilePlus2, X } from "lucide-react";
 import type { TreeNode } from "../../lib/tree";
+import { useEscape } from "../../lib/useEscape";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Select } from "../ui/Select";
@@ -29,6 +30,7 @@ export function NewPageDialog({
   const [parentId, setParentId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEscape(onClose);
 
   // Flatten the tree for the parent picker, depth-indented.
   const options: { id: string; label: string }[] = [];

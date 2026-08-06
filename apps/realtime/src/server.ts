@@ -6,6 +6,7 @@ import { applyDocJson, createYdocFromJson, ydocToJson, type JSONContent } from "
 import { getEffectivePageLevel, getPrisma } from "@angy/db";
 import {
   DOC_COMMAND_CHANNEL,
+  JOB_COMPACT_PAGE,
   JOB_PROJECTION_REBUILD,
   JOB_REVISION_CHECKPOINT,
   QUEUE_MAINTENANCE,
@@ -28,6 +29,11 @@ interface ConnectionContext {
 
 /** Y.Doc hot cache TTL — the doc lives in Redis while it is being edited. */
 const HOT_TTL_SECONDS = 30 * 60;
+
+/** Size-triggered compaction (runbook): enqueue as soon as a blob crosses this. */
+const COMPACTION_SIZE_THRESHOLD_BYTES = Number(
+  process.env.COMPACTION_SIZE_THRESHOLD_BYTES ?? 2 * 1024 * 1024,
+);
 const hotKey = (pageId: string) => `ydoc:hot:${pageId}`;
 const ydocS3Key = (pageId: string) => `ydoc/${pageId}`;
 
@@ -248,6 +254,29 @@ export function buildServer(port = env.port): Server {
       });
       // Live-by-default (ADR 0010): readers see this once the projection rebuilds.
       await projections.add(JOB_PROJECTION_REBUILD, { pageId: documentName });
+      // Size-triggered compaction (runbook) — deduped while one is pending.
+      if (update.byteLength > COMPACTION_SIZE_THRESHOLD_BYTES) {
+        await maintenance.add(
+          JOB_COMPACT_PAGE,
+          { pageId: documentName },
+          { jobId: `compact-size-${documentName}`, removeOnComplete: true, removeOnFail: true },
+        );
+      }
+    },
+
+    /** Health endpoint for the WS tier (alerts runbook TODO closed). */
+    async onRequest({ request, response }) {
+      if (request.url === "/health") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            success: true,
+            data: { status: "ok", service: "realtime", time: new Date().toISOString() },
+          }),
+        );
+        // Rejecting stops the default handler from also answering.
+        return Promise.reject(null);
+      }
     },
 
     async onDisconnect({ documentName, clientsCount }) {

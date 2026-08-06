@@ -46,7 +46,10 @@ export const getSpaceAttachments = (spaceId: string) =>
 export const getSpaceTrash = (spaceId: string) =>
   apiFetch<TrashItemDto[]>(`/spaces/${spaceId}/trash`);
 export const getSearchToken = () =>
-  apiFetch<{ token: string; host: string; indexUid: string; expiresAt: string }>("/search/token");
+  apiFetch<
+    | { mode: "direct"; token: string; host: string; indexUid: string; expiresAt: string }
+    | { mode: "proxy" }
+  >("/search/token");
 export const getRevisionContent = (id: string, version: number) =>
   apiFetch<{ version: number; documentJson: JSONContent }>(`/pages/${id}/revisions/${version}`);
 

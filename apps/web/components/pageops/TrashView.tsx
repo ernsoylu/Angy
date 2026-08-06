@@ -26,6 +26,7 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
+  const [query, setQuery] = useState("");
 
   async function act(path: string, removeId: string) {
     setBusy(true);
@@ -79,6 +80,12 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
             children and its place in the tree
           </p>
         </div>
+        <input
+          className={styles.search}
+          placeholder="Search trash"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <Button
           variant="danger"
           icon={<Trash2 size={14} />}
@@ -110,7 +117,9 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
             <span>Deleted in</span>
             <span>Actions</span>
           </div>
-          {items.map((item, index) => {
+          {items
+            .filter((i) => !query.trim() || i.title.toLowerCase().includes(query.trim().toLowerCase()))
+            .map((item, index) => {
             const days = daysLeft(item.hardDeleteAt);
             return (
               <div key={item.id} className={styles.row}>
@@ -153,7 +162,7 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
                 </span>
               </div>
             );
-          })}
+            })}
         </div>
       )}
     </div>

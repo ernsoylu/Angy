@@ -383,3 +383,21 @@
     padding: 16px;
   }
 }
+
+/* Frame D: first tab stop, visually hidden until focused */
+.skipLink {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  z-index: 100;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--r-btn);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.skipLink:focus {
+  top: 10px;
+}

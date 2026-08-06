@@ -31,3 +31,14 @@
   border-top: 1px solid var(--border-soft);
   margin: 18px 0 24px;
 }
+
+.mobileEdit {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .mobileEdit {
+    display: block;
+    margin-top: 24px;
+  }
+}

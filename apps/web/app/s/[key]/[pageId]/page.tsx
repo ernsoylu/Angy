@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileClock, Globe, ShieldCheck, Users } from "lucide-react";
+import { FileClock, Globe, Pencil, ShieldCheck, Users } from "lucide-react";
 import { Avatar } from "../../../../components/ui/Avatar";
 import { Button } from "../../../../components/ui/Button";
 import { PageActions } from "../../../../components/pageops/PageActions";
+import { Toc } from "../../../../components/reader/Toc";
 import { RestrictedState } from "../../../../components/ui/SystemState";
 import { getMe } from "../../../../lib/api";
 import { getReaderPage } from "../../../../lib/reader";
@@ -55,24 +56,19 @@ export default async function ReaderPage({
         </div>
         <hr className={styles.divider} />
         <div className="article-prose" dangerouslySetInnerHTML={{ __html: html }} />
+        {/* Frame E mobile: full-width edit affordance replaces the hidden top-bar button. */}
+        <Link href={`/s/${key}/${pageId}/edit`} className={styles.mobileEdit}>
+          <Button icon={<Pencil size={15} />} style={{ width: "100%" }}>
+            Edit this page
+          </Button>
+        </Link>
       </article>
 
       <aside className={shell.rail}>
         {toc.length > 0 && (
           <div className={shell.railGroup}>
             <div className="t-caption">On this page</div>
-            <div>
-              {toc.map((item, i) => (
-                <a
-                  key={item.id}
-                  href={`#${item.id}`}
-                  className={`${shell.tocItem} ${i === 0 ? shell.tocItemActive : ""}`}
-                  style={{ display: "block" }}
-                >
-                  {item.text}
-                </a>
-              ))}
-            </div>
+            <Toc items={toc} />
           </div>
         )}
         <div className={shell.railGroup}>

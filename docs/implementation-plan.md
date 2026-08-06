@@ -2,7 +2,7 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (53 unit/integration tests, 12 Playwright e2e tests, all builds green), plus a post-V1 punch list: editor image embedding with the serve-time media route, page rename, sign-out, slash-command menu, New-page dialog, and production Dockerfiles. Remaining work is tracked in **§ Open gaps** at the end of this document.
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (58 unit/integration tests, 13 Playwright e2e tests, all builds green), plus the post-V1 punch list and two burn-down waves (see § Open gaps for what was closed and what remains).
 
 ## Design inputs
 
@@ -144,7 +144,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 ### ADR / runbook obligations
 
-- Revision retention/thinning (ADR 0006 operational TODO) — revisions accumulate forever.
+- ~~Revision retention/thinning~~ — **done (2026-08-06)**: GC sweep thins past-retention revisions to one per day (pure policy unit-tested in shared).
 - ~~Media URL re-emission on cross-visibility moves~~ — **done (2026-08-06)**: the worker moves objects between access-class prefixes and realtime rewrites embedded srcs in the live doc; verified in both directions.
 - CDN key-rotation runbook (ADR 0007, "before GA"); the CDN layer itself is unprovisioned.
 - Search-token guardrail for oversized grant lists + session-tied TTL (ADR 0009) — flat 15-minute tokens, no proxy fallback.

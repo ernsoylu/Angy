@@ -25,8 +25,15 @@ debounce (~2s).
 3. Raising `maxmemory` is the correct short-term fix. Never change the
    eviction policy.
 
-## Not yet wired (V1 TODO)
+## `[alert] compaction failed N× consecutively for <pageId>`
 
-- Realtime tier has no health endpoint — monitor the WebSocket port.
-- Compaction repeated-failure alert (runbooks/compaction.md) is manual today:
-  watch for repeated `compact-page failed` lines on the same doc.
+Same doc failing repeatedly — likely a corrupt update log (compaction
+runbook). Escalate; never force-swap the blob pointer. The counter resets on
+the first successful compaction and expires after 24h.
+
+## Health endpoints
+
+- api: `GET :3001/health`
+- realtime: `GET :3002/health`
+- web: any page (e.g. `/signin`)
+- worker: no port — monitor its `[worker]`/`[alert]` log lines.

@@ -170,6 +170,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/runbooks/compaction.md — operating the Y.Doc compaction worker
 - docs/runbooks/dev-debugging.md — local debugging recipes
 - docs/runbooks/alerts.md — log-based alert signals ([alert] lines) and responses
+- docs/runbooks/key-rotation.md — rotation procedures for every deployment secret
 
 ## UI Design Source
 

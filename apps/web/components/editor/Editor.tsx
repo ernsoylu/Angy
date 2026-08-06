@@ -27,6 +27,8 @@ interface EditorProps {
   pageId: string;
   user: { name: string };
   onPresenceChange?: (users: PresenceUser[], status: string) => void;
+  /** Fired when auth fails — first connect or live revocation (ADR 0008). */
+  onAccessLost?: () => void;
 }
 
 /**
@@ -34,7 +36,7 @@ interface EditorProps {
  * the explicit Edit action — immediatelyRender: false is mandatory in Next.js
  * (hard rule 6). Undo/redo comes from Collaboration, not StarterKit.
  */
-export function Editor({ pageId, user, onPresenceChange }: EditorProps) {
+export function Editor({ pageId, user, onPresenceChange, onAccessLost }: EditorProps) {
   const [status, setStatus] = useState("connecting");
 
   // The provider lives for the lifetime of the mounted editor. Tokens are
@@ -86,12 +88,15 @@ export function Editor({ pageId, user, onPresenceChange }: EditorProps) {
     provider.awareness?.on("change", update);
     const onStatus = ({ status: s }: { status: string }) => setStatus(s);
     provider.on("status", onStatus);
+    const onAuthFail = () => onAccessLost?.();
+    provider.on("authenticationFailed", onAuthFail);
     update();
     return () => {
       provider.awareness?.off("change", update);
       provider.off("status", onStatus);
+      provider.off("authenticationFailed", onAuthFail);
     };
-  }, [provider, status, onPresenceChange]);
+  }, [provider, status, onPresenceChange, onAccessLost]);
 
   useEffect(() => () => provider.destroy(), [provider]);
 

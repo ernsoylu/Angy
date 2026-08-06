@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CornerDownRight, Cpu, Folder, X } from "lucide-react";
 import type { PageSummaryDto, SpaceDto } from "@angy/shared";
 import { cx } from "../../lib/cx";
+import { useEscape } from "../../lib/useEscape";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -57,6 +58,8 @@ export function MoveDialog({
   const [destination, setDestination] = useState<Destination | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  useEscape(onClose);
 
   useEffect(() => {
     void (async () => {
@@ -182,9 +185,22 @@ export function MoveDialog({
 
         {error && <div className={share.error}>{error}</div>}
 
+        <input
+          className={share.inviteInput}
+          placeholder="Search spaces and pages..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         <div className="t-caption">Move to</div>
         <div className={styles.tree}>
-          {rows.map((row) => (
+          {rows
+            .filter(
+              (row) =>
+                !query.trim() ||
+                row.title.toLowerCase().includes(query.trim().toLowerCase()) ||
+                row.kind === "space",
+            )
+            .map((row) => (
             <button
               key={`${row.spaceId}:${row.id ?? "root"}`}
               className={cx(
@@ -201,7 +217,7 @@ export function MoveDialog({
               {row.isCurrent && <Badge hue="neutral">current</Badge>}
               {isSelected(row) && <Badge hue="accent">destination</Badge>}
             </button>
-          ))}
+            ))}
         </div>
 
         <div className={share.warning}>

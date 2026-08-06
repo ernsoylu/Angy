@@ -72,6 +72,9 @@ spec:
           image: angy/realtime:latest
           ports: [{ containerPort: 3002 }]
           envFrom: [{ secretRef: { name: angy-env } }]
+          readinessProbe:
+            httpGet: { path: /health, port: 3002 }
+            initialDelaySeconds: 5
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -34,6 +34,12 @@ export async function searchPages(
   options: { spaceIds?: string[]; updatedAfter?: number } = {},
 ): Promise<SearchResult> {
   const token = await getSearchToken();
+
+  // ADR 0009 guardrail: oversized grant lists fall back to API-proxied search.
+  if (token.mode === "proxy") {
+    return searchViaApi(q, options);
+  }
+
   const filter: string[] = [];
   if (options.spaceIds?.length) {
     filter.push(`space_id IN [${options.spaceIds.map((id) => `"${id}"`).join(", ")}]`);
@@ -61,6 +67,27 @@ export async function searchPages(
   });
   if (!res.ok) throw new Error(`Search failed: ${res.status}`);
   return (await res.json()) as SearchResult;
+}
+
+async function searchViaApi(
+  q: string,
+  options: { spaceIds?: string[]; updatedAfter?: number },
+): Promise<SearchResult> {
+  const { cookies } = await import("next/headers");
+  const API_URL =
+    process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const res = await fetch(`${API_URL}/search`, {
+    method: "POST",
+    headers: {
+      cookie: (await cookies()).toString(),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ q, spaceIds: options.spaceIds, updatedAfter: options.updatedAfter }),
+    cache: "no-store",
+  });
+  const body = await res.json();
+  if (!body.success) throw new Error(body.error.message);
+  return body.data as SearchResult;
 }
 
 /** Split highlighted text into renderable parts (no raw HTML reaches React). */

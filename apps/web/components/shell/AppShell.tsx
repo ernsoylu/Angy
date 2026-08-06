@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -91,9 +91,24 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
   const onEditor = EDIT_ROUTE.test(pathname);
   const currentPageId = pathname.match(/([0-9a-f-]{36})/)?.[1] ?? null;
 
+  // Frame D: cmd/ctrl+K opens search from anywhere.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        document.getElementById("global-search")?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   return (
     <ToastProvider>
     <div className={styles.shell}>
+      <a href="#main-content" className={styles.skipLink}>
+        Skip to content
+      </a>
       <header className={styles.topbar}>
         <span className={styles.menuBtn}>
           <IconButton label="Menu" onClick={() => setDrawerOpen((v) => !v)}>
@@ -107,7 +122,7 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
           {space.name}
         </Link>
         <form className={styles.topSearch} action={`/s/${space.key}/search`}>
-          <SearchField name="q" placeholder={`Search ${space.name}...`} />
+          <SearchField id="global-search" name="q" placeholder={`Search ${space.name}...`} />
         </form>
         <div className={styles.topRight}>
           {onPage && currentPageId && (
@@ -208,7 +223,7 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
           </div>
         </nav>
 
-        <main className={styles.main}>{children}</main>
+        <main id="main-content" className={styles.main}>{children}</main>
       </div>
 
       {shareOpen && currentPageId && (

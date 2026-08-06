@@ -8,6 +8,7 @@ import { Banner } from "../ui/Feedback";
 import { Avatar } from "../ui/Avatar";
 import { StatusDot } from "../ui/Badge";
 import shell from "../shell/shell.module.css";
+import { RestrictedState } from "../ui/SystemState";
 import { Editor, type PresenceUser } from "./Editor";
 
 interface EditorViewProps {
@@ -76,6 +77,11 @@ export function EditorView({
 }: EditorViewProps) {
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [status, setStatus] = useState("connecting");
+  const [accessLost, setAccessLost] = useState(false);
+
+  // Live revocation (ADR 0008): the server closed us out — show the design
+  // state instead of a dead editor.
+  if (accessLost) return <RestrictedState />;
 
   return (
     <>
@@ -100,6 +106,7 @@ export function EditorView({
           <Editor
             pageId={pageId}
             user={user}
+            onAccessLost={() => setAccessLost(true)}
             onPresenceChange={(users, s) => {
               setPresence(users);
               setStatus(s);

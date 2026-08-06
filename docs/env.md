@@ -24,6 +24,8 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `TRASH_RETENTION_MS` | — | api, worker | Trash hard-delete retention (default 30 days) |
 | `COMPACTION_EVERY_MS` | — | worker | Compaction scan cadence (default 6h) |
 | `GC_EVERY_MS` | — | worker | Trash/attachment GC sweep cadence (default 6h) |
+| `REVISION_THIN_AFTER_MS` | — | worker | Age past which revisions thin to one/day (default 30 days, ADR 0006) |
+| `COMPACTION_SIZE_THRESHOLD_BYTES` | — | realtime | Doc size that triggers immediate compaction (default 2 MiB) |
 
 ## Production notes
 

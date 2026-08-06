@@ -165,6 +165,14 @@ export const trashItemSchema = z.object({
 });
 export type TrashItemDto = z.infer<typeof trashItemSchema>;
 
+/** Search request for the API-proxied mode (ADR 0009 guardrail). */
+export const searchQuerySchema = z.object({
+  q: z.string().max(200),
+  spaceIds: z.array(z.string().regex(/^\d+$/)).max(50).optional(),
+  updatedAfter: z.number().int().optional(),
+});
+export type SearchQueryDto = z.infer<typeof searchQuerySchema>;
+
 export const revisionSchema = z.object({
   version: z.number().int(),
   label: z.string().nullable(),

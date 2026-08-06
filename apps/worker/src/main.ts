@@ -140,8 +140,10 @@ const maintenanceWorker = new Worker(
     } else if (job.name === GC_SCAN_JOB) {
       const { gcTrash } = await import("./gc.js");
       const swept = await gcTrash();
-      if (swept.pages || swept.attachments) {
-        console.log(`[worker] gc: ${swept.pages} page(s), ${swept.attachments} attachment(s)`);
+      if (swept.pages || swept.attachments || swept.revisions) {
+        console.log(
+          `[worker] gc: ${swept.pages} page(s), ${swept.attachments} attachment(s), ${swept.revisions} thinned revision(s)`,
+        );
       }
     } else if (job.name === COMPACTION_SCAN_JOB) {
       const candidates = await findCompactionCandidates();
@@ -160,6 +162,31 @@ const maintenanceWorker = new Worker(
   { connection, concurrency: 2 },
 );
 
+// Compaction runbook: alert when the same doc fails repeatedly — likely a
+// corrupt update log. Escalate; never force-swap.
+const COMPACT_FAIL_ALERT_AT = 3;
+const compactFailKey = (pageId: string) => `compactfail:${pageId}`;
+
 maintenanceWorker.on("failed", (job, err) => {
   console.error(`[worker] ${job?.name} failed (${job?.id}):`, err.message);
+  if (job?.name === JOB_COMPACT_PAGE) {
+    const pageId = (job.data as CompactPageJobData).pageId;
+    void connection
+      .incr(compactFailKey(pageId))
+      .then(async (count) => {
+        await connection.expire(compactFailKey(pageId), 24 * 60 * 60);
+        if (count >= COMPACT_FAIL_ALERT_AT) {
+          console.warn(
+            `[alert] compaction failed ${count}× consecutively for ${pageId} — possible corrupt update log, do not force-swap`,
+          );
+        }
+      })
+      .catch(() => undefined);
+  }
+});
+
+maintenanceWorker.on("completed", (job) => {
+  if (job.name === JOB_COMPACT_PAGE) {
+    void connection.del(compactFailKey((job.data as CompactPageJobData).pageId));
+  }
 });

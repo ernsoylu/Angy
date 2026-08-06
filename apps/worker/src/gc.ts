@@ -1,10 +1,12 @@
 import { getPrisma } from "@angy/db";
+import { chooseRevisionsToThin } from "@angy/shared";
 import { deleteObject } from "./s3.js";
 import { removeFromIndex } from "./search.js";
 
 const DEFAULT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const retentionMs = () => Number(process.env.TRASH_RETENTION_MS ?? DEFAULT_RETENTION_MS);
+const thinAfterMs = () => Number(process.env.REVISION_THIN_AFTER_MS ?? DEFAULT_RETENTION_MS);
 
 const swallow = (p: Promise<unknown>) => p.catch(() => undefined);
 
@@ -41,7 +43,11 @@ export async function hardDeletePage(pageId: string): Promise<void> {
  * so parent deletes never cascade past a child we haven't cleaned), then
  * soft-deleted attachments past retention get their objects swept too.
  */
-export async function gcTrash(): Promise<{ pages: number; attachments: number }> {
+export async function gcTrash(): Promise<{
+  pages: number;
+  attachments: number;
+  revisions: number;
+}> {
   const prisma = getPrisma();
   const cutoff = new Date(Date.now() - retentionMs());
 
@@ -67,5 +73,43 @@ export async function gcTrash(): Promise<{ pages: number; attachments: number }>
   }
   await prisma.attachment.deleteMany({ where: { id: { in: orphaned.map((a) => a.id) } } });
 
-  return { pages: ordered.length, attachments: orphaned.length };
+  const thinned = await thinRevisions();
+  return { pages: ordered.length, attachments: orphaned.length, revisions: thinned };
+}
+
+/**
+ * Revision thinning (ADR 0006): past the retention window, keep one revision
+ * per day per page — blobs and rows for the rest are deleted. The policy
+ * itself is pure and unit-tested in @angy/shared.
+ */
+export async function thinRevisions(): Promise<number> {
+  const prisma = getPrisma();
+  const pages = await prisma.pageRevision.findMany({
+    distinct: ["pageId"],
+    select: { pageId: true },
+  });
+  let deleted = 0;
+  for (const { pageId } of pages) {
+    const revisions = await prisma.pageRevision.findMany({
+      where: { pageId },
+      select: { version: true, createdAt: true, revisionS3Key: true },
+    });
+    const doomed = new Set(
+      chooseRevisionsToThin(
+        revisions.map((r) => ({ version: r.version, createdAt: r.createdAt.toISOString() })),
+        new Date(),
+        thinAfterMs(),
+      ),
+    );
+    if (doomed.size === 0) continue;
+    for (const revision of revisions) {
+      if (doomed.has(revision.version)) await swallow(deleteObject(revision.revisionS3Key));
+    }
+    await prisma.pageRevision.deleteMany({
+      where: { pageId, version: { in: [...doomed] } },
+    });
+    deleted += doomed.size;
+    console.log(`[worker] thinned ${doomed.size} old revision(s) on ${pageId}`);
+  }
+  return deleted;
 }
