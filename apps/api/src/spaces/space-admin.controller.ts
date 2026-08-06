@@ -13,10 +13,13 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import { Queue } from "bullmq";
 import { getEffectiveSpaceLevel, getPrisma } from "@angy/db";
 import {
   createSpaceSchema,
+  JOB_SPACE_REINDEX,
   ok,
+  QUEUE_PROJECTIONS,
   satisfies,
   updateSpaceSchema,
   upsertMemberSchema,
@@ -29,7 +32,15 @@ import {
 } from "@angy/shared";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
 import { invalidateSpacePermissions } from "../permissions/permissions.service";
+import { getRedis } from "../redis";
 import { ZodValidationPipe } from "../zod.pipe";
+
+let projections: Queue | undefined;
+
+function projectionsQueue(): Queue {
+  projections ??= new Queue(QUEUE_PROJECTIONS, { connection: getRedis() });
+  return projections;
+}
 
 /**
  * Space administration (frame 12). Every mutation here changes what *every*
@@ -84,6 +95,55 @@ export class SpaceAdminController {
       await invalidateSpacePermissions(spaceId);
     }
     return ok(toSpaceDto(space));
+  }
+
+  /**
+   * Soft delete, 30 days — the same contract as page trash (frame 9). The
+   * space's pages keep their own deleted_at untouched, so a restore brings
+   * back exactly what was live. Access resolution keeps working so its admins
+   * can still find and restore it; what changes immediately is that the space
+   * leaves every listing, and its pages leave search.
+   */
+  @Delete(":id")
+  async trash(
+    @Param("id") id: string,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<{ trashed: true; pages: number }>> {
+    const prisma = getPrisma();
+    const spaceId = BigInt(id);
+    await assertSpaceAdmin(req.user.id, spaceId);
+    const space = await prisma.space.findUnique({ where: { id: spaceId } });
+    if (!space) throw new NotFoundException("Space not found");
+    if (space.deletedAt) throw new BadRequestException("That space is already in the trash");
+
+    await prisma.space.update({
+      where: { id: spaceId },
+      data: { deletedAt: new Date(), deletedBy: req.user.id },
+    });
+    const pages = await invalidateSpacePermissions(spaceId);
+    await projectionsQueue().add(JOB_SPACE_REINDEX, { spaceId: id });
+    return ok({ trashed: true, pages });
+  }
+
+  @Post(":id/restore")
+  async restore(
+    @Param("id") id: string,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<{ restored: true }>> {
+    const prisma = getPrisma();
+    const spaceId = BigInt(id);
+    await assertSpaceAdmin(req.user.id, spaceId);
+    const space = await prisma.space.findUnique({ where: { id: spaceId } });
+    if (!space) throw new NotFoundException("Space not found");
+    if (!space.deletedAt) throw new BadRequestException("That space is not in the trash");
+
+    await prisma.space.update({
+      where: { id: spaceId },
+      data: { deletedAt: null, deletedBy: null },
+    });
+    await invalidateSpacePermissions(spaceId);
+    await projectionsQueue().add(JOB_SPACE_REINDEX, { spaceId: id });
+    return ok({ restored: true });
   }
 
   @Get(":id/members")

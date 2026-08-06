@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Cpu, FileText, Plus } from "lucide-react";
+import { Cpu, FileText } from "lucide-react";
 import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Callout } from "../../../components/ui/Callout";
+import { NewPageButton } from "../../../components/pageops/NewPageButton";
 import { EmptyState } from "../../../components/ui/SystemState";
 import { getSpaceByKey, getSpaceHome } from "../../../lib/api";
 import { formatBytes, timeAgo } from "../../../lib/time";
@@ -38,7 +39,9 @@ export default async function SpaceHomePage({ params }: { params: Promise<{ key:
             </h1>
             {home.space.description && <p className={styles.description}>{home.space.description}</p>}
           </div>
-          <Button icon={<Plus size={14} />}>New page</Button>
+          {/* The sidebar's New page button owns the dialog; this one is the
+              same action reached from the space header. */}
+          <NewPageButton spaceId={space.id} spaceKey={key} spaceName={home.space.name} />
         </header>
 
         <div className={styles.stats}>
@@ -97,9 +100,11 @@ export default async function SpaceHomePage({ params }: { params: Promise<{ key:
             this, never reduce it.
           </Callout>
         </div>
-        <Button variant="secondary" className={ui.btnSecondary}>
-          Space settings
-        </Button>
+        <Link href={`/s/${key}/settings`}>
+          <Button variant="secondary" className={ui.btnSecondary} style={{ width: "100%" }}>
+            Space settings
+          </Button>
+        </Link>
       </aside>
     </div>
   );

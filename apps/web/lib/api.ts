@@ -9,6 +9,7 @@ import type {
   RevisionDto,
   SpaceDto,
   SpaceHomeDto,
+  SpaceMemberDto,
   TrashItemDto,
   UserDto,
 } from "@angy/shared";
@@ -46,6 +47,8 @@ export const getSpaceAttachments = (spaceId: string) =>
   apiFetch<AttachmentDto[]>(`/spaces/${spaceId}/attachments`);
 export const getSpaceTrash = (spaceId: string) =>
   apiFetch<TrashItemDto[]>(`/spaces/${spaceId}/trash`);
+export const getSpaceMembers = (spaceId: string) =>
+  apiFetch<SpaceMemberDto[]>(`/spaces/${spaceId}/members`);
 export const getRecentPages = (spaceId: string) =>
   apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/recent`);
 export const getStarredPages = (spaceId: string) =>

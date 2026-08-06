@@ -36,6 +36,11 @@ model Space {
   visibility       SpaceVisibility @default(PUBLIC)
   defaultPermLevel PermLevel       @default(VIEW) @map("default_perm_level")
   createdAt        DateTime        @default(now()) @map("created_at")
+  /// 30-day soft delete, mirroring page trash. Its pages keep their own
+  /// deleted_at untouched, so restoring the space restores exactly what was
+  /// live when it was trashed.
+  deletedAt        DateTime?       @map("deleted_at")
+  deletedBy        BigInt?         @map("deleted_by")
 
   members SpaceMember[]
   pages   Page[]

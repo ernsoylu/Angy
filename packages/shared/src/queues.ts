@@ -40,6 +40,13 @@ export interface SearchReindexJobData {
   pageId: string;
 }
 
+/** Re-index every page in a space — after the space is trashed or restored. */
+export const JOB_SPACE_REINDEX = "space-reindex";
+
+export interface SpaceReindexJobData {
+  spaceId: string;
+}
+
 /** Re-index one attachment after an upload or delete. */
 export const JOB_ATTACHMENT_REINDEX = "attachment-reindex";
 

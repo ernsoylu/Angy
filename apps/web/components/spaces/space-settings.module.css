@@ -1,0 +1,254 @@
+/* Space settings, frame 12. Full-width content region like frame 9 (Trash):
+   no right rail, so the two-column band gets the room instead. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 30px 44px 56px;
+  max-width: 1120px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.title {
+  font-family: var(--font-body), serif;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 448px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* Locked input: disabled tokens, not a global opacity drop (frame D). */
+.lockedField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  background: var(--disabled-fill);
+  border: 1px solid var(--disabled-border);
+  border-radius: var(--r-btn);
+  color: var(--disabled-text);
+  font-size: 13.5px;
+}
+
+.textarea {
+  width: 100%;
+  padding: 9px 12px;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+  color: var(--text);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  outline: none;
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Labelled radio-option row, composed from the card + accent-soft treatment. */
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 14px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--r-btn);
+  background: var(--elevated);
+}
+
+.optionActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.optionTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.optionActive .optionTitle {
+  color: var(--accent-text);
+}
+
+.optionBody {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inviteRow > *:first-child {
+  flex: 1;
+}
+
+.memberList {
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Frame D density card: 47px comfortable · 34px compact. */
+  min-height: var(--row-h);
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.memberRow:last-child {
+  border-bottom: none;
+}
+
+.memberName {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberEmail {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memberRow > span:nth-child(2) {
+  flex: 1;
+}
+
+.removeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 30px pointer target (frame D); the tinted square is padding, not a border. */
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-row);
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.removeBtn:hover:not(:disabled) {
+  background: var(--clay-soft);
+  color: var(--text);
+}
+
+.danger {
+  border-color: var(--clay);
+}
+
+.dangerRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.dangerTitle {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.dangerBody {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.dangerRow > :last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1024px) {
+  .wrap {
+    padding: 24px;
+  }
+
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dangerRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .dangerRow > :last-child {
+    margin-left: 0;
+  }
+}

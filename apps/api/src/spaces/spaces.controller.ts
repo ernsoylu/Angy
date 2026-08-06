@@ -43,6 +43,9 @@ export class SpacesController {
   async list(@Req() req: AuthedRequest): Promise<ApiOk<SpaceDto[]>> {
     const spaces = await getPrisma().space.findMany({
       where: {
+        // A trashed space vanishes from every listing; its admins reach it
+        // through the trash screen until the 30 days run out.
+        deletedAt: null,
         OR: [{ visibility: "PUBLIC" }, { members: { some: { userId: req.user.id } } }],
       },
       orderBy: { name: "asc" },
@@ -54,7 +57,7 @@ export class SpacesController {
   async get(@Param("id") id: string, @Req() req: AuthedRequest): Promise<ApiOk<SpaceDto>> {
     await assertSpaceView(req.user.id, BigInt(id));
     const space = await getPrisma().space.findUnique({ where: { id: BigInt(id) } });
-    if (!space) throw new NotFoundException("Space not found");
+    if (!space || space.deletedAt) throw new NotFoundException("Space not found");
     return ok(toDto(space));
   }
 

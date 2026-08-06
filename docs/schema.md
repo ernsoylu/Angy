@@ -4,7 +4,7 @@
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|
-| `space` | Top-level container + permission baseline | `id` bigint PK, `key` (short slug), `name`, `visibility` (public/private), `default_perm_level` |
+| `space` | Top-level container + permission baseline | `id` bigint PK, `key` (short slug, permanent — it is in every page URL, the search tenant filter and the bitmap prefix), `name`, `visibility` (public/private), `default_perm_level`, `deleted_at`/`deleted_by` (30-day soft delete, mirroring page trash) |
 | `app_user` | Local mirror of OIDC identities (dense bigint ids required by ADR 0004) | `id` bigint PK, `oidc_subject` unique, `email`, `display_name`, `deactivated_at` |
 | `space_member` | Space membership + per-member baseline level (drives the share dialog's member list) | `space_id`, `user_id`, `perm_level`, `added_at`; PK (space_id, user_id) |
 | `page` | The primitive (ADR 0001). One row per page; blocks live in JSONB/Y.Doc | `id` uuid PK, `space_id`, `parent_id`, `title`, `slug`, `ydoc_s3_key`, `ydoc_state_vector` bytea (small), `document_json` jsonb, `rendered_html` text, `text_extract` text, `projection_updated_at`, `created_at`, `updated_at`, `deleted_at` (30-day trash) |

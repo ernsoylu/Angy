@@ -44,12 +44,21 @@ export async function hardDeletePage(pageId: string): Promise<void> {
  * soft-deleted attachments past retention get their objects swept too.
  */
 export async function gcTrash(): Promise<{
+  spaces: number;
   pages: number;
   attachments: number;
   revisions: number;
 }> {
   const prisma = getPrisma();
   const cutoff = new Date(Date.now() - retentionMs());
+
+  // Spaces first: hard-deleting one takes its pages with it, so doing this
+  // before the page sweep saves walking pages that are about to disappear.
+  const expiredSpaces = await prisma.space.findMany({
+    where: { deletedAt: { lt: cutoff } },
+    select: { id: true, key: true },
+  });
+  for (const space of expiredSpaces) await hardDeleteSpace(space.id, space.key);
 
   const expired = await prisma.page.findMany({
     where: { deletedAt: { lt: cutoff } },
@@ -74,7 +83,37 @@ export async function gcTrash(): Promise<{
   await prisma.attachment.deleteMany({ where: { id: { in: orphaned.map((a) => a.id) } } });
 
   const thinned = await thinRevisions();
-  return { pages: ordered.length, attachments: orphaned.length, revisions: thinned };
+  return {
+    spaces: expiredSpaces.length,
+    pages: ordered.length,
+    attachments: orphaned.length,
+    revisions: thinned,
+  };
+}
+
+/**
+ * Hard-delete a space past retention: every page goes through the normal page
+ * path (S3 objects, rows, search documents) leaf-first, then the space row
+ * itself. Idempotent.
+ */
+export async function hardDeleteSpace(spaceId: bigint, key: string): Promise<void> {
+  const prisma = getPrisma();
+  const pages = await prisma.page.findMany({ where: { spaceId }, select: { id: true } });
+  const withDepth: { id: string; depth: number }[] = [];
+  for (const page of pages) {
+    withDepth.push({
+      id: page.id,
+      depth: await prisma.pageAncestor.count({ where: { descendantId: page.id } }),
+    });
+  }
+  // Leaf-first, so a parent delete never cascades past a child we have not
+  // cleaned up yet (same ordering the page sweep uses).
+  withDepth.sort((a, b) => b.depth - a.depth);
+  for (const page of withDepth) await hardDeletePage(page.id);
+
+  await prisma.spaceMember.deleteMany({ where: { spaceId } });
+  await prisma.space.delete({ where: { id: spaceId } });
+  console.log(`[worker] hard-deleted space ${spaceId} (${key}) and ${pages.length} page(s)`);
 }
 
 /**

@@ -116,7 +116,13 @@ async function toAttachmentDocument(
   });
   // An attachment with no live page has no space, so no read filter could
   // scope it — leave it out rather than index something unreachable.
-  if (!attachment || attachment.deletedAt || !attachment.page || attachment.page.deletedAt) {
+  if (
+    !attachment ||
+    attachment.deletedAt ||
+    !attachment.page ||
+    attachment.page.deletedAt ||
+    attachment.page.space.deletedAt
+  ) {
     return null;
   }
   const uploader = await getPrisma().appUser.findUnique({
@@ -158,6 +164,19 @@ export async function indexAttachmentsForPage(pageId: string): Promise<void> {
   for (const row of rows) await indexAttachment(row.id);
 }
 
+/** Re-index every page and attachment in a space — after it is trashed or restored. */
+export async function indexSpace(spaceId: bigint): Promise<number> {
+  const pages = await getPrisma().page.findMany({
+    where: { spaceId },
+    select: { id: true },
+  });
+  for (const page of pages) {
+    await indexPage(page.id);
+    await indexAttachmentsForPage(page.id);
+  }
+  return pages.length;
+}
+
 export async function indexAllAttachments(): Promise<number> {
   const rows = await getPrisma().attachment.findMany({
     where: { deletedAt: null },
@@ -176,7 +195,8 @@ async function toDocument(pageId: string): Promise<PageSearchDocument | null> {
       tags: { include: { tag: { select: { name: true } } } },
     },
   });
-  if (!page || page.deletedAt) return null;
+  // A trashed space takes its pages out of search with it.
+  if (!page || page.deletedAt || page.space.deletedAt) return null;
   const editor = await getPrisma().appUser.findUnique({
     where: { id: page.updatedBy ?? page.createdBy },
   });

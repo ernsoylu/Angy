@@ -9,6 +9,7 @@ import {
   JOB_PROJECTION_REBUILD,
   JOB_REVISION_CHECKPOINT,
   JOB_SEARCH_REINDEX,
+  JOB_SPACE_REINDEX,
   JOB_THUMBNAIL,
   QUEUE_MAINTENANCE,
   QUEUE_PROJECTIONS,
@@ -19,6 +20,7 @@ import {
   type ProjectionJobData,
   type RevisionCheckpointJobData,
   type SearchReindexJobData,
+  type SpaceReindexJobData,
   type ThumbnailJobData,
 } from "@angy/shared";
 import { env } from "./env.js";
@@ -129,7 +131,11 @@ worker.on("failed", (job, err) => {
 const maintenanceWorker = new Worker(
   QUEUE_MAINTENANCE,
   async (job) => {
-    if (job.name === JOB_ATTACHMENT_REINDEX) {
+    if (job.name === JOB_SPACE_REINDEX) {
+      const { indexSpace } = await import("./search.js");
+      const count = await indexSpace(BigInt((job.data as SpaceReindexJobData).spaceId));
+      console.log(`[worker] reindexed ${count} page(s) after a space state change`);
+    } else if (job.name === JOB_ATTACHMENT_REINDEX) {
       const { indexAttachment } = await import("./search.js");
       await indexAttachment(BigInt((job.data as AttachmentReindexJobData).attachmentId));
     } else if (job.name === JOB_REVISION_CHECKPOINT) {
@@ -157,9 +163,9 @@ const maintenanceWorker = new Worker(
     } else if (job.name === GC_SCAN_JOB) {
       const { gcTrash } = await import("./gc.js");
       const swept = await gcTrash();
-      if (swept.pages || swept.attachments || swept.revisions) {
+      if (swept.spaces || swept.pages || swept.attachments || swept.revisions) {
         console.log(
-          `[worker] gc: ${swept.pages} page(s), ${swept.attachments} attachment(s), ${swept.revisions} thinned revision(s)`,
+          `[worker] gc: ${swept.spaces} space(s), ${swept.pages} page(s), ${swept.attachments} attachment(s), ${swept.revisions} thinned revision(s)`,
         );
       }
     } else if (job.name === COMPACTION_SCAN_JOB) {
