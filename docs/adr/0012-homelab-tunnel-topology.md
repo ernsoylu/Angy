@@ -43,11 +43,14 @@ Three principles follow:
    stays internal; `S3_PUBLIC_ENDPOINT` is what browsers get. `PUBLIC_API_URL`
    is the API's origin as the browser sees it, distinct from its listen port.
    Both default to the old single-address behaviour, so local dev is unchanged.
-2. **Only these five are exposed.** Postgres, Redis, Meilisearch and
-   Authentik's Postgres have no public hostname and are not tunnel targets.
-   `infra/compose.prod.yml` publishes *no* container port to the host either —
-   `newt` shares the docker network and reaches targets by service name, so the
-   tunnel is the only ingress, not merely the intended one.
+2. **Only these five are exposed, and only to the loopback.** The `newt`
+   connector runs as a *host* systemd unit, so it dials from the host network
+   namespace and cannot resolve docker service names. The five tunnel targets
+   therefore publish on `127.0.0.1` — reachable by the connector and by nothing
+   else on the LAN — and Pangolin's resource targets are `127.0.0.1:<port>`.
+   Postgres, Redis, Meilisearch and Authentik's Postgres publish nothing at
+   all: no public hostname, no host port, reachable only from sibling
+   containers.
 3. **Pangolin's own authentication is disabled on all five.** Angy has its own
    session layer and Authentik is the IdP; putting a second auth gate in front
    would break the OIDC redirect dance and every API client.
@@ -75,6 +78,10 @@ Three principles follow:
   gate (G1) rather than an assumption.
 - **All traffic is bounded by residential upstream bandwidth**, and media
   crosses the tunnel twice (home → VPS → viewer). See the ADR 0007 amendment.
+- **The connector is host-managed, not compose-managed.** It is deliberately
+  absent from `infra/compose.prod.yml`: a second connector for the same network
+  would register as a second Pangolin site competing for the same resources.
+  `systemctl {status,restart} newt` is the control surface.
 - **The VPS becomes a single point of failure** for external access. Local
   access does not depend on it, which is worth preserving: nothing in the stack
   should require reaching `snc.ad` to function on the LAN.

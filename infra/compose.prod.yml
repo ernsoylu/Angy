@@ -10,13 +10,19 @@ name: angy
 # one fails loudly at `up` instead of silently starting with a dev password.
 # See docs/runbooks/homelab.md for the full procedure.
 #
-# ── Why nothing publishes a port ──────────────────────────────────────────────
-# `newt` sits on this same network and dials Pangolin outbound, then proxies
-# inbound requests to `web:3000`, `api:3001`, `realtime:3002`,
-# `authentik-server:9000` and `minio:9000` by service name. Publishing those to
-# the host would add a second, unauthenticated way in from the LAN for no gain.
-# Postgres, Redis and Meilisearch are not tunnel targets at all: they have no
-# public hostname and are reachable only from sibling containers.
+# ── Why the tunnel targets bind to 127.0.0.1 ─────────────────────────────────
+# `newt` runs as a *host* systemd unit (/etc/systemd/system/newt.service), not
+# as a container, so it cannot resolve docker service names — it dials targets
+# from the host network namespace. The five tunnel targets therefore publish on
+# the host loopback, and Pangolin's resource targets are `127.0.0.1:<port>`.
+#
+# Binding to 127.0.0.1 rather than 0.0.0.0 is the whole point: the ports are
+# reachable by newt and by nothing else. A bare `"3000:3000"` would publish
+# them to every machine on the LAN, which is a second, unauthenticated way in.
+#
+# Postgres, Redis and Meilisearch publish nothing at all. They are not tunnel
+# targets, have no public hostname, and are reachable only from sibling
+# containers on this network.
 
 x-env: &app-env
   DATABASE_URL: postgresql://angy:${POSTGRES_PASSWORD}@postgres:5432/angy
@@ -40,6 +46,8 @@ services:
   web:
     image: angy/web:${TAG:-latest}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
     environment:
       <<: *app-env
       # Server-side rendering talks to the API over the internal network; only
@@ -58,6 +66,8 @@ services:
   api:
     image: angy/api:${TAG:-latest}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
     environment:
       <<: *app-env
       WEB_ORIGIN: https://${WEB_HOST}
@@ -83,6 +93,8 @@ services:
   realtime:
     image: angy/realtime:${TAG:-latest}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"
     environment: *app-env
     depends_on:
       redis: { condition: service_healthy }
@@ -156,6 +168,10 @@ services:
     image: minio/minio
     restart: unless-stopped
     entrypoint: /bin/sh -c "mkdir -p /data/angy-docs && exec minio server /data --console-address ':9001'"
+    ports:
+      # S3 API only. The console (9001) stays unpublished — it is an admin
+      # surface with no business being one tunnel resource away from public.
+      - "127.0.0.1:9000:9000"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -191,6 +207,10 @@ services:
     image: ghcr.io/goauthentik/server:2025.8
     restart: unless-stopped
     command: server
+    ports:
+      # 9000 is MinIO's on the loopback, so the IdP takes 9010 — same offset as
+      # the dev compose file.
+      - "127.0.0.1:9010:9000"
     environment: &authentik-env
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
       AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
@@ -237,21 +257,11 @@ services:
       retries: 30
       start_period: 60s
 
-  # ─────────────────────────────────────────────────────────────────── Tunnel
-  # Pangolin's tunnel client. Dials the VPS outbound over WireGuard, so the
-  # home network needs no inbound port, no static IP, and no firewall hole.
-  # NEWT_ID/NEWT_SECRET come from the site created in the Pangolin dashboard.
-  newt:
-    image: fosrl/newt:latest
-    restart: unless-stopped
-    environment:
-      PANGOLIN_ENDPOINT: ${PANGOLIN_ENDPOINT}
-      NEWT_ID: ${NEWT_ID}
-      NEWT_SECRET: ${NEWT_SECRET}
-    depends_on:
-      web: { condition: service_started }
-      api: { condition: service_started }
-      realtime: { condition: service_started }
+  # ── Tunnel ───────────────────────────────────────────────────────────────
+  # There is deliberately no `newt` service here. The connector runs as a host
+  # systemd unit so it can reach the published loopback ports above; running it
+  # in this file as well would give Pangolin two competing sites for one
+  # network. Manage it with `systemctl {status,restart} newt`.
 
 volumes:
   pgdata:

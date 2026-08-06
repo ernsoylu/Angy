@@ -16,17 +16,22 @@ never committed.
 | A Pangolin instance with a reachable dashboard | Already running on the VPS |
 | DNS for the five hostnames pointing at the VPS | Your DNS provider; a wildcard `*.angy.<domain>` covers three of them |
 | A home server running Docker | — |
+| The `newt` connector installed there as a systemd unit | Pangolin's site setup script |
 | Built images for all four apps | `infra/docker/build.sh` — see §2 |
 
 The five hostnames (ADR 0012). Substitute your own domain throughout:
 
-```
-angy.<domain>         → web:3000
-api.angy.<domain>     → api:3001
-rt.angy.<domain>      → realtime:3002
-id.<domain>           → authentik-server:9000
-media.angy.<domain>   → minio:9000
-```
+| Hostname | Newt target | Container |
+|---|---|---|
+| `angy.<domain>` | `127.0.0.1:3000` | `web` |
+| `api.angy.<domain>` | `127.0.0.1:3001` | `api` |
+| `rt.angy.<domain>` | `127.0.0.1:3002` | `realtime` |
+| `id.<domain>` | `127.0.0.1:9010` | `authentik-server` (container port 9000) |
+| `media.angy.<domain>` | `127.0.0.1:9000` | `minio` |
+
+Those five ports bind to `127.0.0.1`, not `0.0.0.0` — reachable by the
+connector and by nothing else on the LAN. Postgres, Redis and Meilisearch
+publish nothing at all.
 
 ---
 
@@ -35,11 +40,16 @@ media.angy.<domain>   → minio:9000
 In the Pangolin dashboard:
 
 1. **Create a site** of type *Newt*. Pangolin shows a `NEWT_ID` and
-   `NEWT_SECRET` **once** — copy them straight into `/opt/angy/.env`.
+   `NEWT_SECRET` **once**. Install the connector on the home server as a
+   systemd unit (`/etc/systemd/system/newt.service`) — *not* as a container in
+   `infra/compose.prod.yml`. Two connectors for one network means Pangolin has
+   two competing sites.
 2. **Create five resources**, one per hostname above. For each:
    - Type: **HTTP**
-   - Target: the container name and port from the table (e.g. `api`, `3001`).
-     Targets resolve on the compose network, so use service names, not IPs.
+   - Target: **`127.0.0.1` and the host port** from the table below. The
+     connector is a host process, so it dials from the host network namespace
+     and cannot resolve docker service names; the compose file publishes each
+     tunnel target on the loopback for exactly this reason.
    - **Authentication: disabled.** Angy has its own session layer and Authentik
      is the IdP. A second gate in front breaks the OIDC redirect and every API
      client (ADR 0012).
@@ -98,9 +108,6 @@ AUTHENTIK_SECRET_KEY=
 AUTHENTIK_POSTGRES_PASSWORD=
 OIDC_CLIENT_ID=
 OIDC_CLIENT_SECRET=
-NEWT_ID=
-NEWT_SECRET=
-PANGOLIN_ENDPOINT=https://<pangolin-host>
 WEB_HOST=angy.<domain>
 API_HOST=api.angy.<domain>
 ID_HOST=id.<domain>
@@ -178,8 +185,9 @@ Each step assumes the previous one passed. Stop at the first failure; the later
 symptoms are usually just the earlier cause wearing a disguise.
 
 ```bash
-# 1. Tunnel is up
-docker compose -f infra/compose.prod.yml logs newt | tail
+# 1. Tunnel is up — the connector is a host unit, not a container
+systemctl status newt --no-pager
+journalctl -u newt -n 20 --no-pager   # want: "Tunnel connection ... established"
 
 # 2. Each hostname reaches the right service
 curl -sf https://api.angy.<domain>/health
