@@ -35,6 +35,18 @@ export const env = {
     url: process.env.MEILISEARCH_URL ?? "http://localhost:7700",
     apiKey: process.env.MEILISEARCH_API_KEY ?? "masterKey",
   },
+  /**
+   * `Domain` for the session cookie. Unset means host-only, which is correct
+   * for local dev where web and api share `localhost` (cookies ignore ports,
+   * so :3000 and :3001 are the same host and a host-only cookie is shared).
+   *
+   * Behind a tunnel they are different hosts, and a host-only cookie set by
+   * `api.<domain>` is never sent to `<domain>` — so the RSC render forwards no
+   * session and redirects a signed-in user back to /signin. Set this to the
+   * lowest domain that covers both.
+   */
+  sessionCookieDomain: () => process.env.SESSION_COOKIE_DOMAIN || undefined,
+
   s3: {
     endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9000",
     /**

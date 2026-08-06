@@ -22,6 +22,7 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `NEXT_PUBLIC_REALTIME_URL` | ✅ | web | Public WebSocket endpoint. Build-time, same as above |
 | `API_INTERNAL_URL` | — | web | Server-side API endpoint when it differs from the public one (defaults to `NEXT_PUBLIC_API_URL`) |
 | `WEB_ORIGIN` | — | api | CORS origin for the web app (default `http://localhost:3000`) |
+| `SESSION_COOKIE_DOMAIN` | — | api | `Domain` for the session cookie. Unset = host-only, correct for local dev where web and api share `localhost` (cookies ignore ports). Behind a proxy they are **different hosts**, and a host-only cookie set by `api.<domain>` is never sent to `<domain>` — the RSC render then forwards no session and bounces a signed-in user back to `/signin`. Set it to the lowest domain covering both (e.g. `angy.<domain>`) |
 | `PUBLIC_API_URL` | — | api | The API's own origin *as the browser sees it* (default: its listen address). Behind a proxy or tunnel this must be set: it forms the OIDC `redirect_uri`, the URL `openid-client` validates the callback against, and — when it is `https:` — flips the session cookie to `Secure` |
 | `TRASH_RETENTION_MS` | — | api, worker | Trash hard-delete retention (default 30 days) |
 | `COMPACTION_EVERY_MS` | — | worker | Compaction scan cadence (default 6h) |

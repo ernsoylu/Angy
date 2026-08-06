@@ -69,9 +69,23 @@ describe("session auth", () => {
   // and forcing it on plain-http dev means the browser never stores the cookie
   // at all — a failure that presents as "sign-in silently does nothing".
   it("adds Secure only when asked, on both the set and clear cookies", () => {
-    expect(sessionCookie("abc", true)).toContain("; Secure");
-    expect(sessionCookie("abc", false)).not.toContain("Secure");
-    expect(clearedSessionCookie(true)).toContain("; Secure");
-    expect(clearedSessionCookie(false)).not.toContain("Secure");
+    expect(sessionCookie("abc", { secure: true })).toContain("; Secure");
+    expect(sessionCookie("abc", { secure: false })).not.toContain("Secure");
+    expect(clearedSessionCookie({ secure: true })).toContain("; Secure");
+    expect(clearedSessionCookie({ secure: false })).not.toContain("Secure");
+  });
+
+  // A host-only cookie set by api.<domain> is never sent to <domain>, so the
+  // RSC render forwards no session and bounces a signed-in user to /signin.
+  // Invisible in dev, where both are `localhost` (cookies ignore ports).
+  it("scopes to a domain only when one is given", () => {
+    expect(sessionCookie("abc")).not.toContain("Domain=");
+    expect(sessionCookie("abc", { domain: "example.com" })).toContain("; Domain=example.com");
+  });
+
+  // Clearing a domain-scoped cookie with a host-only Set-Cookie is a no-op:
+  // sign-out looks like it worked and the session is still live.
+  it("clears with the same Domain it set", () => {
+    expect(clearedSessionCookie({ domain: "example.com" })).toContain("; Domain=example.com");
   });
 });

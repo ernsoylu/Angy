@@ -56,14 +56,32 @@ export async function resolveSessionUser(
  * registrable domain, so credentialed XHR between them is same-site and Lax
  * permits it; it also survives the top-level OIDC redirect back from the IdP.
  */
-function attributes(secure: boolean): string {
-  return `Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
+export interface CookieOptions {
+  secure?: boolean;
+  /**
+   * Omit for a host-only cookie. Set it when the browser must send the session
+   * to more than one host — a web app and an API on sibling subdomains are
+   * *different hosts*, and a host-only cookie set by one never reaches the
+   * other, however same-site they are.
+   */
+  domain?: string;
 }
 
-export function sessionCookie(sessionId: string, secure = false): string {
-  return `${SESSION_COOKIE}=${sessionId}; ${attributes(secure)}; Max-Age=${SESSION_TTL_SECONDS}`;
+function attributes({ secure, domain }: CookieOptions): string {
+  return [
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    ...(domain ? [`Domain=${domain}`] : []),
+    ...(secure ? ["Secure"] : []),
+  ].join("; ");
 }
 
-export function clearedSessionCookie(secure = false): string {
-  return `${SESSION_COOKIE}=; ${attributes(secure)}; Max-Age=0`;
+export function sessionCookie(sessionId: string, opts: CookieOptions = {}): string {
+  return `${SESSION_COOKIE}=${sessionId}; ${attributes(opts)}; Max-Age=${SESSION_TTL_SECONDS}`;
+}
+
+/** Must carry the same Domain as the cookie it clears, or it clears nothing. */
+export function clearedSessionCookie(opts: CookieOptions = {}): string {
+  return `${SESSION_COOKIE}=; ${attributes(opts)}; Max-Age=0`;
 }

@@ -79,6 +79,11 @@ services:
       # openid-client validates the callback against, and — being https — the
       # session cookie's Secure flag.
       PUBLIC_API_URL: https://${API_HOST}
+      # The session must reach both the web app and the API, which are
+      # different hosts. Defaults to WEB_HOST because api/rt/media all sit
+      # under it — which also keeps the cookie away from the IdP, since
+      # Authentik has no business receiving Angy's session.
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-${WEB_HOST}}
       OIDC_ISSUER_URL: https://${ID_HOST}/application/o/angy/
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
@@ -238,6 +243,11 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
       PUBLIC_API_URL: https://${API_HOST}
+      # The session must reach both the web app and the API, which are
+      # different hosts. Defaults to WEB_HOST because api/rt/media all sit
+      # under it — which also keeps the cookie away from the IdP, since
+      # Authentik has no business receiving Angy's session.
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-${WEB_HOST}}
       WEB_PUBLIC_URL: https://${WEB_HOST}
     # The *dev* blueprint is deliberately not mounted — it carries a well-known
     # client secret and a shared password. This is the production one, which

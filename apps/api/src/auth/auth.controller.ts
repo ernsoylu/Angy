@@ -16,6 +16,16 @@ import {
 } from "./session";
 import { SessionGuard, type AuthedRequest } from "./session.guard";
 
+/**
+ * Both the set and the clear must use identical attributes — a Set-Cookie that
+ * omits the Domain of the cookie it means to clear silently clears nothing,
+ * and sign-out appears to work while the session survives.
+ */
+const cookieOptions = () => ({
+  secure: env.publicApiUrl().startsWith("https:"),
+  domain: env.sessionCookieDomain(),
+});
+
 @Controller("auth")
 export class AuthController {
   constructor(private readonly oidc: OidcService) {}
@@ -53,7 +63,7 @@ export class AuthController {
           },
         });
     const sessionId = await createSession(getRedis(), user.id);
-    res.setHeader("Set-Cookie", sessionCookie(sessionId, env.publicApiUrl().startsWith("https:")));
+    res.setHeader("Set-Cookie", sessionCookie(sessionId, cookieOptions()));
     res.redirect(env.webOrigin);
   }
 
@@ -61,7 +71,7 @@ export class AuthController {
   async logout(@Req() req: Request, @Res() res: Response) {
     const sessionId = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     if (sessionId) await destroySession(getRedis(), sessionId);
-    res.setHeader("Set-Cookie", clearedSessionCookie(env.publicApiUrl().startsWith("https:")));
+    res.setHeader("Set-Cookie", clearedSessionCookie(cookieOptions()));
     res.json(ok({ signedOut: true }));
   }
 
