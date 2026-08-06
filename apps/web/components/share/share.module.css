@@ -21,6 +21,21 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* A dialog looks like its own root but lives wherever it was mounted in the
+     DOM, so it inherits ambient typography from its trigger's surroundings —
+     e.g. the centred `.stateWrap` of an empty state. Anchor the alignment
+     rather than relying on every caller to mount it somewhere neutral. */
+  text-align: left;
+}
+
+/* `overflow-y: auto` above only starts scrolling once the children have
+   stopped shrinking, and flex items shrink to their min-content height first.
+   For a form that means every input loses its vertical padding and collapses
+   into a squashed pill *before* the dialog ever offers a scrollbar. Children
+   keep their height; the dialog scrolls. (`.tree` in the move dialog caps
+   itself at 300px, so it still scrolls internally.) */
+.dialog > * {
+  flex-shrink: 0;
 }
 
 .header {
