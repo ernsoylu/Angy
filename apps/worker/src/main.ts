@@ -163,9 +163,9 @@ const maintenanceWorker = new Worker(
     } else if (job.name === GC_SCAN_JOB) {
       const { gcTrash } = await import("./gc.js");
       const swept = await gcTrash();
-      if (swept.spaces || swept.pages || swept.attachments || swept.revisions) {
+      if (swept.spaces || swept.pages || swept.attachments || swept.revisions || swept.tags) {
         console.log(
-          `[worker] gc: ${swept.spaces} space(s), ${swept.pages} page(s), ${swept.attachments} attachment(s), ${swept.revisions} thinned revision(s)`,
+          `[worker] gc: ${swept.spaces} space(s), ${swept.pages} page(s), ${swept.attachments} attachment(s), ${swept.revisions} thinned revision(s), ${swept.tags} unused tag(s)`,
         );
       }
     } else if (job.name === COMPACTION_SCAN_JOB) {

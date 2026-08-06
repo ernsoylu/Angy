@@ -5,6 +5,7 @@ import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Callout } from "../../../components/ui/Callout";
 import { NewPageButton } from "../../../components/pageops/NewPageButton";
+import { NewSpaceButton } from "../../../components/spaces/NewSpaceButton";
 import { EmptyState } from "../../../components/ui/SystemState";
 import { getSpaceByKey, getSpaceHome } from "../../../lib/api";
 import { formatBytes, timeAgo } from "../../../lib/time";
@@ -105,6 +106,8 @@ export default async function SpaceHomePage({ params }: { params: Promise<{ key:
             Space settings
           </Button>
         </Link>
+        {/* Frame 13 opens over the space home — this is its entry point. */}
+        <NewSpaceButton />
       </aside>
     </div>
   );

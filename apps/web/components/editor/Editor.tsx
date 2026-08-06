@@ -6,6 +6,7 @@ import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { editorExtensions } from "@angy/blocks";
+import { REVOKED_CLOSE_REASON } from "@angy/shared";
 import { cx } from "../../lib/cx";
 import { BlockGutter } from "./BlockGutter";
 import { BubbleToolbar } from "./BubbleToolbar";
@@ -103,11 +104,21 @@ export function Editor({
     provider.on("status", onStatus);
     const onAuthFail = () => onAccessLost?.();
     provider.on("authenticationFailed", onAuthFail);
+    // Live revocation (ADR 0008) closes the connection rather than failing
+    // authentication, so without this the provider just retries and the user
+    // sees "offline" — a network problem, not a refusal. Match on the reason:
+    // the provider hardcodes code 1000 for a document-level close, so the
+    // server's 4403 never arrives.
+    const onClose = ({ event }: { event: CloseEvent }) => {
+      if (event.reason === REVOKED_CLOSE_REASON) onAccessLost?.();
+    };
+    provider.on("close", onClose);
     update();
     return () => {
       provider.awareness?.off("change", update);
       provider.off("status", onStatus);
       provider.off("authenticationFailed", onAuthFail);
+      provider.off("close", onClose);
     };
   }, [provider, status, onPresenceChange, onAccessLost]);
 

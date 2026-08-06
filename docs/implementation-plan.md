@@ -2,7 +2,7 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (80 unit/integration tests, 31 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–D, F, and E1–E3 (see § Open gaps for what was closed and what remains).
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (80 unit/integration tests, 34 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–F (see § Open gaps for what was closed and what remains).
 
 ## Design inputs
 
@@ -134,10 +134,10 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~**Search over attachments**~~ — **done (2026-08-06)**: an `attachments` index carrying space_id/page_id, so one tenant token's read filter covers both indexes; the Attachments tab is a real filter.
 - **Space administration** — the API half is **done (2026-08-06)**: space create/update, member list/invite/change-level/remove, all ADMIN-gated, each ending in a space-wide bitmap invalidation (a new operation — nothing in the closure table expresses "the whole space"). The settings screen (frame 12) and both dead buttons are **done** too; the create-space dialog (frame 13) has an API but no UI yet.
 - ~~**Editor block affordances**~~ — **done (2026-08-06)**: bubble-menu link editor, a table-structure toolbar shown while the caret is in a table, and the `⠿`/`+` gutter (`@tiptap/extension-drag-handle-react`, with `+` opening the same `SLASH_ITEMS` palette).
-- **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash".
+- **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash". The only frame-level gap left.
 - ~~**Mobile**~~ — **done (2026-08-06)**: every tab-bar entry routes, with Me rendering the profile, both personal lists, and sign-out. (The full-width "Edit this page" button was already built in Phase 3.)
 - ~~**Frame D interaction spec**~~ — **done (2026-08-06)**: page-tree roving-tabindex traversal (↑↓ → ← Enter/Home/End) and the compact density preference join the ⌘K binding, skip link, and Esc handling.
-- **Misc** — second IdP button is decorative (single issuer); ~~attachment "Used on N pages"~~ now lists every page sharing the blob's sha256.
+- **Misc** — second IdP button is decorative (single issuer), the last open product question; ~~attachment "Used on N pages"~~ now lists every page sharing the blob's sha256.
 
 ### Frame-11 mandate only half-wired
 
@@ -149,7 +149,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~Revision retention/thinning~~ — **done (2026-08-06)**: GC sweep thins past-retention revisions to one per day (pure policy unit-tested in shared).
 - ~~Media URL re-emission on cross-visibility moves~~ — **done (2026-08-06)**: the worker moves objects between access-class prefixes and realtime rewrites embedded srcs in the live doc; verified in both directions.
 - CDN key-rotation runbook (ADR 0007, "before GA"); the CDN layer itself is unprovisioned.
-- Search-token guardrail for oversized grant lists + session-tied TTL (ADR 0009) — flat 15-minute tokens, no proxy fallback.
+- ~~Search-token guardrail for oversized grant lists~~ — **already built**: past 200 explicit grants the token is withheld and search proxies through the API (`GRANT_GUARDRAIL`). The gap line was stale. Session-tied TTL stays an accepted deviation: sessions have no refresh interval to bind to.
 - Size-triggered compaction and the repeated-failure alert (compaction runbook) — interval scan only, alerts are manual log-watching.
 - Realtime health endpoint (alerts runbook TODO) — the WS tier is monitored by port only.
 
@@ -157,8 +157,8 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 - ~~**Realtime token refresh on reconnect**~~ — **done (2026-08-06)**: the provider now takes a token *function*, fetching a fresh page-scoped JWT on every (re)connect.
 - ~~Page title is PATCH-based last-write-wins~~ — **done (2026-08-06)**: the title is a `title` Y.Text in the page's own Y.Doc, so it syncs, persists, and restores with the body. `onStoreDocument` copies it into `page.title`; REST renames publish a `rename` doc command rather than writing the row, which is what keeps the two from fighting (the API is CommonJS and must never touch a Y.Doc).
-- Revoked live editors see "offline", not the restricted state.
-- Reader TOC has no scroll-spy (first heading statically active).
+- ~~Revoked live editors see "offline"~~ — **done (2026-08-06)**: the editor now matches on the close *reason*, not the code. Hocuspocus synthesises a document-level close with code 1000 hardcoded, so the server's 4403 never reaches the client; the reason string is the only thing that survives, and it is a shared constant now.
+- ~~Reader TOC has no scroll-spy~~ — **already built**: `Toc.tsx` tracks the heading in view with an IntersectionObserver. The gap line was stale.
 
 ### Ops / infra
 

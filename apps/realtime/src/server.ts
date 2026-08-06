@@ -19,6 +19,7 @@ import {
   JOB_REVISION_CHECKPOINT,
   QUEUE_MAINTENANCE,
   QUEUE_PROJECTIONS,
+  REVOKED_CLOSE_REASON,
   satisfies,
   type DocCommand,
   type RenameCommand,
@@ -165,7 +166,7 @@ function subscribeToPermChanges(server: Server, subscriber: Redis): void {
             console.log(
               `[realtime] revoking ${context.name} on ${pageId} (now ${level ?? "none"})`,
             );
-            connection.close({ code: 4403, reason: "permission-revoked" });
+            connection.close({ code: 4403, reason: REVOKED_CLOSE_REASON });
           }
         }
       }

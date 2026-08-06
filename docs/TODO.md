@@ -1,6 +1,6 @@
 # TODO — Remaining Work Tracker
 
-> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–D, F, and E1–E3 shipped as of 2026-08-06 — 80 unit/integration + 31 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
+> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–F (all but E4) shipped as of 2026-08-06 — 80 unit/integration + 34 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
 
 ## Decision gates (answer before the dependent wave starts)
 
@@ -47,7 +47,7 @@
 - [x] E2 · Space CRUD + member management (ADMIN-gated): create (creator becomes first admin), update name/description/visibility/baseline, list/invite/change-level/remove members. Visibility and baseline changes trigger E1; a rename does not. Two guards worth keeping: a space can never lose its last admin, and inviting an unknown email explains that SCIM is V2 rather than failing silently
 - [x] E3 · Space-settings screen (frame 12), ADMIN-gated with frame 11's restricted state as the whole-screen answer. Identity and access stage behind Save; member changes apply on click — pretending otherwise would misreport what the server has already done. Space soft-delete lands with it (`space.deleted_at`, 30 days, mirroring page trash): the space leaves every listing and its pages leave both search indexes immediately, while its own pages keep their `deleted_at` untouched so a restore returns exactly what was live. Both space-home buttons are wired
 - [ ] E4 · Config-driven multi-IdP (`?provider=` on `/auth/login`) — or remove the second button
-- [ ] E3-follow-up · Create-space flow (frame 13) has an API but no UI yet; tag rename/merge (Wave D) still has no home in the settings screen
+- [x] E3-follow-up · Create-space dialog (frame 13) with a key derived from the name; tag rename/merge now lives in the settings screen
 
 ## Wave F — Deep editor ✅ *(2026-08-06)*
 
@@ -64,5 +64,7 @@
 - Dev/prod media access classes are storage prefixes (`media/` vs `media-private/`); the CDN tier supersedes the anonymous-read bucket policy in production (Wave G).
 - The pruned runtime tree keeps `typescript` and the full `@prisma/client` engine set (~97 MB of the 602 MB). Both arrive as optional peers of production dependencies; trimming them means pruning inside the store, which is more fragile than the size is worth.
 - Recent and Starred are **space-scoped routes**, not expanding sidebar trays. No frame specifies either surface; routing matches the sibling rows in the same nav group (Home, Attachments, Trash) and gives the Me tab something to link to.
+- Tag admin lives in *space* settings even though tags are workspace-wide — it is the only admin surface there is. A workspace-settings screen would be its proper home if one is ever designed.
+- Unused tags are swept by the GC rather than kept: freeform authoring means the vocabulary only grows otherwise, and an orphan name blocks renaming onto it.
 
-**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E1–E3~~ → E4 → G. What is left: **E4** (multi-IdP: real requirement or remove the button), **G** (cloud provider), the create-space UI, and the small standalone items in the plan's § Open gaps.
+**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E1–E3~~ → E4 → G. Two things are left and **both are waiting on you**: **E4** (is multi-IdP real, or should the second sign-in button go?) and **Wave G** (which cloud provider?). The only unblocked item remaining is the dialog search fields in frames 9 and 10.

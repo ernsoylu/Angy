@@ -45,3 +45,14 @@ export function grantWidensBaseline(
 ): boolean {
   return baseline === null || LEVEL_ORDER[grant] > LEVEL_ORDER[baseline];
 }
+
+/**
+ * Close reason the realtime server uses when it disconnects a live editor
+ * whose access was revoked (ADR 0008).
+ *
+ * The *reason* is the discriminator, not the close code: when Hocuspocus
+ * closes one document on a shared socket it sends a CLOSE message, and the
+ * provider synthesises the event with code 1000 hardcoded — whatever code the
+ * server passed is lost. The string is all that survives the trip.
+ */
+export const REVOKED_CLOSE_REASON = "permission-revoked";

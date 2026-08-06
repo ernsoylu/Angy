@@ -48,6 +48,7 @@ export async function gcTrash(): Promise<{
   pages: number;
   attachments: number;
   revisions: number;
+  tags: number;
 }> {
   const prisma = getPrisma();
   const cutoff = new Date(Date.now() - retentionMs());
@@ -83,12 +84,29 @@ export async function gcTrash(): Promise<{
   await prisma.attachment.deleteMany({ where: { id: { in: orphaned.map((a) => a.id) } } });
 
   const thinned = await thinRevisions();
+  const tags = await gcOrphanTags();
   return {
     spaces: expiredSpaces.length,
     pages: ordered.length,
     attachments: orphaned.length,
     revisions: thinned,
+    tags,
   };
+}
+
+/**
+ * Drop tags nothing carries any more.
+ *
+ * Freeform authoring means the vocabulary only ever grows: untagging the last
+ * page leaves the name behind forever, cluttering typeahead and — worse —
+ * blocking a rename onto a name nobody actually uses. Anything still in use is
+ * untouched; re-coining a swept tag simply recreates it.
+ */
+export async function gcOrphanTags(): Promise<number> {
+  const prisma = getPrisma();
+  const { count } = await prisma.tag.deleteMany({ where: { pages: { none: {} } } });
+  if (count > 0) console.log(`[worker] swept ${count} unused tag(s)`);
+  return count;
 }
 
 /**

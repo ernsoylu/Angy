@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, sessionContext } from "./helpers";
+import { api, pageIdBySlug, sessionContext } from "./helpers";
 
 const API = "http://localhost:3001";
 
@@ -219,6 +219,74 @@ test.describe("space administration", () => {
     expect((await raw("e2e-eren", `/spaces/${space.id}/restore`, { method: "POST" })).success).toBe(
       false,
     );
+  });
+
+  test("the create-space dialog suggests a key and lands in the new space", async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const context = await sessionContext(browser, "e2e-eren");
+    const page = await context.newPage();
+    await page.goto("/s/eng");
+
+    await page.getByRole("button", { name: "New space" }).click();
+    const dialog = page.getByRole("dialog", { name: "New space" });
+    await expect(dialog).toBeVisible();
+
+    // The key is derived from the name, so most people never touch it.
+    const name = `Design Ops ${Date.now().toString(36)}`;
+    await dialog.getByPlaceholder("Engineering").fill(name);
+    const keyField = dialog.getByLabel("Space key");
+    await expect(keyField).toHaveValue(/^design-ops-/);
+    // Keys are capped, so take the suggestion rather than a long literal.
+    const key = (await keyField.inputValue()).slice(0, 20).replace(/-+$/, "");
+    await keyField.fill(key);
+    await expect(dialog.getByText("Permanent — it goes into every page URL")).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Create space" }).click();
+    await expect(page).toHaveURL(new RegExp(`/s/${key}$`));
+    await expect(page.getByRole("heading", { name })).toBeVisible();
+
+    // The creator is its first admin, so settings opens rather than refusing.
+    await page.goto(`/s/${key}/settings`);
+    await expect(page.getByRole("heading", { name: "Space settings" })).toBeVisible();
+    await context.close();
+  });
+
+  test("tag cleanup lives in settings and reports refusals", async ({ browser }) => {
+    test.setTimeout(90_000);
+    // A tag confined to Engineering, which Eren fully administers.
+    const pageId = await pageIdBySlug("e2e-eren", "onboarding");
+    // Tags are workspace-wide and survive a reseed (the seed only cascades page
+    // rows), so both names have to be unique to this run.
+    const stamp = Date.now().toString(36);
+    const before = `typoo-${stamp}`;
+    const after = `typo-${stamp}`;
+    await api("e2e-eren", `/pages/${pageId}/tags`, {
+      method: "PUT",
+      body: JSON.stringify({ tags: [before] }),
+    });
+
+    const context = await sessionContext(browser, "e2e-eren");
+    const page = await context.newPage();
+    await page.goto("/s/eng/settings");
+    await expect(page.getByText("Tags are shared across every space")).toBeVisible();
+
+    const row = page.getByTestId(`tag-row-${before}`);
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: "Rename" }).click();
+    await row.getByLabel(`New name for ${before}`).fill(after);
+    await row.getByRole("button", { name: "Apply" }).click();
+    await expect(page.getByText("Tag renamed")).toBeVisible();
+
+    const tags = await api<{ name: string }[]>("e2e-eren", `/tags?q=${after}`);
+    expect(tags.some((t) => t.name === after)).toBe(true);
+
+    await api("e2e-eren", `/pages/${pageId}/tags`, {
+      method: "PUT",
+      body: JSON.stringify({ tags: [] }),
+    });
+    await context.close();
   });
 
   test("a duplicate space key is refused", async () => {
