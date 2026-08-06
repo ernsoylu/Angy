@@ -1,0 +1,19 @@
+# Build from the repo root: infra/docker/build.sh web
+FROM node:24-slim AS build
+RUN npm install -g pnpm@10
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+RUN pnpm build:packages && pnpm --filter @angy/web build
+
+# Next standalone output is self-contained (traced node_modules included).
+FROM node:24-slim
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+EXPOSE 3000
+ENV PORT=3000 HOSTNAME=0.0.0.0
+CMD ["node", "apps/web/server.js"]

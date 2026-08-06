@@ -1,0 +1,16 @@
+# Build from the repo root: infra/docker/build.sh realtime
+FROM node:24-slim AS build
+RUN npm install -g pnpm@10
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+RUN pnpm build:packages && pnpm --filter @angy/realtime build
+
+FROM node:24-slim
+ENV NODE_ENV=production
+WORKDIR /app/apps/realtime
+COPY --from=build /app /app
+EXPOSE 3002
+CMD ["node", "dist/main.js"]

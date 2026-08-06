@@ -1,0 +1,15 @@
+# Build from the repo root: infra/docker/build.sh worker
+FROM node:24-slim AS build
+RUN npm install -g pnpm@10
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+RUN pnpm build:packages && pnpm --filter @angy/worker build
+
+FROM node:24-slim
+ENV NODE_ENV=production
+WORKDIR /app/apps/worker
+COPY --from=build /app /app
+CMD ["node", "dist/main.js"]

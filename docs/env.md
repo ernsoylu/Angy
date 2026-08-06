@@ -19,6 +19,11 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `JWT_SECRET` | ✅ | api, realtime | Signs **short-lived realtime connect tokens and media access tokens** (ADR 0007/0008) — *not* user authentication, which is OIDC + Redis sessions. Random, ≥32 chars |
 | `NEXT_PUBLIC_API_URL` | ✅ | web | Public API endpoint |
 | `NEXT_PUBLIC_REALTIME_URL` | ✅ | web | Public WebSocket endpoint |
+| `API_INTERNAL_URL` | — | web | Server-side API endpoint when it differs from the public one (defaults to `NEXT_PUBLIC_API_URL`) |
+| `WEB_ORIGIN` | — | api | CORS origin for the web app (default `http://localhost:3000`) |
+| `TRASH_RETENTION_MS` | — | api, worker | Trash hard-delete retention (default 30 days) |
+| `COMPACTION_EVERY_MS` | — | worker | Compaction scan cadence (default 6h) |
+| `GC_EVERY_MS` | — | worker | Trash/attachment GC sweep cadence (default 6h) |
 
 ## Production notes
 

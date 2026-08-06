@@ -1,0 +1,23 @@
+# Build from the repo root: infra/docker/build.sh api
+#
+# prisma generate --sql introspects query types against a live database, so
+# the build needs DATABASE_URL reachable from the build container (local dev:
+# host.docker.internal via --network host; CI: a service container).
+FROM node:24-slim AS build
+RUN npm install -g pnpm@10
+WORKDIR /app
+COPY . .
+RUN pnpm install --frozen-lockfile
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
+RUN pnpm build:packages && pnpm --filter @angy/api build
+
+# V1 runtime keeps the workspace as-built (generated Prisma client included).
+# Slimming via pnpm deploy is a follow-up: it re-installs, which would need
+# another generate pass.
+FROM node:24-slim
+ENV NODE_ENV=production
+WORKDIR /app/apps/api
+COPY --from=build /app /app
+EXPOSE 3001
+CMD ["node", "dist/main.js"]

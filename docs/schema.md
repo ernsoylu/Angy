@@ -1,6 +1,6 @@
 # Database Schema — Table Inventory
 
-> **DDL: TODO.** Full SQL lands with `packages/db/prisma/schema.prisma` when scaffolding begins. This file fixes the table inventory, ownership, and key columns so the Prisma schema has a spec to follow. Conventions (CLAUDE.md): snake_case tables/columns; uuid for pages (gen_random_uuid), bigint identity for spaces/users/attachments.
+> **DDL lives in [`packages/db/prisma/schema.prisma`](../packages/db/prisma/schema.prisma)** (migrations under `prisma/migrations/`). This file remains the spec-level inventory: table ownership and key columns. Conventions (CLAUDE.md): snake_case tables/columns; uuid for pages (gen_random_uuid), bigint identity for spaces/users/attachments.
 
 | Table | Purpose | Key columns |
 |-------|---------|-------------|

@@ -88,11 +88,11 @@ Full narrative, data-flow diagrams, and the consistency/backup model: [docs/arch
 ## Deployment
 
 ```bash
-docker build -t angy:latest .
-helm install angy ./infra/k8s/angy --set postgresql.auth.password=<pw> --set redis.auth.password=<pw>
+infra/docker/build.sh                  # builds angy/{web,api,realtime,worker}:latest
+kubectl apply -f infra/k8s/angy.yaml   # V1 topology; secrets come from the angy-env Secret
 ```
 
-Production environment variables: [docs/env.md](docs/env.md). Operational runbooks: [docs/runbooks/](docs/runbooks/). Note the V1 realtime topology: a single Hocuspocus replica with sticky sessions (see ADR 0008).
+Image builds need a reachable Postgres for `prisma generate --sql` (see the note in `infra/docker/build.sh`). Production environment variables: [docs/env.md](docs/env.md). Operational runbooks: [docs/runbooks/](docs/runbooks/). Note the V1 realtime topology: a single Hocuspocus replica with sticky sessions (see ADR 0008).
 
 ## Hard Rules
 
