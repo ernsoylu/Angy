@@ -132,7 +132,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~**Tags**~~ — **done (2026-08-06)**: workspace-wide `tag` + `page_tag`, freeform to write and normalised on the way in, with ADMIN-gated rename/merge as the cleanup half. Byline chips (frame 1), a searchable+facetable `tags` index field, and the Tags facet (frame 3).
 - ~~**Recent / Starred**~~ — **done (2026-08-06)**: `page_visit` + `page_star`, a throttled conditional upsert written straight from the reader's RSC render, a star toggle in the page-info rail, and space-scoped list routes behind the sidebar's two nav rows.
 - ~~**Search over attachments**~~ — **done (2026-08-06)**: an `attachments` index carrying space_id/page_id, so one tenant token's read filter covers both indexes; the Attachments tab is a real filter.
-- **Space administration** — the API half is **done (2026-08-06)**: space create/update, member list/invite/change-level/remove, all ADMIN-gated, each ending in a space-wide bitmap invalidation (a new operation — nothing in the closure table expresses "the whole space"). The settings screen (frame 12) and both dead buttons are **done** too; the create-space dialog (frame 13) has an API but no UI yet.
+- ~~**Space administration**~~ — **done (2026-08-06)**: the API half is: space create/update, member list/invite/change-level/remove, all ADMIN-gated, each ending in a space-wide bitmap invalidation (a new operation — nothing in the closure table expresses "the whole space"). The settings screen (frame 12), the create-space dialog (frame 13) and both dead buttons are **done** too, along with a 30-day space soft delete and the tag-cleanup surface.
 - ~~**Editor block affordances**~~ — **done (2026-08-06)**: bubble-menu link editor, a table-structure toolbar shown while the caret is in a table, and the `⠿`/`+` gutter (`@tiptap/extension-drag-handle-react`, with `+` opening the same `SLASH_ITEMS` palette).
 - ~~**Dialog search fields**~~ — **both already existed**; the gap line was stale. What was actually wrong is fixed: the move dialog kept every space header regardless of matches (so a search read as noise around no result), and the trash field searched titles only. Both now report an empty filter instead of showing a bare header.
 - ~~**Mobile**~~ — **done (2026-08-06)**: every tab-bar entry routes, with Me rendering the profile, both personal lists, and sign-out. (The full-width "Edit this page" button was already built in Phase 3.)
@@ -148,10 +148,10 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 - ~~Revision retention/thinning~~ — **done (2026-08-06)**: GC sweep thins past-retention revisions to one per day (pure policy unit-tested in shared).
 - ~~Media URL re-emission on cross-visibility moves~~ — **done (2026-08-06)**: the worker moves objects between access-class prefixes and realtime rewrites embedded srcs in the live doc; verified in both directions.
-- CDN key-rotation runbook (ADR 0007, "before GA"); the CDN layer itself is unprovisioned.
+- CDN key-rotation is documented in runbooks/key-rotation.md, but the CDN layer itself is unprovisioned — it lands with Wave G, once a provider is chosen.
 - ~~Search-token guardrail for oversized grant lists~~ — **already built**: past 200 explicit grants the token is withheld and search proxies through the API (`GRANT_GUARDRAIL`). The gap line was stale. Session-tied TTL stays an accepted deviation: sessions have no refresh interval to bind to.
-- Size-triggered compaction and the repeated-failure alert (compaction runbook) — interval scan only, alerts are manual log-watching.
-- Realtime health endpoint (alerts runbook TODO) — the WS tier is monitored by port only.
+- ~~Size-triggered compaction and the repeated-failure alert~~ — **already built**: `onStoreDocument` enqueues compaction the moment a blob crosses `COMPACTION_SIZE_THRESHOLD_BYTES`, and the worker emits `[alert] compaction failed N× consecutively` after three strikes. The gap line was stale.
+- ~~Realtime health endpoint~~ — **already built**: the WS tier answers `GET /health` from its `onRequest` hook. The gap line was stale.
 
 ### Robustness
 
