@@ -11,8 +11,15 @@ import {
 } from "@nestjs/common";
 import { SignJWT } from "jose";
 import { env } from "../env";
-import { createPage, getBreadcrumb, getEffectiveSpaceLevel, getPrisma } from "@angy/db";
 import {
+  createPage,
+  getBreadcrumb,
+  getEffectivePageLevel,
+  getEffectiveSpaceLevel,
+  getPrisma,
+} from "@angy/db";
+import {
+  createChildPageSchema,
   createPageSchema,
   DOC_COMMAND_CHANNEL,
   JOB_PROJECTION_INIT,
@@ -20,6 +27,7 @@ import {
   renamePageSchema,
   satisfies,
   type ApiOk,
+  type CreateChildPageDto,
   type CreatePageDto,
   type PageDetailDto,
   type RenameCommand,
@@ -174,5 +182,54 @@ export class PagesController {
     // and generates the first projections (docs/implementation-plan.md § 3).
     await projectionsQueue().add(JOB_PROJECTION_INIT, { pageId: page.id });
     return ok({ id: page.id, slug: page.slug });
+  }
+
+  /**
+   * Create a child of an existing page — the `/page` slash command.
+   *
+   * Separate from POST /pages because the caller is the editor, which knows
+   * only which page it is editing. Taking a spaceId from it would mean
+   * threading one through the editor purely to hand it back, and would let a
+   * malformed client ask for a child in a space its parent does not live in.
+   * A child always belongs to its parent's space, so the server derives it.
+   */
+  @Post(":id/children")
+  async createChild(
+    @Param("id") parentId: string,
+    @Body(new ZodValidationPipe(createChildPageSchema)) body: CreateChildPageDto,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<{ id: string; slug: string; title: string }>> {
+    const prisma = getPrisma();
+    const parent = await prisma.page.findFirst({
+      where: { id: parentId, deletedAt: null },
+      select: { id: true, spaceId: true },
+    });
+    if (!parent) throw new NotFoundException("Page not found");
+
+    // EDIT on the parent, not merely on the space: page grants only ever widen
+    // the space baseline, so the parent is the stricter and correct gate.
+    const level = await getEffectivePageLevel(prisma, req.user.id, parent.id);
+    if (!satisfies(level, "EDIT")) {
+      throw new ForbiddenException("You need edit access to this page to add a child");
+    }
+
+    const base = slugify(body.title);
+    const taken = await prisma.page.findMany({
+      where: { spaceId: parent.spaceId, slug: { startsWith: base } },
+      select: { slug: true },
+    });
+    const slugs = new Set(taken.map((p) => p.slug));
+    let slug = base;
+    for (let i = 2; slugs.has(slug); i++) slug = `${base}-${i}`;
+
+    const page = await createPage(prisma, {
+      spaceId: parent.spaceId,
+      parentId: parent.id,
+      title: body.title,
+      slug,
+      createdBy: req.user.id,
+    });
+    await projectionsQueue().add(JOB_PROJECTION_INIT, { pageId: page.id });
+    return ok({ id: page.id, slug: page.slug, title: body.title });
   }
 }

@@ -65,8 +65,8 @@ public hostnames, tunnel as sole ingress. Procedure:
 - [x] **G2 · Public origin config** *(2026-08-06)* — `infra/docker/build.sh` already takes the two `NEXT_PUBLIC_*` values as build args; the runbook records that the web image is therefore environment-specific and cannot be promoted across deployments.
 - [x] **G3 · Media without a CDN** *(2026-08-06)* — decided in favour of exposing MinIO as `media.angy.<domain>`, a fifth public hostname (ADR 0007 amendment). This required the `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` split: SigV4 signs the Host header, so presigning must happen against the public origin while all SDK traffic stays internal.
 - [x] **G1 · WebSocket tier survives the tunnel** *(2026-08-06, verified against the live deployment)* — upgrade completes in 0.24s; an idle connection held 60s and was then closed by Hocuspocus itself with `4408 Connection Timeout`. The close **code** is the evidence, not the duration: a proxy reaping an idle upgrade produces `1006` with no close frame, so a clean application-level 4408 proves the tunnel carried the connection for its full lifetime. Procedure: runbooks/homelab.md §5.1.
-- [ ] **G4 · Persistence and backup** — volume inventory and the Postgres dump procedure are in runbooks/homelab.md §6; Postgres PITR and a *tested* restore drill are still open.
-- [ ] **G5 · Does terraform earn its place** — leaning no. `infra/compose.prod.yml` covers the homelab, and `infra/k8s/rehearse.sh` covers the k8s path. Revisit only if a second deployment target appears.
+- [x] **G4 · Persistence and backup** *(2026-08-07)* — `infra/backup.sh` dumps both Postgres databases and archives the object store, on a daily cron with a **weekly restore drill**. Drilled against the live deployment: the dump restored into a throwaway container and the row counts matched the manifest exactly. Postgres alone would not have been a backup — it holds pointers into object storage, so restoring it without the bucket yields a full page tree of empty pages. Snapshots are replicated to a SMB share at `/mnt/Backups` (60-day retention there, 14 locally); a missing mount fails the run rather than silently degrading to local-only. **Still open:** snapshots are not PITR, and the share is on the same LAN — that covers a disk, not the room.
+- [x] **G5 · Terraform does not earn its place** *(2026-08-07)* — **no**. There is no cloud account, no CDN and no DNS zone to manage: the whole infrastructure is one compose file, five Pangolin resources clicked once, and a connector. Terraform would describe a VPS it does not own. `infra/compose.prod.yml` covers the homelab and `infra/k8s/rehearse.sh` covers the k8s path. Revisit only if a second deployment target appears.
 
 **Not blocking, worth knowing:** Pangolin's Integration API listens on port
 3003 (not 443) behind `flags.enable_integration_api`, and was unreachable from
@@ -82,12 +82,26 @@ the dashboard rather than scripted.
 - Tag admin lives in *space* settings even though tags are workspace-wide — it is the only admin surface there is. A workspace-settings screen would be its proper home if one is ever designed.
 - Unused tags are swept by the GC rather than kept: freeform authoring means the vocabulary only grows otherwise, and an orphan name blocks renaming onto it.
 
-**Critical path:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E~~ → G.
+**Critical path:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E~~ → ~~G~~.
 
-Waves A through F are done, and **Wave G is deployed and serving** on the
-homelab behind the tunnel: all five hostnames route, OIDC discovery and the
-sign-in redirect work end to end, and G1 is measured rather than assumed.
+**V1 is complete and deployed.** Waves A–G are closed. The stack runs on the
+homelab behind a Pangolin tunnel, serving six public hostnames alongside
+Forgejo on the same identity provider; sign-in, collaborative editing, search,
+media and page history all work end to end against the live deployment, and the
+backup is drilled rather than merely written down.
 
-What remains is operational, not architectural: G4's *tested* restore drill
-(the dump procedure exists; an untested backup is a hypothesis) and the G5
-call on terraform, which is leaning no.
+What is genuinely open is operational, not architectural:
+
+- **Backups reach a NAS but not another site.** That covers a failed disk, not
+  a failed room; and snapshots are not point-in-time recovery.
+- **Credential rotation** — the deployment secrets generated during setup have
+  never been rotated, and several were typed in plaintext while it was built.
+- **No production seed by design.** A new workspace starts genuinely empty, so
+  first-run paths are load-bearing in a way development never exercises. Two
+  V1-blocking defects hid there (an empty space list read as signed-out; the
+  only button out of an empty space was wired to nothing), which is a reason to
+  keep exercising them.
+
+Next feature work is V2, sequenced in implementation-plan.md. The first
+question to settle is `block_index`, because backlinks, stale page-link titles
+and databases (ADR 0013) all wait on it.

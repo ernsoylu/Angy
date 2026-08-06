@@ -3,6 +3,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { Image } from "@tiptap/extension-image";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { Callout } from "./callout.js";
+import { PageLink } from "./page-link.js";
 
 /**
  * The one place the V1 block schema is defined (isomorphic-block invariant):
@@ -23,6 +24,7 @@ function makeExtensions(options: { undoRedo: boolean }): Extensions {
     TableHeader,
     TableCell,
     Callout,
+    PageLink,
   ];
 }
 

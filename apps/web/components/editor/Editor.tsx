@@ -12,7 +12,7 @@ import { BlockGutter } from "./BlockGutter";
 import { BubbleToolbar } from "./BubbleToolbar";
 import { CollaborativeTitle } from "./CollaborativeTitle";
 import { TableToolbar } from "./TableToolbar";
-import { IMAGE_REQUEST_EVENT } from "./slash-items";
+import { IMAGE_REQUEST_EVENT, PAGE_REQUEST_EVENT } from "./slash-items";
 import { SlashCommand } from "./SlashMenu";
 import styles from "./editor.module.css";
 
@@ -145,6 +145,45 @@ export function Editor({
     dom.addEventListener(IMAGE_REQUEST_EVENT, open);
     return () => dom.removeEventListener(IMAGE_REQUEST_EVENT, open);
   }, [editor]);
+
+  // "/page" flow: create a real child page, then drop a reference to it into
+  // this document. The page is created first and the node second, so a failed
+  // request leaves no link pointing at a page that does not exist — the
+  // opposite order would produce a dead link on every network blip.
+  useEffect(() => {
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const create = () => {
+      void (async () => {
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/pages/${pageId}/children`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: "Untitled" }),
+            },
+          );
+          const body = await res.json();
+          if (!body.success) return;
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "pageLink",
+              attrs: { pageId: body.data.id as string, title: body.data.title as string },
+            })
+            .run();
+        } catch {
+          // Swallowed on purpose: the slash query is already removed, so the
+          // document is unchanged and the user can simply try again.
+        }
+      })();
+    };
+    dom.addEventListener(PAGE_REQUEST_EVENT, create);
+    return () => dom.removeEventListener(PAGE_REQUEST_EVENT, create);
+  }, [editor, pageId]);
 
   async function uploadImage(file: File) {
     if (!editor) return;

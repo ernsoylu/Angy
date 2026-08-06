@@ -9,6 +9,7 @@ import {
   List,
   ListOrdered,
   Minus,
+  FileText,
   Table2,
   TextQuote,
   Type,
@@ -16,6 +17,14 @@ import {
 
 /** Fired at the editor DOM when the Image slash item needs a file picked. */
 export const IMAGE_REQUEST_EVENT = "angy:image-request";
+
+/**
+ * Fired when the Page slash item runs. Like the image flow, the palette cannot
+ * do the work itself: creating a child needs the API and the id of the page
+ * being edited, neither of which a pure block-insert command has. The Editor
+ * owns both, so the item asks and the Editor answers.
+ */
+export const PAGE_REQUEST_EVENT = "angy:page-request";
 
 export interface SlashItem {
   title: string;
@@ -32,6 +41,19 @@ const cell = (type: "tableHeader" | "tableCell") => ({
 
 /** Block palette per frontend.pen frame 2 ("Basic blocks"). */
 export const SLASH_ITEMS: SlashItem[] = [
+  {
+    title: "Page",
+    description: "Create a page nested under this one",
+    icon: FileText,
+    keywords: "page subpage child nested new",
+    command: (editor, range) => {
+      // Delete the "/page" text before the async work starts: the request is
+      // a round trip, and leaving the query in the document means the user can
+      // keep typing into text that is about to be replaced.
+      editor.chain().focus().deleteRange(range).run();
+      editor.view.dom.dispatchEvent(new CustomEvent(PAGE_REQUEST_EVENT, { bubbles: true }));
+    },
+  },
   {
     title: "Text",
     description: "Plain paragraph",

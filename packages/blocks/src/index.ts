@@ -12,11 +12,13 @@ export const V1_BLOCK_TYPES = [
   "callout",
   "divider",
   "blockquote",
+  "pageLink",
 ] as const;
 
 export type BlockType = (typeof V1_BLOCK_TYPES)[number];
 
 export { Callout, CALLOUT_TONES, type CalloutTone } from "./callout.js";
+export { PageLink } from "./page-link.js";
 export { diffDocuments, diffWords, type DiffBlock, type WordDiffPart } from "./diff.js";
 export { baseExtensions, editorExtensions } from "./extensions.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";

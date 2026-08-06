@@ -126,6 +126,16 @@ export const createPageSchema = z.object({
 });
 export type CreatePageDto = z.infer<typeof createPageSchema>;
 
+/**
+ * Creating a child from the editor (`/page`). No spaceId and no parentId: the
+ * parent is the URL, and its space is derived server-side — a child cannot
+ * belong anywhere else.
+ */
+export const createChildPageSchema = z.object({
+  title: z.string().min(1).max(200),
+});
+export type CreateChildPageDto = z.infer<typeof createChildPageSchema>;
+
 /** Page grant levels — ADMIN is space-only. */
 export const grantLevelSchema = z.enum(["VIEW", "EDIT", "FULL"]);
 

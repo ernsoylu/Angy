@@ -90,3 +90,36 @@ describe("extractText", () => {
     expect(text).not.toContain("<");
   });
 });
+
+describe("page links", () => {
+  const doc = {
+    type: "doc",
+    content: [
+      {
+        type: "pageLink",
+        attrs: { pageId: "fc8c9d0e-c54c-47fd-afc5-1d2c03ee96b4", title: "Runbooks" },
+      },
+    ],
+  };
+
+  // The isomorphic-block invariant: the SSR read path renders through the same
+  // extension set as the editor, so a node the editor can insert but the static
+  // renderer cannot draw would show up only in production, as a blank page.
+  it("renders through the static renderer, not just the editor", () => {
+    const html = renderDocumentToHtml(doc);
+    expect(html).toContain("data-page-link");
+    expect(html).toContain("Runbooks");
+  });
+
+  // Space-agnostic on purpose: a page that moves between spaces must not
+  // invalidate every document linking to it.
+  it("links by page id rather than space key", () => {
+    const html = renderDocumentToHtml(doc);
+    expect(html).toContain('href="/p/fc8c9d0e-c54c-47fd-afc5-1d2c03ee96b4"');
+    expect(html).not.toContain("/s/");
+  });
+
+  it("contributes its title to the search extract", () => {
+    expect(extractText(doc)).toContain("Runbooks");
+  });
+});

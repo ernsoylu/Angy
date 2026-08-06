@@ -278,33 +278,104 @@ Sign in through the browser and confirm:
 
 ## 6. Backups
 
-Volumes to back up, in order of how much it hurts to lose them:
-
-| Volume | Contents | Recoverable without a backup? |
-|---|---|---|
-| `miniodata` | Y.Doc blobs, revisions, media | **No — this is the actual content** |
-| `pgdata` | Pages, permissions, projections | No |
-| `authentikdb` | Identities, provider config | Rebuildable by hand, tediously |
-| `meilidata` | Search index | Yes — reindex from Postgres |
-| `redisdata` | Sessions, hot Y.Docs, bitmaps | Mostly — see below |
-
-Redis is the subtle one. It is a cache for permission bitmaps (recomputed
-lazily) but *not* purely a cache for live Y.Docs: the window between an edit and
-its debounced S3 store is real data that exists nowhere else. That window is
-~2s, which is why `appendonly yes` and `noeviction` are both set, and why the
-store debounce should stay short.
-
-Both Postgres containers mount `./backup`, so:
+`infra/backup.sh`, deployed alongside the compose file. Run it from the
+deployment directory:
 
 ```bash
-docker compose -f infra/compose.prod.yml exec postgres \
-  pg_dump -U angy angy -Fc -f /backup/angy-$(date +%F).dump
+./backup.sh            # dated snapshot under ./backup
+./backup.sh --verify   # ...then restore it and assert the counts match
 ```
 
-Restore drill belongs on the calendar, not in the incident. An untested backup
-is a hypothesis.
+Scheduled by cron under the deploying user — no sudo, since docker-group
+membership is the only privilege it needs:
 
----
+```
+20 3 * * 1-6  cd $HOME/angy && ./backup.sh          >> backup/backup.log 2>&1
+20 3 * * 0    cd $HOME/angy && ./backup.sh --verify >> backup/backup.log 2>&1
+```
+
+Daily on weekdays, **drilled weekly**. The drill is the part that matters: the
+usual way a backup fails is not corruption, it is a dump that was always empty
+or a role that does not exist on restore — and you find out on the day you
+cannot afford to.
+
+### What it captures, and what it deliberately does not
+
+| Volume | Contents | In the backup? |
+|---|---|---|
+| `miniodata` | Y.Doc blobs, revisions, media | ✅ **the actual content** |
+| `pgdata` | pages, permissions, projections | ✅ |
+| `authentikdb` | identities, provider config | ✅ |
+| `meilidata` | search index | ❌ pure projection — reindexed from Postgres |
+| `redisdata` | sessions, bitmaps, hot Y.Docs | ❌ see below |
+
+**Postgres alone is not a backup.** It holds pointers into object storage, so
+restoring the database without the bucket gives you a complete page tree in
+which every page is empty. That is why the object store is archived first-class
+rather than treated as a cache.
+
+**Redis is the subtle omission.** Sessions and permission bitmaps are genuinely
+disposable — they recompute. But Redis is *not* purely a cache for live Y.Docs:
+the window between an edit and its debounced S3 store is real data that exists
+nowhere else. That window is ~2s, which is why the store debounce stays short
+and why `appendonly yes` and `noeviction` are both set. Losing it costs the
+last couple of seconds of an in-flight edit, not a document.
+
+### How it reads the object store
+
+Directly from the volume, via a throwaway container, rather than through the
+MinIO API — the image ships neither `tar` nor a writable staging area, and
+anything staged under `/data` risks being read back as a bucket.
+
+A file-level copy is safe because MinIO writes objects atomically (temp file,
+then rename): a concurrent write is seen as either the old object or the new
+one, never a torn one. Media keys are content-addressed and immutable anyway;
+only the per-page Y.Doc blobs are ever overwritten.
+
+### Restoring for real
+
+```bash
+# Postgres
+docker compose -f compose.prod.yml exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
+  pg_restore -U angy -d angy --clean --no-owner --no-privileges < backup/<stamp>/angy.dump
+
+# Object store — stop MinIO first, or it will not see the files it is handed
+docker compose -f compose.prod.yml stop minio
+docker run --rm -v angy_miniodata:/data -v "$PWD/backup/<stamp>":/b:ro \
+  alpine tar -xf /b/angy-docs.tar -C /data
+docker compose -f compose.prod.yml start minio
+
+# Meilisearch rebuilds itself; no restore step
+```
+
+Verified on this deployment 2026-08-07: dump restored into a throwaway
+container, `space=1 page=1 user=1` matched the live manifest exactly.
+
+### Off the machine
+
+Snapshots are written locally and then replicated to a SMB share mounted at
+`/mnt/Backups`, kept for 60 days there against 14 locally. Local first, then
+copy — a dump streamed straight at the network is corrupted by a mid-write
+blip, and the local copy is the fast path for an ordinary restore. The share is
+the replica, not the target.
+
+```
+//<nas>/Backup /mnt/Backups cifs credentials=/etc/cifs/backup.cred,uid=1000,gid=1000,file_mode=0640,dir_mode=0750,_netdev,nofail 0 0
+```
+
+Credentials live in `/etc/cifs/backup.cred` (root, 0600), never in `/etc/fstab`
+— fstab is world-readable. `nofail` keeps a NAS outage from blocking boot;
+`uid=1000` lets the backup run unprivileged.
+
+**A missing mount fails the run loudly rather than falling back to local-only.**
+Quietly skipping is exactly how you discover months later that nothing was ever
+copied — the failure this step exists to prevent. Watch for `[alert] OFFSITE`
+in `backup/backup.log`.
+
+**Still open:** these are snapshots, not point-in-time recovery, so losing the
+server costs up to a day of edits. Continuous archiving (`wal_level=replica`
+plus an archive command) is the upgrade when the content justifies it. The
+share also sits on the same LAN, which covers disk failure but not the room.
 
 ## Related
 
