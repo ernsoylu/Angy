@@ -232,10 +232,18 @@ services:
       AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
       AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
-    # The dev blueprint is deliberately NOT mounted: it carries the well-known
-    # client secret and the shared `angy` password. Configure the production
-    # provider through the admin UI, or write a separate blueprint whose
-    # secrets come from the environment.
+      # Consumed by blueprints/prod/angy.yaml via !Env, so the provider and the
+      # API read the same client credentials and redirect URI from one place
+      # and cannot drift apart.
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      PUBLIC_API_URL: https://${API_HOST}
+      WEB_PUBLIC_URL: https://${WEB_HOST}
+    # The *dev* blueprint is deliberately not mounted — it carries a well-known
+    # client secret and a shared password. This is the production one, which
+    # holds no secrets: every sensitive value is !Env.
+    volumes:
+      - ./authentik/blueprints/prod:/blueprints/custom:ro
     depends_on:
       authentik-postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -251,6 +259,9 @@ services:
     restart: unless-stopped
     command: worker
     environment: *authentik-env
+    # The worker is what actually applies blueprints, on every start.
+    volumes:
+      - ./authentik/blueprints/prod:/blueprints/custom:ro
     depends_on:
       authentik-postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

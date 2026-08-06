@@ -1,0 +1,96 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+#
+# Production Authentik configuration for Angy (ADR 0011).
+#
+# The sibling dev blueprint (../angy.yaml) hardcodes a well-known client secret
+# and a shared password, which is why it is not mounted outside development.
+# This one carries no secrets at all: every sensitive value is `!Env`, resolved
+# from the same /opt/angy/.env (or ~/angy/.env) that configures the API, so the
+# two cannot drift into a client_id/secret mismatch.
+#
+# It also creates no users. Real accounts are created in the admin UI or
+# provisioned later; a blueprint that invents users is a dev convenience.
+#
+# Applied by the authentik-worker on every start, so it is idempotent and the
+# provider config is reproducible rather than a sequence of remembered clicks.
+version: 1
+
+metadata:
+  name: angy-prod
+  labels:
+    blueprints.goauthentik.io/description: "Angy: OIDC provider and application"
+
+entries:
+  # ---------------------------------------------------------------- provider
+  - model: authentik_providers_oauth2.oauth2provider
+    id: angy-provider
+    identifiers:
+      name: angy-web
+    attrs:
+      # Implicit consent: Angy and Authentik are both first-party here, so the
+      # "do you allow this app" interstitial would ask the user to authorise
+      # their own company wiki on every login. Swap to the explicit-consent
+      # flow if Angy ever stops being first-party.
+      authorization_flow:
+        !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: confidential
+      client_id: !Env OIDC_CLIENT_ID
+      client_secret: !Env OIDC_CLIENT_SECRET
+      # per_provider, not global. With `global` Authentik advertises
+      # https://id.<domain>/ as the issuer while serving discovery from
+      # /application/o/angy/, and openid-client validates that the two agree —
+      # discovery fails outright on the mismatch (ADR 0011).
+      issuer_mode: per_provider
+      # Angy joins users by the OIDC subject (app_user.oidc_subject), so the
+      # subject must be stable per user and never per session.
+      sub_mode: hashed_user_id
+      redirect_uris:
+        - matching_mode: strict
+          # Must equal OidcService.redirectUri(), which is built from
+          # PUBLIC_API_URL — hence the same variable on both sides.
+          #
+          # `!Env VAR`, never `!Env [VAR]`. Authentik's Env tag reads
+          # node.value[1] for the default when handed a sequence, so a
+          # one-element list raises IndexError inside the YAML constructor —
+          # which aborts blueprint *discovery* wholesale, not just this file.
+          url: !Format ["%s/auth/callback", !Env PUBLIC_API_URL]
+          redirect_uri_type: authorization
+      grant_types:
+        - authorization_code
+        - refresh_token
+      # Exactly the scopes OidcService requests: openid profile email.
+      property_mappings:
+        - !Find [
+            authentik_providers_oauth2.scopemapping,
+            [managed, goauthentik.io/providers/oauth2/scope-openid],
+          ]
+        - !Find [
+            authentik_providers_oauth2.scopemapping,
+            [managed, goauthentik.io/providers/oauth2/scope-profile],
+          ]
+        - !Find [
+            authentik_providers_oauth2.scopemapping,
+            [managed, goauthentik.io/providers/oauth2/scope-email],
+          ]
+      signing_key:
+        !Find [authentik_crypto.certificatekeypair, [name, authentik Self-signed Certificate]]
+
+  # ------------------------------------------------------------- application
+  - model: authentik_core.application
+    identifiers:
+      slug: angy
+    attrs:
+      name: Angy
+      provider: !KeyOf angy-provider
+      meta_description: Company knowledge, one page at a time.
+      meta_launch_url: !Env WEB_PUBLIC_URL
+
+  # ------------------------------------------------------------------- group
+  # The claim Angy and the rest of the suite will read once group mapping
+  # lands. Created now so the shape is fixed before anything depends on it.
+  - model: authentik_core.group
+    identifiers:
+      name: eng
+    attrs:
+      is_superuser: false
