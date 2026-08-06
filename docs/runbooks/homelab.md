@@ -125,16 +125,37 @@ docker compose --env-file /opt/angy/.env -f infra/compose.prod.yml up -d
 docker compose -f infra/compose.prod.yml exec api node -e "…"   # see §4.1
 ```
 
-### 4.1 Migrate and seed
+### 4.1 Migrate
 
 Migrations do not run automatically — that is deliberate, so a restart can
-never surprise you with a schema change:
+never surprise you with a schema change.
+
+They cannot run *inside* the app containers either: the pruned runtime images
+carry the schema and the migration SQL but not the Prisma CLI, which is a
+devDependency and correctly absent from production. Lift the schema out and
+run the CLI in a throwaway container on the same network:
 
 ```bash
-docker compose -f infra/compose.prod.yml run --rm \
-  -e DATABASE_URL="postgresql://angy:$POSTGRES_PASSWORD@postgres:5432/angy" \
-  api npx prisma migrate deploy --schema node_modules/@angy/db/prisma/schema.prisma
+cd ~/angy
+cid=$(docker create angy/api:homelab)
+rm -rf prisma && mkdir -p prisma
+docker cp "$cid:/app/node_modules/@angy/db/prisma/." prisma/
+docker rm "$cid"
+
+set -a; . ./.env; set +a
+docker run --rm --network angy_default \
+  -v "$PWD/prisma:/prisma" \
+  -e DATABASE_URL="postgresql://angy:${POSTGRES_PASSWORD}@postgres:5432/angy" \
+  node:24-alpine \
+  npx -y prisma@6.19.3 migrate deploy --schema /prisma/schema.prisma
 ```
+
+Until this runs, `worker` crash-loops on `The table public.page does not exist`
+(P2021) — that is the expected symptom of a migrated-too-late database, not a
+worker bug.
+
+There is no production seed. `pnpm db:seed` creates fake users and demo
+content; a real deployment starts empty and gets its first space from the UI.
 
 ### 4.2 Configure Authentik
 
@@ -198,6 +219,13 @@ curl -sfI https://angy.<domain>/signin | head -1
 curl -sfI https://media.angy.<domain>/angy-docs/media/<known-key> | head -1   # 200
 curl -sI  https://media.angy.<domain>/angy-docs/media-private/x | head -1     # 403
 ```
+
+> **If `api`, `realtime` or `web` sit at `unhealthy` while their logs look
+> fine**, check the probe before the service. The runtime images ship node and
+> essentially nothing else — no curl, no wget — so a shell-based probe reports
+> a live service as unhealthy and `depends_on: service_healthy` stalls
+> everything behind it. `docker inspect <c> --format '{{range
+> .State.Health.Log}}{{.Output}}{{end}}'` shows the real error.
 
 ### 5.1 The WebSocket check (the one that actually matters)
 

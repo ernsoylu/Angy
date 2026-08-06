@@ -43,6 +43,10 @@ x-env: &app-env
 
 services:
   # ──────────────────────────────────────────────────────────── Angy services
+  # Healthchecks use `node -e`, not curl: the pruned runtime images ship node
+  # and essentially nothing else. A curl-based probe reports a live service as
+  # unhealthy, and `depends_on: service_healthy` then stalls everything behind
+  # it — the failure looks like a startup-order bug rather than a missing binary.
   web:
     image: angy/web:${TAG:-latest}
     restart: unless-stopped
@@ -57,7 +61,7 @@ services:
     depends_on:
       api: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/signin || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/signin').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -84,7 +88,7 @@ services:
       meilisearch: { condition: service_healthy }
       minio: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3001/health || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -100,7 +104,7 @@ services:
       redis: { condition: service_healthy }
       minio: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3002/health || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       retries: 10
