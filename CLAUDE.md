@@ -119,6 +119,9 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **Compaction candidacy compares state vectors, never timestamps** — compaction itself touches page.updated_at, so a timestamp check re-enqueues every page forever.
 - **Crashed browser tabs reap at Hocuspocus's ~30s health timeout** (no WS close frame), so idle-cutoff checkpoints from them arrive late — the Done button's explicit checkpoint is the deterministic save path.
 - **pg_advisory_xact_lock returns void** — cast it (`::text`) under Prisma $queryRaw or deserialization fails.
+- **`NEXT_PUBLIC_*` are baked into the web image at build time**, so the `angy-env` Secret cannot change what the browser talks to — pass them to infra/docker/build.sh per deployment target. Server-side code uses `API_INTERNAL_URL`, which *is* runtime env.
+- **Editor plugins registered from React (drag handle) must take referentially stable props** — a new `onNodeChange` identity each render re-registers the ProseMirror plugin, and the reconfigure tears down every other plugin's view (the slash menu silently stops opening).
+- **The page title is a `title` Y.Text in the page's own Y.Doc** (`TITLE_FIELD`), not a plain column write: `onStoreDocument` copies it into `page.title`, so anything renaming a page must go through the doc (`rename` doc command) or the next store overwrites it. Never persist an empty title — reseed the doc from the row instead.
 
 ## V1 Scope (Ship the Core Editing Experience)
 

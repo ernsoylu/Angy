@@ -2,7 +2,7 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (58 unit/integration tests, 13 Playwright e2e tests, all builds green), plus the post-V1 punch list and two burn-down waves (see § Open gaps for what was closed and what remains).
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (73 unit/integration tests, 21 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–C and F (see § Open gaps for what was closed and what remains).
 
 ## Design inputs
 
@@ -128,14 +128,14 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 - ~~**Cross-space move**~~ — **done (2026-08-06)**: `movePage` carries the subtree's `space_id` under dual advisory locks with slug de-duplication; the dialog lists every space; moving requires EDIT in the destination space.
 - **Tags** — no tag model; frames 1 (byline chips) and 3 (search facet) both show them.
-- **Recent / Starred** — sidebar stubs; need visit-tracking and star models.
+- ~~**Recent / Starred**~~ — **done (2026-08-06)**: `page_visit` + `page_star`, a throttled conditional upsert written straight from the reader's RSC render, a star toggle in the page-info rail, and space-scoped list routes behind the sidebar's two nav rows.
 - **Search over attachments** — frame 3's Attachments tab is decorative; only pages are indexed (Phase 7 text also promised attachment metadata).
 - **Space administration** — no create-space flow or member management; space-home "New page" header button and "Space settings" are unwired.
-- **Editor block affordances** — frame 2's `+` inserter and drag handles, bubble-menu link button, table row/column editing.
+- ~~**Editor block affordances**~~ — **done (2026-08-06)**: bubble-menu link editor, a table-structure toolbar shown while the caret is in a table, and the `⠿`/`+` gutter (`@tiptap/extension-drag-handle-react`, with `+` opening the same `SLASH_ITEMS` palette).
 - **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash".
-- **Mobile** — frame E's full-width "Edit this page" button; tab-bar Search/Page/Me are stubs.
-- **Frame D interaction spec** — ⌘K binding, skip-to-content, page-tree arrow keys, Esc-closes-topmost; compact density preference.
-- **Misc** — second IdP button is decorative (single issuer); attachment "Used on N pages" shows one page.
+- ~~**Mobile**~~ — **done (2026-08-06)**: every tab-bar entry routes, with Me rendering the profile, both personal lists, and sign-out. (The full-width "Edit this page" button was already built in Phase 3.)
+- ~~**Frame D interaction spec**~~ — **done (2026-08-06)**: page-tree roving-tabindex traversal (↑↓ → ← Enter/Home/End) and the compact density preference join the ⌘K binding, skip link, and Esc handling.
+- **Misc** — second IdP button is decorative (single issuer); ~~attachment "Used on N pages"~~ now lists every page sharing the blob's sha256.
 
 ### Frame-11 mandate only half-wired
 
@@ -154,17 +154,18 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 ### Robustness
 
 - ~~**Realtime token refresh on reconnect**~~ — **done (2026-08-06)**: the provider now takes a token *function*, fetching a fresh page-scoped JWT on every (re)connect.
-- Page title is PATCH-based last-write-wins, not collaborative like the body.
+- ~~Page title is PATCH-based last-write-wins~~ — **done (2026-08-06)**: the title is a `title` Y.Text in the page's own Y.Doc, so it syncs, persists, and restores with the body. `onStoreDocument` copies it into `page.title`; REST renames publish a `rename` doc command rather than writing the row, which is what keeps the two from fighting (the API is CommonJS and must never touch a Y.Doc).
 - Revoked live editors see "offline", not the restricted state.
 - Reader TOC has no scroll-spy (first heading statically active).
 
 ### Ops / infra
 
 - `infra/terraform/` (named in CLAUDE.md's layout) does not exist.
-- e2e suite is local-only; CI runs unit/integration tests (e2e needs the full compose stack as services).
-- No clean-deploy rehearsal: images build and the API container smoke-tests, but `kubectl apply` has never been exercised; runtime images carry the whole workspace (~1.5 GB — slimming via `pnpm deploy` + a second generate pass is the noted follow-up).
+- ~~e2e suite is local-only~~ — **done (2026-08-06)**: a second CI job brings the compose stack up, boots all four apps from their production builds, and runs Playwright; app logs and traces upload on failure.
+- ~~Runtime images carry the whole workspace~~ — **done (2026-08-06)**: `infra/docker/prune.sh` deploys each app prod-only and regenerates the Prisma client in the pruned tree; ~1.5 GB → 578–602 MB (web 509 MB via Next standalone).
+- ~~No clean-deploy rehearsal~~ — **done (2026-08-06)**: `infra/k8s/rehearse.sh` stands `angy.yaml` up on a throwaway kind cluster with a real `angy-env` Secret and smoke-tests all four workloads plus the SSR read path. It caught two real deploy bugs on the first run: `angy.yaml` had no `imagePullPolicy`, so `:latest` defaulted to `Always` and every pod hit `ErrImagePull`; and `NEXT_PUBLIC_*` are inlined by Next at build time, so the Secret's copies never reached the browser — they are build args on `Dockerfile.web` now.
 
-The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. What remains is either V2-shaped (tags, Recent/Starred, space administration — data-model decisions first), polish (editor affordances, dialog search, mobile items, frame-D interaction spec), or ops (retention policies, rotation runbook, terraform, e2e-in-CI, image slimming).
+The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–C and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); and the collaborative title. Everything still open is either behind a decision gate (tags, attachment search, space administration, the cloud provider) or a small standalone item (dialog search fields, revoked-editor state, TOC scroll-spy, search-token guardrail).
 
 ## V2 sequencing (dependency-ordered, planned 2026-08-06)
 
