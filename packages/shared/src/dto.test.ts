@@ -4,6 +4,7 @@ import {
   createPageSchema,
   movePageSchema,
   pageDetailSchema,
+  pageListItemSchema,
   pagePermissionsSchema,
   pageSummarySchema,
   revisionSchema,
@@ -46,8 +47,18 @@ describe("dto schemas", () => {
         version: 3,
         updatedByName: "Mira",
         contributors: 2,
+        starred: false,
         createdAt: NOW,
         updatedAt: NOW,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      pageListItemSchema.parse({
+        id: UUID,
+        title: "Runbooks",
+        parentTitle: null,
+        at: NOW,
+        updatedByName: "Mira",
       }),
     ).not.toThrow();
     expect(() =>
@@ -82,6 +93,7 @@ describe("dto schemas", () => {
         sha256: "ab",
         pageId: UUID,
         pageTitle: null,
+        usedOnPages: [{ id: UUID, title: "Realtime Sync" }],
         uploadedByName: null,
         createdAt: NOW,
         url: "http://x/y",

@@ -51,6 +51,7 @@ async function toDto(
   attachment: Attachment & { page?: { title: string } | null },
   visibility: SpaceVisibility,
   uploaderName: string | null,
+  usedOnPages: AttachmentDto["usedOnPages"] = [],
 ): Promise<AttachmentDto> {
   const isPrivate = visibility === "PRIVATE";
   return {
@@ -63,6 +64,7 @@ async function toDto(
     sha256: attachment.sha256,
     pageId: attachment.pageId,
     pageTitle: attachment.page?.title ?? null,
+    usedOnPages,
     uploadedByName: uploaderName,
     createdAt: attachment.createdAt.toISOString(),
     url: await mediaUrl(attachment.s3Key, isPrivate),
@@ -120,7 +122,11 @@ export class AttachmentsController {
     if (file.mimetype.startsWith("image/")) {
       await maintenanceQueue().add(JOB_THUMBNAIL, { attachmentId: attachment.id.toString() });
     }
-    return ok(await toDto(attachment, page.space.visibility, req.user.displayName));
+    return ok(
+      await toDto(attachment, page.space.visibility, req.user.displayName, [
+        { id: page.id, title: page.title },
+      ]),
+    );
   }
 
   /** Space media library (frame 8): every live attachment on the space's pages. */
@@ -139,17 +145,35 @@ export class AttachmentsController {
 
     const attachments = await prisma.attachment.findMany({
       where: { deletedAt: null, page: { spaceId: space.id, deletedAt: null } },
-      include: { page: { select: { title: true } } },
+      include: { page: { select: { id: true, title: true } } },
       orderBy: { createdAt: "desc" },
     });
     const uploaderIds = [...new Set(attachments.map((a) => a.uploadedBy))];
     const uploaders = await prisma.appUser.findMany({ where: { id: { in: uploaderIds } } });
     const nameOf = new Map(uploaders.map((u) => [u.id.toString(), u.displayName]));
 
+    // One S3 object per sha256, one row per (page, upload) — so usage is the
+    // set of pages sharing a hash. Space-scoped: page grants only widen, so
+    // everyone who can read the space can read every page title in it.
+    const usage = new Map<string, AttachmentDto["usedOnPages"]>();
+    for (const attachment of attachments) {
+      if (!attachment.page) continue;
+      const pages = usage.get(attachment.sha256) ?? [];
+      if (!pages.some((p) => p.id === attachment.page!.id)) {
+        pages.push({ id: attachment.page.id, title: attachment.page.title });
+      }
+      usage.set(attachment.sha256, pages);
+    }
+
     return ok(
       await Promise.all(
         attachments.map((a) =>
-          toDto(a, space.visibility, nameOf.get(a.uploadedBy.toString()) ?? null),
+          toDto(
+            a,
+            space.visibility,
+            nameOf.get(a.uploadedBy.toString()) ?? null,
+            usage.get(a.sha256) ?? [],
+          ),
         ),
       ),
     );

@@ -48,10 +48,23 @@ export const pageDetailSchema = z.object({
   version: z.number().int().nullable(),
   updatedByName: z.string().nullable(),
   contributors: z.number().int(),
+  /** Whether the *requesting* user has starred this page. */
+  starred: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
 export type PageDetailDto = z.infer<typeof pageDetailSchema>;
+
+/** A row in the sidebar's Recent or Starred list — per-user, space-scoped. */
+export const pageListItemSchema = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  parentTitle: z.string().nullable(),
+  /** Last visit for Recent, star time for Starred. */
+  at: z.iso.datetime(),
+  updatedByName: z.string().nullable(),
+});
+export type PageListItemDto = z.infer<typeof pageListItemSchema>;
 
 export const spaceHomeSchema = z.object({
   space: spaceSchema,
@@ -127,6 +140,12 @@ export const attachmentSchema = z.object({
   sha256: z.string(),
   pageId: z.uuid().nullable(),
   pageTitle: z.string().nullable(),
+  /**
+   * Every page in the space carrying a blob with this sha256. Uploads are
+   * content-addressed, so re-uploading the same file to another page yields a
+   * second row over one S3 object — this is what makes it visible.
+   */
+  usedOnPages: z.array(z.object({ id: z.uuid(), title: z.string() })),
   uploadedByName: z.string().nullable(),
   createdAt: z.iso.datetime(),
   /** Bare immutable URL for public spaces; short-lived signed URL for private (ADR 0007). */

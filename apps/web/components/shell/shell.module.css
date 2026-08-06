@@ -132,6 +132,11 @@
   background: var(--surface-hover);
 }
 
+.userMenuCheck {
+  margin-left: auto;
+  color: var(--accent-text);
+}
+
 /* ---------- Body ---------- */
 .body {
   display: flex;
@@ -279,6 +284,11 @@
 
 .tabItemActive {
   color: var(--accent-text);
+}
+
+.tabItemDisabled {
+  color: var(--disabled-text);
+  pointer-events: none;
 }
 
 .overlay {

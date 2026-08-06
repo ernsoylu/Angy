@@ -64,7 +64,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 56px;
+  /* Frame D density card: 47px comfortable · 34px compact. */
+  min-height: var(--row-h);
   padding: 0 16px;
   color: var(--text);
   border-bottom: 1px solid var(--border-soft);
@@ -98,7 +99,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: var(--row-font);
   color: var(--text-3);
   flex-shrink: 0;
 }

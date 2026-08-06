@@ -88,6 +88,25 @@
   --s-7: 32px;
   --s-8: 44px;
   --s-9: 56px;
+
+  /* Density (frame D): comfortable is the default, compact is a user
+     preference rather than a breakpoint. List surfaces size from these. */
+  --row-h: 47px;
+  --row-font: 12.5px;
+}
+
+:root[data-density="compact"] {
+  --row-h: 34px;
+  --row-font: 11.5px;
+}
+
+/* Frame D: compact never applies to touch, where the comfortable row is
+   already close to the 44px minimum target. */
+@media (pointer: coarse), (max-width: 640px) {
+  :root[data-density="compact"] {
+    --row-h: 47px;
+    --row-font: 12.5px;
+  }
 }
 
 * {

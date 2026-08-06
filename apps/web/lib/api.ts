@@ -4,6 +4,7 @@ import type {
   ApiResponse,
   AttachmentDto,
   PageDetailDto,
+  PageListItemDto,
   PageSummaryDto,
   RevisionDto,
   SpaceDto,
@@ -45,6 +46,10 @@ export const getSpaceAttachments = (spaceId: string) =>
   apiFetch<AttachmentDto[]>(`/spaces/${spaceId}/attachments`);
 export const getSpaceTrash = (spaceId: string) =>
   apiFetch<TrashItemDto[]>(`/spaces/${spaceId}/trash`);
+export const getRecentPages = (spaceId: string) =>
+  apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/recent`);
+export const getStarredPages = (spaceId: string) =>
+  apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/starred`);
 export const getSearchToken = () =>
   apiFetch<
     | { mode: "direct"; token: string; host: string; indexUid: string; expiresAt: string }

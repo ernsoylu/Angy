@@ -12,13 +12,14 @@ export const metadata: Metadata = {
   description: "Company knowledge, fast.",
 };
 
-const themeInit = `(function(){try{var q=new URLSearchParams(location.search).get("theme");var t=q||localStorage.getItem("angy-theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t}catch(e){}})();`;
+const themeInit = `(function(){try{var q=new URLSearchParams(location.search).get("theme");var t=q||localStorage.getItem("angy-theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t;var d=localStorage.getItem("angy-density");document.documentElement.dataset.density=d==="compact"?"compact":"comfortable"}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
       data-theme="light"
+      data-density="comfortable"
       suppressHydrationWarning
       className={`${fontUi.variable} ${fontBody.variable} ${fontMono.variable}`}
     >

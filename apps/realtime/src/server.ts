@@ -2,7 +2,15 @@ import { Server } from "@hocuspocus/server";
 import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import * as Y from "yjs";
-import { applyDocJson, createYdocFromJson, ydocToJson, type JSONContent } from "@angy/blocks";
+import {
+  applyDocJson,
+  applyTextDiff,
+  createYdocFromJson,
+  TITLE_FIELD,
+  ydocTitle,
+  ydocToJson,
+  type JSONContent,
+} from "@angy/blocks";
 import { getEffectivePageLevel, getPrisma } from "@angy/db";
 import {
   DOC_COMMAND_CHANNEL,
@@ -13,6 +21,7 @@ import {
   QUEUE_PROJECTIONS,
   satisfies,
   type DocCommand,
+  type RenameCommand,
   type RewriteMediaCommand,
 } from "@angy/shared";
 import { env } from "./env.js";
@@ -69,6 +78,40 @@ async function loadPersistedUpdate(redis: Redis, pageId: string): Promise<Uint8A
   });
   ydoc.destroy();
   return update;
+}
+
+/**
+ * Seed the collaborative title from `page.title` for any doc that predates the
+ * field — the one-time migration path. An emptied title reseeds the same way,
+ * which is what keeps a page from ending up nameless.
+ */
+async function bootstrapTitle(document: Y.Doc, pageId: string): Promise<void> {
+  if (ydocTitle(document) !== "") return;
+  const page = await getPrisma().page.findFirst({
+    where: { id: pageId, deletedAt: null },
+    select: { title: true },
+  });
+  if (page?.title) document.getText(TITLE_FIELD).insert(0, page.title);
+}
+
+/**
+ * Rename through the doc (Wave F). REST renames land here rather than writing
+ * `page.title`, so the row and the doc can never disagree — `onStoreDocument`
+ * copies the title back out once the edit persists.
+ */
+async function renameDocument(server: Server, command: RenameCommand): Promise<void> {
+  const connection = await server.hocuspocus.openDirectConnection(command.pageId, {
+    userId: command.userId,
+    name: "rename",
+  });
+  try {
+    await connection.transact((document) => {
+      applyTextDiff(document.getText(TITLE_FIELD), command.title);
+    });
+  } finally {
+    await connection.disconnect();
+  }
+  console.log(`[realtime] renamed ${command.pageId} -> ${command.title}`);
 }
 
 /**
@@ -160,6 +203,10 @@ function subscribeToDocCommands(
         await rewriteMedia(server, command);
         return;
       }
+      if (command.type === "rename") {
+        await renameDocument(server, command);
+        return;
+      }
       if (command.type !== "restore") return;
       const revision = await getPrisma().pageRevision.findUnique({
         where: { pageId_version: { pageId: command.pageId, version: command.version } },
@@ -232,6 +279,7 @@ export function buildServer(port = env.port): Server {
     async onLoadDocument({ document, documentName }) {
       const bytes = await loadPersistedUpdate(redis, documentName);
       Y.applyUpdate(document, bytes);
+      await bootstrapTitle(document, documentName);
       return document;
     },
 
@@ -239,6 +287,10 @@ export function buildServer(port = env.port): Server {
       const update = Y.encodeStateAsUpdate(document);
       const stateVector = Y.encodeStateVector(document);
       const editor = (lastContext ?? undefined) as ConnectionContext | undefined;
+      // The doc owns the title (Wave F). An empty one means someone cleared the
+      // field mid-edit — keep the last good row value rather than a nameless
+      // page; the next load reseeds the doc from it.
+      const title = ydocTitle(document).trim();
 
       await Promise.all([
         redis.set(hotKey(documentName), Buffer.from(update), "EX", HOT_TTL_SECONDS),
@@ -249,6 +301,7 @@ export function buildServer(port = env.port): Server {
         data: {
           ydocS3Key: ydocS3Key(documentName),
           ydocStateVector: Buffer.from(stateVector),
+          ...(title && { title }),
           ...(editor && /^\d+$/.test(editor.userId) && { updatedBy: BigInt(editor.userId) }),
         },
       });

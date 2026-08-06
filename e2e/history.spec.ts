@@ -38,10 +38,13 @@ test.describe("revision history & non-destructive restore (ADR 0006)", () => {
       )
       .toBeGreaterThanOrEqual(2);
 
-    // History screen: diff v1 → latest shows the added line.
+    // History screen: diff v1 → latest shows the added line. Scope to the
+    // rendered document — a bare getByText also matches the inlined RSC flight
+    // payload, which carries every string on the page.
     await page.goto(`/s/eng/${pageId}/history?from=1`);
-    await expect(page.getByText("Version history")).toBeVisible();
-    await expect(page.getByText("non-destructive", { exact: false })).toBeVisible();
+    const main = page.locator("#main-content");
+    await expect(main.getByText("Version history")).toBeVisible();
+    await expect(main.getByText("non-destructive", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Restore v1" })).toBeVisible();
 
     // Restore v1 through the UI.

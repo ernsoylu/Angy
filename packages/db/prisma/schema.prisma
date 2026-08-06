@@ -55,6 +55,8 @@ model AppUser {
 
   memberships SpaceMember[]
   permissions PagePermission[]
+  visits      PageVisit[]
+  stars       PageStar[]
 
   @@map("app_user")
 }
@@ -100,11 +102,44 @@ model Page {
   permissions PagePermission[]
   revisions   PageRevision[]
   attachments Attachment[]
+  visits      PageVisit[]
+  stars       PageStar[]
 
   @@unique([spaceId, slug])
   @@index([spaceId])
   @@index([parentId])
   @@map("page")
+}
+
+/// Per-user reading history behind the sidebar's Recent list. One row per
+/// (user, page) — the reader render only writes through a Redis throttle, so a
+/// reload storm costs one row update, not one per request.
+model PageVisit {
+  userId    BigInt   @map("user_id")
+  pageId    String   @map("page_id") @db.Uuid
+  visitedAt DateTime @default(now()) @map("visited_at")
+  visits    Int      @default(1)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@id([userId, pageId])
+  @@index([userId, visitedAt(sort: Desc)])
+  @@map("page_visit")
+}
+
+/// Per-user bookmarks behind the sidebar's Starred list.
+model PageStar {
+  userId    BigInt   @map("user_id")
+  pageId    String   @map("page_id") @db.Uuid
+  starredAt DateTime @default(now()) @map("starred_at")
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@id([userId, pageId])
+  @@index([userId, starredAt(sort: Desc)])
+  @@map("page_star")
 }
 
 /// Closure table over pages only — never blocks (hard rule 2).

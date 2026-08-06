@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { CloudUpload, GitCommitHorizontal, Radio, Users } from "lucide-react";
 import { Banner } from "../ui/Feedback";
 import { Avatar } from "../ui/Avatar";
@@ -21,52 +20,6 @@ interface EditorViewProps {
 }
 
 /** Editor screen chrome per frame 2: live banner, article column, presence rail. */
-function EditableTitle({ pageId, initial }: { pageId: string; initial: string }) {
-  const router = useRouter();
-  const [value, setValue] = useState(initial);
-
-  async function save() {
-    const next = value.trim();
-    if (!next || next === initial) {
-      setValue(next || initial);
-      return;
-    }
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/pages/${pageId}`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: next }),
-      },
-    );
-    const body = await res.json();
-    if (body.success) router.refresh(); // breadcrumb + tree pick up the rename
-    else setValue(initial);
-  }
-
-  return (
-    <input
-      className="t-title"
-      aria-label="Page title"
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => void save()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      style={{
-        width: "100%",
-        border: "none",
-        background: "transparent",
-        outline: "none",
-        color: "var(--text)",
-        marginBottom: 18,
-      }}
-    />
-  );
-}
-
 export function EditorView({
   pageId,
   title,
@@ -78,6 +31,9 @@ export function EditorView({
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [status, setStatus] = useState("connecting");
   const [accessLost, setAccessLost] = useState(false);
+  // The Y.Doc owns the title now, so the breadcrumb tracks it rather than the
+  // value the server rendered with.
+  const [liveTitle, setLiveTitle] = useState(title);
 
   // Live revocation (ADR 0008): the server closed us out — show the design
   // state instead of a dead editor.
@@ -100,13 +56,14 @@ export function EditorView({
                 {" › "}
               </span>
             ))}
-            <span style={{ color: "var(--text)" }}>{title}</span>
+            <span style={{ color: "var(--text)" }}>{liveTitle}</span>
           </nav>
-          <EditableTitle pageId={pageId} initial={title} />
           <Editor
             pageId={pageId}
             user={user}
+            title={title}
             onAccessLost={() => setAccessLost(true)}
+            onTitleChange={setLiveTitle}
             onPresenceChange={(users, s) => {
               setPresence(users);
               setStatus(s);

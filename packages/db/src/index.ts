@@ -15,3 +15,4 @@ export {
   type MoveResult,
 } from "./closure.js";
 export { getEffectivePageLevel, getEffectiveSpaceLevel } from "./permissions.js";
+export { isPageStarred, recordPageVisit, VISIT_THROTTLE_MS } from "./personal.js";

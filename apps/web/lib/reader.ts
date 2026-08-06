@@ -1,6 +1,12 @@
 import "server-only";
 import { config } from "dotenv";
-import { getBreadcrumb, getEffectivePageLevel, getPrisma } from "@angy/db";
+import {
+  getBreadcrumb,
+  getEffectivePageLevel,
+  getPrisma,
+  isPageStarred,
+  recordPageVisit,
+} from "@angy/db";
 import { satisfies, type PermLevelDto } from "@angy/shared";
 
 // The read path (CLAUDE.md): RSC streams rendered_html from Postgres directly —
@@ -15,6 +21,8 @@ export interface ReaderPage {
   version: number | null;
   updatedByName: string | null;
   contributors: number;
+  /** Whether the caller has starred this page (Wave C). */
+  starred: boolean;
   updatedAt: string;
 }
 
@@ -34,7 +42,7 @@ export async function getReaderPage(
   const level = await getEffectivePageLevel(prisma, userId, pageId);
   if (!satisfies(level, required)) return "forbidden";
 
-  const [breadcrumb, latestRevision, contributors, editor] = await Promise.all([
+  const [breadcrumb, latestRevision, contributors, editor, starred] = await Promise.all([
     getBreadcrumb(prisma, page.id),
     prisma.pageRevision.findFirst({ where: { pageId: page.id }, orderBy: { version: "desc" } }),
     prisma.pageRevision.findMany({
@@ -43,6 +51,7 @@ export async function getReaderPage(
       select: { createdBy: true },
     }),
     prisma.appUser.findUnique({ where: { id: page.updatedBy ?? page.createdBy } }),
+    isPageStarred(prisma, userId, pageId),
   ]);
 
   return {
@@ -53,6 +62,20 @@ export async function getReaderPage(
     version: latestRevision?.version ?? null,
     updatedByName: editor?.displayName ?? null,
     contributors: Math.max(contributors.length, 1),
+    starred,
     updatedAt: page.updatedAt.toISOString(),
   };
+}
+
+/**
+ * Record a read for the Recent list. Call only after getReaderPage has cleared
+ * permissions — this writes without re-checking. Failures are swallowed:
+ * reading history is never worth failing a page render over.
+ */
+export async function recordVisit(pageId: string, userId: bigint): Promise<void> {
+  try {
+    await recordPageVisit(getPrisma(), userId, pageId);
+  } catch {
+    /* history is best-effort */
+  }
 }

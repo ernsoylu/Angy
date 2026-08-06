@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Copy,
   Download,
@@ -51,9 +52,11 @@ const PREVIEW_BG: Record<Filter, string> = {
 export function AttachmentsView({
   initial,
   pages,
+  spaceKey,
 }: {
   initial: AttachmentDto[];
   pages: { id: string; title: string }[];
+  spaceKey: string;
 }) {
   const [items, setItems] = useState(initial);
   const [filter, setFilter] = useState<Filter>("all");
@@ -237,10 +240,20 @@ export function AttachmentsView({
                 {selected.uploadedByName} · {timeAgo(selected.createdAt)}
               </span>
             </div>
-            {selected.pageTitle && (
+            {selected.usedOnPages.length > 0 && (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Used on</span>
-                <span>{selected.pageTitle}</span>
+                <span className={styles.detailUsage}>
+                  {selected.usedOnPages.length === 1
+                    ? selected.usedOnPages[0]!.title
+                    : `${selected.usedOnPages.length} pages`}
+                  {selected.usedOnPages.length > 1 &&
+                    selected.usedOnPages.map((p) => (
+                      <Link key={p.id} href={`/s/${spaceKey}/${p.id}`} className={styles.usageLink}>
+                        {p.title}
+                      </Link>
+                    ))}
+                </span>
               </div>
             )}
             <div className="t-caption">Content hash</div>

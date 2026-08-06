@@ -7,10 +7,7 @@ import { usePathname } from "next/navigation";
 import {
   Bell,
   Check,
-  ChevronDown,
-  ChevronRight,
   FileText,
-  Folder,
   Home,
   History,
   Menu,
@@ -26,6 +23,7 @@ import { cx } from "../../lib/cx";
 import type { TreeNode } from "../../lib/tree";
 import { NewPageDialog } from "../pageops/NewPageDialog";
 import { ShareDialog } from "../share/ShareDialog";
+import { PageTree } from "./PageTree";
 import { UserMenu } from "./UserMenu";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
@@ -41,43 +39,6 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-function TreeItem({ node, depth }: { node: TreeNode; depth: number }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(true);
-  const active = pathname === node.href;
-  const isFolder = node.children.length > 0;
-
-  return (
-    <>
-      <span style={{ display: "flex", alignItems: "center" }}>
-        <Link
-          href={node.href}
-          className={cx(styles.treeRow, active && styles.treeRowActive)}
-          style={{ paddingLeft: 8 + depth * 20, flex: 1 }}
-          aria-current={active ? "page" : undefined}
-        >
-          {isFolder && (
-            <span
-              className={styles.treeChevron}
-              onClick={(e) => {
-                e.preventDefault();
-                setOpen((v) => !v);
-              }}
-            >
-              {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            </span>
-          )}
-          {isFolder ? <Folder size={15} /> : <FileText size={15} />}
-          <span className={styles.treeLabel}>{node.title}</span>
-        </Link>
-      </span>
-      {isFolder &&
-        open &&
-        node.children.map((child) => <TreeItem key={child.id} node={child} depth={depth + 1} />)}
-    </>
-  );
-}
-
 const PAGE_ROUTE = /^\/s\/[^/]+\/[0-9a-f-]{36}$/;
 const EDIT_ROUTE = /^\/s\/[^/]+\/[0-9a-f-]{36}\/edit$/;
 
@@ -87,9 +48,18 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
   const [newPageOpen, setNewPageOpen] = useState(false);
   const pathname = usePathname();
   const spaceHome = `/s/${space.key}`;
+  const searchHref = `/s/${space.key}/search`;
+  const meHref = `/s/${space.key}/me`;
   const onPage = PAGE_ROUTE.test(pathname);
   const onEditor = EDIT_ROUTE.test(pathname);
   const currentPageId = pathname.match(/([0-9a-f-]{36})/)?.[1] ?? null;
+
+  // The mobile Page tab needs a target even from Search or Trash, so remember
+  // the last page visited this session.
+  const [lastPageHref, setLastPageHref] = useState<string | null>(null);
+  useEffect(() => {
+    if (currentPageId) setLastPageHref(`${spaceHome}/${currentPageId}`);
+  }, [currentPageId, spaceHome]);
 
   // Frame D: cmd/ctrl+K opens search from anywhere.
   useEffect(() => {
@@ -176,14 +146,26 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
               <Home size={15} />
               <span className={styles.treeLabel}>Home</span>
             </Link>
-            <a href="#" className={styles.treeRow}>
+            <Link
+              href={`/s/${space.key}/recent`}
+              className={cx(
+                styles.treeRow,
+                pathname === `/s/${space.key}/recent` && styles.treeRowActive,
+              )}
+            >
               <History size={15} />
               <span className={styles.treeLabel}>Recent</span>
-            </a>
-            <a href="#" className={styles.treeRow}>
+            </Link>
+            <Link
+              href={`/s/${space.key}/starred`}
+              className={cx(
+                styles.treeRow,
+                pathname === `/s/${space.key}/starred` && styles.treeRowActive,
+              )}
+            >
               <Star size={15} />
               <span className={styles.treeLabel}>Starred</span>
-            </a>
+            </Link>
             <Link
               href={`/s/${space.key}/attachments`}
               className={cx(
@@ -206,11 +188,7 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
             </Link>
           </div>
           <div className={cx("t-caption", styles.sidebarSection)}>{space.name}</div>
-          <div className={styles.treeGroup}>
-            {tree.map((node) => (
-              <TreeItem key={node.id} node={node} depth={0} />
-            ))}
-          </div>
+          <PageTree tree={tree} activeHref={pathname} />
           <div className={styles.newPage}>
             <Button
               variant="secondary"
@@ -240,22 +218,44 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
       )}
 
       <nav className={styles.tabbar}>
-        <Link href={spaceHome} className={cx(styles.tabItem, styles.tabItemActive)}>
+        <Link
+          href={spaceHome}
+          className={cx(styles.tabItem, pathname === spaceHome && styles.tabItemActive)}
+        >
           <Home size={19} />
           Home
         </Link>
-        <a href="#" className={styles.tabItem}>
+        <Link
+          href={searchHref}
+          className={cx(styles.tabItem, pathname === searchHref && styles.tabItemActive)}
+        >
           <Search size={19} />
           Search
-        </a>
-        <a href="#" className={styles.tabItem}>
+        </Link>
+        {/* "Page" points at whatever page you were last on; with none open it
+            has nowhere to go, so it reads as disabled rather than dead. */}
+        <Link
+          href={lastPageHref ?? spaceHome}
+          aria-disabled={lastPageHref ? undefined : true}
+          className={cx(
+            styles.tabItem,
+            onPage && styles.tabItemActive,
+            !lastPageHref && styles.tabItemDisabled,
+          )}
+          onClick={(event) => {
+            if (!lastPageHref) event.preventDefault();
+          }}
+        >
           <FileText size={19} />
           Page
-        </a>
-        <a href="#" className={styles.tabItem}>
+        </Link>
+        <Link
+          href={meHref}
+          className={cx(styles.tabItem, pathname === meHref && styles.tabItemActive)}
+        >
           <User size={19} />
           Me
-        </a>
+        </Link>
       </nav>
     </div>
     </ToastProvider>

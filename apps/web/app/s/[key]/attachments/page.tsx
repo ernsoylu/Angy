@@ -20,6 +20,7 @@ export default async function AttachmentsPage({
     <AttachmentsView
       initial={attachments}
       pages={pages.map((p) => ({ id: p.id, title: p.title }))}
+      spaceKey={key}
     />
   );
 }

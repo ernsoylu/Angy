@@ -4,10 +4,11 @@ import { FileClock, Globe, Pencil, ShieldCheck, Users } from "lucide-react";
 import { Avatar } from "../../../../components/ui/Avatar";
 import { Button } from "../../../../components/ui/Button";
 import { PageActions } from "../../../../components/pageops/PageActions";
+import { StarButton } from "../../../../components/reader/StarButton";
 import { Toc } from "../../../../components/reader/Toc";
 import { RestrictedState } from "../../../../components/ui/SystemState";
 import { getMe } from "../../../../lib/api";
-import { getReaderPage } from "../../../../lib/reader";
+import { getReaderPage, recordVisit } from "../../../../lib/reader";
 import { timeAgo } from "../../../../lib/time";
 import { injectToc } from "../../../../lib/toc";
 import shell from "../../../../components/shell/shell.module.css";
@@ -27,6 +28,9 @@ export default async function ReaderPage({
   const page = await getReaderPage(pageId, BigInt(me.id));
   if (!page) notFound();
   if (page === "forbidden") return <RestrictedState />;
+  // Reading history for the sidebar's Recent list — throttled in Postgres, so
+  // reloads and route prefetches don't turn into a write each.
+  await recordVisit(pageId, BigInt(me.id));
 
   const { html, toc } = injectToc(page.renderedHtml ?? "");
   const parents = page.breadcrumb.slice(0, -1);
@@ -87,6 +91,7 @@ export default async function ReaderPage({
           <div className={shell.railItem}>
             <Globe size={14} /> Public to workspace
           </div>
+          <StarButton pageId={pageId} initial={page.starred} />
           <Link href={`/s/${key}/${pageId}/history`}>
             <Button variant="secondary" icon={<FileClock size={14} />} style={{ marginTop: 6 }}>
               View history

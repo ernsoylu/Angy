@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { pageIdBySlug, sessionContext } from "./helpers";
+import { api, pageIdBySlug, sessionContext } from "./helpers";
 
 test.describe("multi-user collaboration", () => {
   test("two editors see each other's edits and presence live", async ({ browser }) => {
@@ -30,8 +30,29 @@ test.describe("multi-user collaboration", () => {
       timeout: 10_000,
     });
 
+    // The title is a field in the same Y.Doc (Wave F), so it syncs the same
+    // way — and Mira's breadcrumb, which reads the live value, follows.
+    const erenTitle = eren.getByRole("textbox", { name: "Page title" });
+    await erenTitle.click();
+    await eren.keyboard.press("End");
+    await eren.keyboard.type(" (live)");
+    await expect(mira.getByRole("textbox", { name: "Page title" })).toHaveValue(
+      /Realtime Sync Architecture \(live\)$/,
+      { timeout: 10_000 },
+    );
+    await expect(mira.locator("article nav")).toContainText("(live)");
+
     await erenContext.close();
     await miraContext.close();
+
+    // The doc's title reaches Postgres through the store path, not a PATCH.
+    await expect
+      .poll(
+        () =>
+          api<{ title: string }>("e2e-eren", `/pages/${pageId}`).then((p) => p.title),
+        { timeout: 20_000, intervals: [1_000] },
+      )
+      .toBe("Realtime Sync Architecture (live)");
 
     // Live-by-default: the SSR reader catches up after debounce + projection.
     const readerContext = await sessionContext(browser, "e2e-ada");

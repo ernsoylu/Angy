@@ -55,11 +55,18 @@ export function EmptyState({
   body = "This space is ready but empty. Create the first page to give the team somewhere to start.",
   actionLabel = "Create the first page",
   onAction,
+  action,
 }: {
   title?: string;
   body?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /**
+   * Replaces the default button — pass `null` where the empty state is purely
+   * informational (a list that fills itself as you use the app), or a link for
+   * server-rendered surfaces that can't hand down a callback.
+   */
+  action?: ReactNode | null;
 }) {
   return (
     <StateShell
@@ -67,7 +74,9 @@ export function EmptyState({
       iconBg="var(--sage-soft)"
       title={title}
       body={body}
-      action={<Button onClick={onAction}>{actionLabel}</Button>}
+      action={
+        action === undefined ? <Button onClick={onAction}>{actionLabel}</Button> : action
+      }
     />
   );
 }

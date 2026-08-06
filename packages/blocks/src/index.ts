@@ -21,5 +21,20 @@ export { diffDocuments, diffWords, type DiffBlock, type WordDiffPart } from "./d
 export { baseExtensions, editorExtensions } from "./extensions.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";
 export { applyDocJson } from "./restore.js";
-export { createYdocFromJson, updateToJson, ydocToJson, YDOC_FIELD } from "./ydoc.js";
+export {
+  applyTextDiff,
+  createYdocFromJson,
+  TITLE_FIELD,
+  updateToJson,
+  ydocTitle,
+  ydocToJson,
+  YDOC_FIELD,
+} from "./ydoc.js";
 export type { JSONContent } from "@tiptap/core";
+
+// The extension packages augment Tiptap's ChainedCommands from their own .d.ts
+// files. Re-exporting them here carries `setLink`, `addRowBefore`, … to anyone
+// consuming this package, so editor UI never has to depend on the extension
+// packages directly (isomorphic-block invariant: schema lives here alone).
+export type {} from "@tiptap/extension-link";
+export type {} from "@tiptap/extension-table";

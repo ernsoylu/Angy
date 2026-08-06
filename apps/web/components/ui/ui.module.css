@@ -500,7 +500,7 @@
   font-weight: 500;
 }
 
-/* ---------- Table: 40px header · 47px rows · zebra on even ---------- */
+/* ---------- Table: 40px header · 47px rows (34px compact) · zebra on even --- */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -515,14 +515,14 @@
   height: 40px;
   padding: 0 16px;
   text-align: left;
-  font-size: 12.5px;
+  font-size: var(--row-font);
   font-weight: 600;
   color: var(--text-2);
   border-bottom: 1px solid var(--border);
 }
 
 .table td {
-  height: 47px;
+  height: var(--row-h);
   padding: 0 16px;
   border-bottom: 1px solid var(--border-soft);
 }

@@ -1,0 +1,56 @@
+.subtitle {
+  color: var(--text-2);
+  font-size: 14px;
+  margin: 4px 0 24px;
+}
+
+.list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Frame D density card: 47px comfortable · 34px compact. */
+  min-height: var(--row-h);
+  padding: 0 16px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+.rowTitle {
+  display: block;
+  font-weight: 600;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowCrumb {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.rowMeta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--row-font);
+  color: var(--text-3);
+  flex-shrink: 0;
+}

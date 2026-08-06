@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/react/menus";
 import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { HocuspocusProvider } from "@hocuspocus/provider";
-import { Bold, Code, Italic, Strikethrough, UnderlineIcon } from "lucide-react";
 import { editorExtensions } from "@angy/blocks";
 import { cx } from "../../lib/cx";
-import { IconButton } from "../ui/IconButton";
+import { BlockGutter } from "./BlockGutter";
+import { BubbleToolbar } from "./BubbleToolbar";
+import { CollaborativeTitle } from "./CollaborativeTitle";
+import { TableToolbar } from "./TableToolbar";
 import { IMAGE_REQUEST_EVENT } from "./slash-items";
 import { SlashCommand } from "./SlashMenu";
 import styles from "./editor.module.css";
@@ -26,9 +27,13 @@ export interface PresenceUser {
 interface EditorProps {
   pageId: string;
   user: { name: string };
+  /** Server-known title, shown until the doc syncs (see CollaborativeTitle). */
+  title: string;
   onPresenceChange?: (users: PresenceUser[], status: string) => void;
   /** Fired when auth fails — first connect or live revocation (ADR 0008). */
   onAccessLost?: () => void;
+  /** Live title, so the surrounding chrome (breadcrumb) can follow along. */
+  onTitleChange?: (title: string) => void;
 }
 
 /**
@@ -36,8 +41,16 @@ interface EditorProps {
  * the explicit Edit action — immediatelyRender: false is mandatory in Next.js
  * (hard rule 6). Undo/redo comes from Collaboration, not StarterKit.
  */
-export function Editor({ pageId, user, onPresenceChange, onAccessLost }: EditorProps) {
+export function Editor({
+  pageId,
+  user,
+  title,
+  onPresenceChange,
+  onAccessLost,
+  onTitleChange,
+}: EditorProps) {
   const [status, setStatus] = useState("connecting");
+  const [synced, setSynced] = useState(false);
 
   // The provider lives for the lifetime of the mounted editor. Tokens are
   // 15-minute page-scoped JWTs, so every (re)connect fetches a fresh one —
@@ -98,6 +111,17 @@ export function Editor({ pageId, user, onPresenceChange, onAccessLost }: EditorP
     };
   }, [provider, status, onPresenceChange, onAccessLost]);
 
+  // The title input only becomes editable once the doc has synced, so track it
+  // separately from connection status (connected ≠ state received).
+  useEffect(() => {
+    const onSynced = () => setSynced(true);
+    provider.on("synced", onSynced);
+    if (provider.isSynced) setSynced(true);
+    return () => {
+      provider.off("synced", onSynced);
+    };
+  }, [provider]);
+
   useEffect(() => () => provider.destroy(), [provider]);
 
   // "/image" flow: the slash item asks for a file; we upload it as a page
@@ -132,60 +156,36 @@ export function Editor({ pageId, user, onPresenceChange, onAccessLost }: EditorP
     }
   }
 
-  if (!editor) return null;
-
   return (
     <>
-      <BubbleMenu editor={editor} className={styles.bubble}>
-        <IconButton
-          label="Bold"
-          active={editor.isActive("bold")}
-          onClick={() => editor.chain().focus().toggleMark("bold").run()}
-        >
-          <Bold size={14} />
-        </IconButton>
-        <IconButton
-          label="Italic"
-          active={editor.isActive("italic")}
-          onClick={() => editor.chain().focus().toggleMark("italic").run()}
-        >
-          <Italic size={14} />
-        </IconButton>
-        <IconButton
-          label="Underline"
-          active={editor.isActive("underline")}
-          onClick={() => editor.chain().focus().toggleMark("underline").run()}
-        >
-          <UnderlineIcon size={14} />
-        </IconButton>
-        <IconButton
-          label="Strikethrough"
-          active={editor.isActive("strike")}
-          onClick={() => editor.chain().focus().toggleMark("strike").run()}
-        >
-          <Strikethrough size={14} />
-        </IconButton>
-        <IconButton
-          label="Code"
-          active={editor.isActive("code")}
-          onClick={() => editor.chain().focus().toggleMark("code").run()}
-        >
-          <Code size={14} />
-        </IconButton>
-      </BubbleMenu>
-      <EditorContent editor={editor} />
-      <input
-        ref={imageInput}
-        type="file"
-        accept="image/*"
-        hidden
-        data-testid="editor-image-input"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void uploadImage(file);
-          e.target.value = "";
-        }}
+      {/* The title lives in the same Y.Doc as the body, so it renders here —
+          beside the content it travels with — not in the surrounding chrome. */}
+      <CollaborativeTitle
+        ydoc={provider.document}
+        synced={synced}
+        fallback={title}
+        onChange={onTitleChange}
       />
+      {!editor ? null : (
+        <>
+          <BubbleToolbar editor={editor} />
+          <TableToolbar editor={editor} />
+          <BlockGutter editor={editor} />
+          <EditorContent editor={editor} />
+          <input
+            ref={imageInput}
+            type="file"
+            accept="image/*"
+            hidden
+            data-testid="editor-image-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadImage(file);
+              e.target.value = "";
+            }}
+          />
+        </>
+      )}
     </>
   );
 }

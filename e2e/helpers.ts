@@ -1,11 +1,28 @@
 import type { Browser, BrowserContext } from "@playwright/test";
+import { Redis } from "ioredis";
 
+/** Sessions planted by global-setup, shared by the whole suite. */
 export type SessionName = "e2e-mira" | "e2e-ada" | "e2e-eren";
+
+/** Seeded user ids (deterministic: mira=1 … eren=5). */
+export const SEEDED_USER_ID = { mira: 1, ada: 4, eren: 5 } as const;
+
+/**
+ * Mint a throwaway session for a seeded user. Sign-out tests must use one of
+ * these: signing out destroys the session key, and burning a shared one leaves
+ * every later test that needs it depending on file order.
+ */
+export async function plantSession(name: string, userId: number): Promise<string> {
+  const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
+  await redis.set(`session:${name}`, String(userId), "EX", 7200);
+  redis.disconnect();
+  return name;
+}
 
 /** A browser context authenticated as one of the seeded users. */
 export async function sessionContext(
   browser: Browser,
-  session: SessionName,
+  session: SessionName | (string & {}),
 ): Promise<BrowserContext> {
   const context = await browser.newContext();
   await context.addCookies([

@@ -14,14 +14,15 @@ import { env } from "../env";
 import { createPage, getBreadcrumb, getEffectiveSpaceLevel, getPrisma } from "@angy/db";
 import {
   createPageSchema,
+  DOC_COMMAND_CHANNEL,
   JOB_PROJECTION_INIT,
-  JOB_PROJECTION_REBUILD,
   ok,
   renamePageSchema,
   satisfies,
   type ApiOk,
   type CreatePageDto,
   type PageDetailDto,
+  type RenameCommand,
   type RenamePageDto,
 } from "@angy/shared";
 import { ForbiddenException } from "@nestjs/common";
@@ -31,6 +32,7 @@ import {
   RequirePageLevel,
 } from "../permissions/page-permission.guard";
 import { projectionsQueue } from "../queue";
+import { getRedis } from "../redis";
 import { ZodValidationPipe } from "../zod.pipe";
 
 function slugify(title: string): string {
@@ -49,11 +51,11 @@ function slugify(title: string): string {
 export class PagesController {
   @Get(":id")
   @RequirePageLevel("VIEW")
-  async get(@Param("id") id: string): Promise<ApiOk<PageDetailDto>> {
+  async get(@Param("id") id: string, @Req() req: AuthedRequest): Promise<ApiOk<PageDetailDto>> {
     const prisma = getPrisma();
     const page = await prisma.page.findFirst({ where: { id, deletedAt: null } });
     if (!page) throw new NotFoundException("Page not found");
-    const [breadcrumb, latestRevision, contributors, editor] = await Promise.all([
+    const [breadcrumb, latestRevision, contributors, editor, star] = await Promise.all([
       getBreadcrumb(prisma, page.id),
       prisma.pageRevision.findFirst({ where: { pageId: page.id }, orderBy: { version: "desc" } }),
       prisma.pageRevision.findMany({
@@ -62,6 +64,9 @@ export class PagesController {
         select: { createdBy: true },
       }),
       prisma.appUser.findUnique({ where: { id: page.updatedBy ?? page.createdBy } }),
+      prisma.pageStar.findUnique({
+        where: { userId_pageId: { userId: req.user.id, pageId: page.id } },
+      }),
     ]);
     return ok({
       id: page.id,
@@ -74,6 +79,7 @@ export class PagesController {
       version: latestRevision?.version ?? null,
       updatedByName: editor?.displayName ?? null,
       contributors: Math.max(contributors.length, 1),
+      starred: star !== null,
       createdAt: page.createdAt.toISOString(),
       updatedAt: page.updatedAt.toISOString(),
     });
@@ -100,7 +106,17 @@ export class PagesController {
     return ok({ token });
   }
 
-  /** Rename — the slug stays stable so links keep working. */
+  /**
+   * Rename — the slug stays stable so links keep working.
+   *
+   * The title is a collaborative field in the page's Y.Doc (Wave F), so this
+   * cannot write `page.title`: the next store would copy the doc's older title
+   * back over it. Instead it publishes a doc command; realtime applies the edit
+   * and `onStoreDocument` updates the row ~2s later, exactly like a keystroke
+   * in the editor. Accepted, not applied — the response echoes the request.
+   *
+   * (The API is CommonJS and must never construct a Y.Doc — CLAUDE.md gotcha.)
+   */
   @Patch(":id")
   @RequirePageLevel("EDIT")
   async rename(
@@ -110,12 +126,13 @@ export class PagesController {
   ): Promise<ApiOk<{ title: string }>> {
     const page = await getPrisma().page.findFirst({ where: { id, deletedAt: null } });
     if (!page) throw new NotFoundException("Page not found");
-    await getPrisma().page.update({
-      where: { id },
-      data: { title: body.title, updatedBy: req.user.id },
-    });
-    // The title lives in projections and the search index too.
-    await projectionsQueue().add(JOB_PROJECTION_REBUILD, { pageId: id });
+    const command: RenameCommand = {
+      type: "rename",
+      pageId: id,
+      title: body.title,
+      userId: req.user.id.toString(),
+    };
+    await getRedis().publish(DOC_COMMAND_CHANNEL, JSON.stringify(command));
     return ok({ title: body.title });
   }
 

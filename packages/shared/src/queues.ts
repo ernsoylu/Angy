@@ -64,7 +64,21 @@ export interface RewriteMediaCommand {
   mappings: { from: string; to: string }[];
 }
 
-export type DocCommand = RestoreCommand | RewriteMediaCommand;
+/**
+ * Rename a page through its Y.Doc. The title is a collaborative field in the
+ * same doc as the body, so REST renames cannot write `page.title` directly —
+ * the next store would overwrite the row from the doc and the two would fight.
+ * The row is updated by `onStoreDocument` once the edit lands, like any edit.
+ */
+export interface RenameCommand {
+  type: "rename";
+  pageId: string;
+  title: string;
+  /** User performing the rename, decimal string. */
+  userId: string;
+}
+
+export type DocCommand = RestoreCommand | RewriteMediaCommand | RenameCommand;
 
 /** Re-emit a page's media URL forms after a cross-visibility move (ADR 0007). */
 export const JOB_MEDIA_REEMIT = "media-reemit";

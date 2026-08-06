@@ -32,7 +32,8 @@
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  min-height: 56px;
+  /* Frame D density card: 47px comfortable · 34px compact. */
+  min-height: var(--row-h);
   border-bottom: 1px solid var(--border-soft);
 }
 

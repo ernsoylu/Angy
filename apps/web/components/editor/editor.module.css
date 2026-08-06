@@ -38,6 +38,89 @@
   box-shadow: var(--shadow-toolbar);
 }
 
+.bubbleDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--border-soft);
+}
+
+.linkInput {
+  width: 220px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-family: var(--font-ui), sans-serif;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-row);
+  outline: none;
+}
+
+.linkInput:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* Table structure controls — the bubble toolbar only covers text selections. */
+.tableToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 5px 8px;
+  background: var(--elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-row);
+  box-shadow: var(--shadow-toolbar);
+}
+
+.tableToolbarLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.tableToolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border-soft);
+  color: var(--text-3);
+}
+
+/* Block gutter (frame 2): `+` inserter and `⠿` drag handle, left of the block.
+   The wrapper is positioned by the DragHandle plugin. */
+.gutter {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding-right: 6px;
+}
+
+.gutterBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Frame D: 30px visual target on the desktop-only pointer surface. */
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-row);
+  color: var(--text-3);
+  cursor: grab;
+}
+
+.gutterBtn:hover {
+  background: var(--surface);
+  color: var(--text-2);
+}
+
 /* Slash menu (frame 2): "Basic blocks" palette */
 .slashMenu {
   width: 300px;
