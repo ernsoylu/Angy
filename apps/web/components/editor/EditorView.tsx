@@ -1,0 +1,111 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { CloudUpload, GitCommitHorizontal, Radio, Users } from "lucide-react";
+import { Banner } from "../ui/Feedback";
+import { Avatar } from "../ui/Avatar";
+import { StatusDot } from "../ui/Badge";
+import shell from "../shell/shell.module.css";
+import { Editor, type PresenceUser } from "./Editor";
+
+interface EditorViewProps {
+  pageId: string;
+  token: string;
+  title: string;
+  version: number | null;
+  spaceKey: string;
+  breadcrumb: { id: string; title: string }[];
+  user: { name: string };
+}
+
+/** Editor screen chrome per frame 2: live banner, article column, presence rail. */
+export function EditorView({
+  pageId,
+  token,
+  title,
+  version,
+  spaceKey,
+  breadcrumb,
+  user,
+}: EditorViewProps) {
+  const [presence, setPresence] = useState<PresenceUser[]>([]);
+  const [status, setStatus] = useState("connecting");
+
+  return (
+    <>
+      <Banner>
+        Live editing — anyone with view access sees these changes within a few seconds. There is no
+        draft state.
+      </Banner>
+      <div className={shell.readerGrid}>
+        <article className={shell.article}>
+          <nav style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 16 }}>
+            {breadcrumb.slice(0, -1).map((crumb) => (
+              <span key={crumb.id}>
+                <Link href={`/s/${spaceKey}/${crumb.id}`} style={{ color: "var(--text-2)" }}>
+                  {crumb.title}
+                </Link>
+                {" › "}
+              </span>
+            ))}
+            <span style={{ color: "var(--text)" }}>{title}</span>
+          </nav>
+          <h1 className="t-title" style={{ marginBottom: 18 }}>
+            {title}
+          </h1>
+          <Editor
+            pageId={pageId}
+            token={token}
+            user={user}
+            onPresenceChange={(users, s) => {
+              setPresence(users);
+              setStatus(s);
+            }}
+          />
+        </article>
+
+        <aside className={shell.rail}>
+          <div className={shell.railGroup}>
+            <div className="t-caption">Editing now</div>
+            {presence.length === 0 && (
+              <div style={{ fontSize: 13, color: "var(--text-3)" }}>Connecting…</div>
+            )}
+            {presence.map((p, i) => (
+              <div key={`${p.name}-${i}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Avatar name={p.name} size={26} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-3)" }}>
+                    {p.name === user.name ? "you" : "in this document"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className={shell.railGroup}>
+            <div className="t-caption">Session</div>
+            <div className={shell.railItem}>
+              <CloudUpload size={14} /> Persisted to S3 · 2s debounce
+            </div>
+            {version !== null && (
+              <div className={shell.railItem}>
+                <GitCommitHorizontal size={14} /> Y.Doc revision {version}
+              </div>
+            )}
+            <div className={shell.railItem}>
+              <Users size={14} /> {presence.length} live connection
+              {presence.length === 1 ? "" : "s"}
+            </div>
+            <div className={shell.railItem}>
+              <Radio size={14} />
+              <StatusDot status={status === "connected" ? "live" : "offline"}>
+                {status === "connected" ? "Live" : status}
+              </StatusDot>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}

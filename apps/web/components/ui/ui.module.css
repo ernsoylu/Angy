@@ -1,0 +1,566 @@
+/* Primitives per frontend.pen frames B (controls) and C (data & feedback). */
+
+/* ---------- Button ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: var(--r-btn);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.btnPrimary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btnSecondary {
+  background: var(--elevated);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--text-2);
+  padding: 0 10px;
+}
+
+.btnGhost:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.btnDanger {
+  background: var(--clay-soft);
+  color: var(--clay);
+  border-color: var(--clay);
+}
+
+:root[data-theme="light"] .btnDanger {
+  color: #b05c54;
+}
+
+.btnDanger:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+/* Disabled uses tokens, not opacity (frame D) */
+.btn:disabled {
+  background: var(--disabled-fill);
+  color: var(--disabled-text);
+  border-color: var(--disabled-border);
+  cursor: not-allowed;
+}
+
+.btnSmall {
+  height: 30px;
+  padding: 0 12px;
+}
+
+/* ---------- Icon button: 30px · 7px radius · 15px glyph ---------- */
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-row);
+  color: var(--text-2);
+}
+
+.iconBtn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.iconBtnActive,
+.iconBtnActive:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.iconBtn:disabled {
+  color: var(--disabled-text);
+  cursor: not-allowed;
+}
+
+/* ---------- Text input: 38px · 9px radius · 12px inset ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+  width: 100%;
+}
+
+.input::placeholder {
+  color: var(--text-3);
+}
+
+.input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.inputError,
+.inputError:focus {
+  border-color: var(--clay);
+  box-shadow: none;
+}
+
+.fieldError {
+  font-size: 12.5px;
+  color: var(--clay);
+}
+
+:root[data-theme="light"] .fieldError {
+  color: #b05c54;
+}
+
+.input:disabled {
+  background: var(--disabled-fill);
+  border-color: var(--disabled-border);
+  color: var(--disabled-text);
+}
+
+/* ---------- Search field: 34px · top bar ---------- */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text-3);
+  width: 100%;
+}
+
+.search input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+  min-width: 0;
+}
+
+.search input::placeholder {
+  color: var(--text-3);
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+}
+
+/* ---------- Select ---------- */
+.select {
+  appearance: none;
+  height: 38px;
+  padding: 0 32px 0 12px;
+  border-radius: var(--r-btn);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+}
+
+.selectWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.selectWrap svg {
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+  color: var(--text-2);
+}
+
+/* ---------- Chip (filter, 30px) & Tag (pill) ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--text-2);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chip:hover {
+  background: var(--surface-hover);
+}
+
+.chipSelected,
+.chipSelected:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tagAccent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.tagSage {
+  background: var(--sage-soft);
+  color: var(--sage);
+}
+
+.tagClay {
+  background: var(--clay-soft);
+  color: var(--clay);
+}
+
+.tagAmber {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.tagLilac {
+  background: var(--lilac-soft);
+  color: var(--lilac);
+}
+
+.tagNeutral {
+  background: var(--surface-hover);
+  color: var(--text-2);
+}
+
+:root[data-theme="light"] .tagSage {
+  color: #5d8a69;
+}
+
+:root[data-theme="light"] .tagClay {
+  color: #b05c54;
+}
+
+:root[data-theme="light"] .tagAmber {
+  color: #a87f3d;
+}
+
+:root[data-theme="light"] .tagLilac {
+  color: #7d5fa0;
+}
+
+/* ---------- Badge & status ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.statusDot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.statusDot::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot, var(--text-3));
+}
+
+/* ---------- Avatar ---------- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: var(--font-ui), sans-serif;
+  font-weight: 600;
+  color: var(--on-pastel);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.avatarStack {
+  display: inline-flex;
+}
+
+.avatarStack > * + * {
+  margin-left: -6px;
+}
+
+.avatarStack .avatar {
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* ---------- Callout: 4 tones · 3px left rule · 10px radius ---------- */
+.callout {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 3px solid var(--tone);
+  background: var(--tone-soft);
+  color: var(--text);
+}
+
+.callout svg {
+  color: var(--tone);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.calloutTitle {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.calloutBody {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+
+/* ---------- Banner: 32px full-bleed ---------- */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 16px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-dialog);
+}
+
+.toastIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.toastIconSuccess {
+  background: var(--sage);
+  color: var(--on-pastel);
+}
+
+.toastIconError {
+  background: var(--clay);
+  color: var(--on-pastel);
+}
+
+.toastTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.toastBody {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.toastClose {
+  margin-left: auto;
+  color: var(--text-3);
+}
+
+/* ---------- Skeleton: $border-soft · 5px radius ---------- */
+.skeleton {
+  background: var(--border-soft);
+  border-radius: 5px;
+  animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------- Progress: 6px bar · 3px radius ---------- */
+.progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-soft);
+  overflow: hidden;
+  flex: 1;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* ---------- Kbd ---------- */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--r-chip);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ---------- Table: 40px header · 47px rows · zebra on even ---------- */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 13.5px;
+}
+
+.table th {
+  height: 40px;
+  padding: 0 16px;
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  height: 47px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.table tbody tr:nth-child(even) {
+  background: var(--surface);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------- System states (frame 11) ---------- */
+.stateWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 56px 24px;
+  text-align: center;
+}
+
+.stateIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin-bottom: 8px;
+}
+
+.stateTitle {
+  font-family: var(--font-ui), sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stateBody {
+  font-size: 13.5px;
+  color: var(--text-2);
+  max-width: 440px;
+}
+
+.stateAction {
+  margin-top: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}

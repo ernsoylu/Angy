@@ -1,0 +1,112 @@
+.queryTitle {
+  font-family: var(--font-body), serif;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin: 18px 0 22px;
+}
+
+.hit {
+  display: block;
+  padding: 16px;
+  border-radius: var(--r-card);
+  color: var(--text);
+  border: 1px solid transparent;
+}
+
+.hit:hover {
+  background: var(--surface-hover);
+}
+
+.hitFirst {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.hitCrumb {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.hitTitle {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--accent-text);
+  margin: 3px 0 4px;
+}
+
+.hitSnippet {
+  font-size: 13.5px;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+
+.hitSnippet mark,
+.hitTitle mark {
+  background: var(--amber-soft);
+  color: var(--text);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.hitMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.facetRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--r-row);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.facetRow:hover {
+  background: var(--surface-hover);
+}
+
+.facetActive {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.facetCount {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--r-chip);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  flex-shrink: 0;
+}
+
+.checkboxOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
