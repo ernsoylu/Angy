@@ -1,6 +1,6 @@
 # TODO — Remaining Work Tracker
 
-> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–D and F shipped as of 2026-08-06 — 79 unit/integration + 25 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
+> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–D, F, and E1–E2 shipped as of 2026-08-06 — 80 unit/integration + 29 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
 
 ## Decision gates (answer before the dependent wave starts)
 
@@ -39,11 +39,11 @@
 - [x] D1-admin · Rename and merge, each requiring **ADMIN on every space the tag appears in** — the namespace is shared, so anything looser would let one space's admin rewrite a label another space depends on. API-only for now; the UI lands with E3's settings screen, which is where it has a designed home
 - [x] D2 · `attachments` Meilisearch index (space_id/page_id/kind filterable); one tenant token now carries the same read filter for **both** indexes — an attachment is exactly as readable as the page it hangs off. Functional Attachments tab, with the guardrailed proxy path saying so rather than silently returning nothing
 
-## Wave E — Administration & auth *(after settings-design + IdP gates)*
+## Wave E — Administration & auth *(E1–E2 done; E3 needs the frame-12 answers, E4 the IdP call)*
 
-- [ ] E1 · **Prerequisite:** space-wide permission-bitmap invalidation (existing path is page-scoped only — membership has only ever changed via seed)
-- [ ] E2 · Member management + space CRUD endpoints (ADMIN-gated) *(after E1)*
-- [ ] E3 · Space-settings screen + create-space flow; wire the dead "New page" header and "Space settings" buttons *(after E2)*
+- [x] E1 · Space-wide permission-bitmap invalidation. The published event names the **space**, not its pages: a space holds thousands while the realtime tier only cares about the handful currently open, so realtime resolves it against the open document set. Keeps the message size and the work proportional to live sessions, not to the space
+- [x] E2 · Space CRUD + member management (ADMIN-gated): create (creator becomes first admin), update name/description/visibility/baseline, list/invite/change-level/remove members. Visibility and baseline changes trigger E1; a rename does not. Two guards worth keeping: a space can never lose its last admin, and inviting an unknown email explains that SCIM is V2 rather than failing silently
+- [ ] E3 · Space-settings screen (frame 12) + create-space flow (frame 13); wire the dead "New page" header and "Space settings" buttons — **needs the four frame-12 answers, chiefly the save model**
 - [ ] E4 · Config-driven multi-IdP (`?provider=` on `/auth/login`) — or remove the second button
 
 ## Wave F — Deep editor ✅ *(2026-08-06)*
@@ -62,4 +62,4 @@
 - The pruned runtime tree keeps `typescript` and the full `@prisma/client` engine set (~97 MB of the 602 MB). Both arrive as optional peers of production dependencies; trimming them means pruning inside the store, which is more fragile than the size is worth.
 - Recent and Starred are **space-scoped routes**, not expanding sidebar trays. No frame specifies either surface; routing matches the sibling rows in the same nav group (Home, Attachments, Trash) and gives the Me tab something to link to.
 
-**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → E → G, with ~~A2 → A3~~ done alongside. **Wave E** is next: E1 (space-wide bitmap invalidation) needs no design and can start now; E2/E3 need the four frame-12 decisions answered, and E4 needs the multi-IdP call. **Wave G** still waits on the cloud provider.
+**Critical path with full parallelism:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E1–E2~~ → E3/E4 → G. Everything that can be built without a human decision now is. What is left: **E3** (the settings UI — needs the four frame-12 answers), **E4** (multi-IdP: real or remove the button), **G** (cloud provider), and the small standalone items in the plan's § Open gaps.

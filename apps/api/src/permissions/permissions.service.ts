@@ -57,9 +57,45 @@ export async function invalidatePagePermissions(pageId: string): Promise<string[
   const pageIds = rows.map((r) => r.descendantId);
   if (!pageIds.includes(pageId)) pageIds.push(pageId);
 
+  await deleteBitmaps(pageIds);
+  await getRedis().publish(PERM_CHANGED_CHANNEL, JSON.stringify({ pageIds }));
+  return pageIds;
+}
+
+/** A single DEL carrying every key in a large space would be one huge command. */
+const DEL_CHUNK = 500;
+
+async function deleteBitmaps(pageIds: string[]): Promise<void> {
   const keys = pageIds.flatMap((id) => CACHED_LEVELS.map((level) => bitmapKey(id, level)));
   const redis = getRedis();
-  await redis.del(...keys);
-  await redis.publish(PERM_CHANGED_CHANNEL, JSON.stringify({ pageIds }));
-  return pageIds;
+  for (let i = 0; i < keys.length; i += DEL_CHUNK) {
+    const chunk = keys.slice(i, i + DEL_CHUNK);
+    if (chunk.length > 0) await redis.del(...chunk);
+  }
+}
+
+/**
+ * Space-wide invalidation, for changes that reach every page at once:
+ * membership, the space baseline level, visibility.
+ *
+ * The page-scoped path walks `page_ancestor` from one page down; nothing in a
+ * closure table expresses "the whole space", so this is a separate operation
+ * rather than a special case of it (Wave E prerequisite).
+ *
+ * The published event names the *space*, not its pages: a space can hold
+ * thousands, while the realtime tier only cares about the handful currently
+ * open. Sending page ids would make the message grow with the space and the
+ * work grow with pages nobody is editing.
+ */
+export async function invalidateSpacePermissions(spaceId: bigint): Promise<number> {
+  const pages = await getPrisma().page.findMany({
+    where: { spaceId },
+    select: { id: true },
+  });
+  await deleteBitmaps(pages.map((p) => p.id));
+  await getRedis().publish(
+    PERM_CHANGED_CHANNEL,
+    JSON.stringify({ spaceId: spaceId.toString() }),
+  );
+  return pages.length;
 }

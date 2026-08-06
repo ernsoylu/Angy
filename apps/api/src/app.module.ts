@@ -12,6 +12,7 @@ import { TagsController } from "./pages/tags.controller";
 import { RevisionsController } from "./pages/revisions.controller";
 import { PagePermissionGuard } from "./permissions/page-permission.guard";
 import { SearchController } from "./search/search.controller";
+import { SpaceAdminController } from "./spaces/space-admin.controller";
 import { SpacesController } from "./spaces/spaces.controller";
 
 @Module({
@@ -19,6 +20,7 @@ import { SpacesController } from "./spaces/spaces.controller";
     HealthController,
     AuthController,
     SpacesController,
+    SpaceAdminController,
     PagesController,
     PagePermissionsController,
     RevisionsController,

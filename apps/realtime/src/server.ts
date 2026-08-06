@@ -115,6 +115,29 @@ async function renameDocument(server: Server, command: RenameCommand): Promise<v
 }
 
 /**
+ * Which currently-open documents a permission change touches.
+ *
+ * A page-scoped event names its pages outright. A space-scoped one names only
+ * the space — a membership change reaches every page in it, and a large space
+ * holds far more pages than anyone has open. Resolving it against the open set
+ * keeps the work proportional to live sessions instead of to the space.
+ */
+async function affectedOpenPages(
+  server: Server,
+  event: { pageIds?: string[]; spaceId?: string },
+): Promise<string[]> {
+  if (event.pageIds) return event.pageIds;
+  if (!event.spaceId) return [];
+  const open = [...server.hocuspocus.documents.keys()];
+  if (open.length === 0) return [];
+  const pages = await getPrisma().page.findMany({
+    where: { spaceId: BigInt(event.spaceId), id: { in: open } },
+    select: { id: true },
+  });
+  return pages.map((page) => page.id);
+}
+
+/**
  * Live revocation (ADR 0008): when permissions change, re-check every open
  * connection on the affected pages and disconnect editors who lost rights.
  * The bitmap invalidation alone only gates NEW checks — this reaches live
@@ -125,7 +148,8 @@ function subscribeToPermChanges(server: Server, subscriber: Redis): void {
   subscriber.on("message", (channel, message) => {
     if (channel !== PERM_CHANGED_CHANNEL) return;
     void (async () => {
-      const { pageIds } = JSON.parse(message) as { pageIds: string[] };
+      const event = JSON.parse(message) as { pageIds?: string[]; spaceId?: string };
+      const pageIds = await affectedOpenPages(server, event);
       for (const pageId of pageIds) {
         const document = server.hocuspocus.documents.get(pageId);
         if (!document) continue;

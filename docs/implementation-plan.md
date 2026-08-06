@@ -2,7 +2,7 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (79 unit/integration tests, 25 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–D and F (see § Open gaps for what was closed and what remains).
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (80 unit/integration tests, 29 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–D, F, and E1–E2 (see § Open gaps for what was closed and what remains).
 
 ## Design inputs
 
@@ -132,7 +132,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - ~~**Tags**~~ — **done (2026-08-06)**: workspace-wide `tag` + `page_tag`, freeform to write and normalised on the way in, with ADMIN-gated rename/merge as the cleanup half. Byline chips (frame 1), a searchable+facetable `tags` index field, and the Tags facet (frame 3).
 - ~~**Recent / Starred**~~ — **done (2026-08-06)**: `page_visit` + `page_star`, a throttled conditional upsert written straight from the reader's RSC render, a star toggle in the page-info rail, and space-scoped list routes behind the sidebar's two nav rows.
 - ~~**Search over attachments**~~ — **done (2026-08-06)**: an `attachments` index carrying space_id/page_id, so one tenant token's read filter covers both indexes; the Attachments tab is a real filter.
-- **Space administration** — no create-space flow or member management; space-home "New page" header button and "Space settings" are unwired.
+- **Space administration** — the API half is **done (2026-08-06)**: space create/update, member list/invite/change-level/remove, all ADMIN-gated, each ending in a space-wide bitmap invalidation (a new operation — nothing in the closure table expresses "the whole space"). The screens (frames 12–13) and the two dead buttons remain, pending four design answers recorded in docs/TODO.md.
 - ~~**Editor block affordances**~~ — **done (2026-08-06)**: bubble-menu link editor, a table-structure toolbar shown while the caret is in a table, and the `⠿`/`+` gutter (`@tiptap/extension-drag-handle-react`, with `+` opening the same `SLASH_ITEMS` palette).
 - **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash".
 - ~~**Mobile**~~ — **done (2026-08-06)**: every tab-bar entry routes, with Me rendering the profile, both personal lists, and sign-out. (The full-width "Edit this page" button was already built in Phase 3.)

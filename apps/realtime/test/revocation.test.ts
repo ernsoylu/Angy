@@ -107,4 +107,70 @@ describe("live revocation", () => {
     expect(await disconnected).toBe(true);
     provider.destroy();
   });
+
+  /**
+   * Wave E: membership and the space baseline reach every page at once, so the
+   * API publishes the *space*, not a page list. The realtime tier has to
+   * resolve that against whatever is currently open.
+   */
+  it("disconnects an editor when the event names only the space", async () => {
+    // Access this time comes from membership, which is what a space-wide
+    // change removes.
+    await prisma.spaceMember.upsert({
+      where: { spaceId_userId: { spaceId, userId: outsiderId } },
+      update: { permLevel: "EDIT" },
+      create: { spaceId, userId: outsiderId, permLevel: "EDIT" },
+    });
+    const page = await prisma.page.create({
+      data: {
+        spaceId,
+        title: "Space-wide",
+        slug: `space-wide-${Date.now()}`,
+        createdBy: outsiderId,
+        documentJson: { type: "doc", content: [{ type: "paragraph" }] },
+      },
+    });
+
+    const token = await new SignJWT({ page: page.id, name: "Revocation Tester" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(outsiderId.toString())
+      .setExpirationTime("5m")
+      .sign(new TextEncoder().encode(env.jwtSecret()));
+
+    const doc = new Y.Doc();
+    const provider = new HocuspocusProvider({
+      url: `ws://127.0.0.1:${PORT}`,
+      name: page.id,
+      document: doc,
+      token,
+    });
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("connect timeout")), 10000);
+      provider.on("synced", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+
+    const disconnected = new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), 8000);
+      const done = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      provider.on("close", done);
+      provider.on("status", ({ status }: { status: string }) => {
+        if (status === "disconnected") done();
+      });
+    });
+
+    await prisma.spaceMember.deleteMany({ where: { spaceId, userId: outsiderId } });
+    await redis.publish(
+      PERM_CHANGED_CHANNEL,
+      JSON.stringify({ spaceId: spaceId.toString() }),
+    );
+
+    expect(await disconnected).toBe(true);
+    provider.destroy();
+  });
 });

@@ -187,6 +187,47 @@ export const attachmentSchema = z.object({
 });
 export type AttachmentDto = z.infer<typeof attachmentSchema>;
 
+/**
+ * Space settings (frame 12). The key is absent on purpose: it is baked into
+ * every page URL, the Meilisearch tenant filter, and the permission-bitmap
+ * prefix, so V1 treats it as permanent — the field renders locked.
+ */
+export const updateSpaceSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  description: z.string().max(500).nullable().optional(),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]).optional(),
+  defaultPermLevel: permLevelSchema.optional(),
+});
+export type UpdateSpaceDto = z.infer<typeof updateSpaceSchema>;
+
+export const createSpaceSchema = z.object({
+  key: z
+    .string()
+    .min(2)
+    .max(20)
+    .regex(/^[a-z][a-z0-9-]*$/, "Lowercase letters, digits and hyphens; must start with a letter"),
+  name: z.string().min(1).max(80),
+  description: z.string().max(500).nullish(),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]).default("PUBLIC"),
+  defaultPermLevel: permLevelSchema.default("VIEW"),
+});
+export type CreateSpaceDto = z.infer<typeof createSpaceSchema>;
+
+export const upsertMemberSchema = z.object({
+  email: z.email(),
+  permLevel: permLevelSchema,
+});
+export type UpsertMemberDto = z.infer<typeof upsertMemberSchema>;
+
+export const spaceMemberSchema = z.object({
+  userId: z.string(),
+  displayName: z.string(),
+  email: z.email(),
+  permLevel: permLevelSchema,
+  addedAt: z.iso.datetime(),
+});
+export type SpaceMemberDto = z.infer<typeof spaceMemberSchema>;
+
 export const renamePageSchema = z.object({
   title: z.string().min(1).max(200),
 });
