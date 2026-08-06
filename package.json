@@ -1,0 +1,45 @@
+{
+  "name": "angy",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm build:packages && concurrently -k -c auto -n web,api,realtime,worker \"pnpm --filter @angy/web dev\" \"pnpm --filter @angy/api dev\" \"pnpm --filter @angy/realtime dev\" \"pnpm --filter @angy/worker dev\"",
+    "build:packages": "pnpm -r --filter \"./packages/*\" build",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @angy/db migrate",
+    "db:generate": "pnpm --filter @angy/db generate",
+    "db:seed": "pnpm --filter @angy/db seed",
+    "docker:up": "docker compose -f infra/docker-compose.yml up -d --wait",
+    "docker:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9",
+    "@playwright/test": "^1.62.1",
+    "concurrently": "^9",
+    "eslint": "^9",
+    "ioredis": "^5.11.1",
+    "prettier": "^3",
+    "typescript": "^5",
+    "typescript-eslint": "^8"
+  },
+  "pnpm": {
+    "overrides": {
+      "yjs": "^13"
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "msgpackr-extract",
+      "prisma",
+      "sharp"
+    ]
+  }
+}

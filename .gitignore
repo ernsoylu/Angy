@@ -1,0 +1,22 @@
+# deps
+node_modules/
+
+# builds
+dist/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# env & secrets
+.env
+.env.local
+.env.*.local
+
+# test output
+coverage/
+playwright-report/
+test-results/
+
+# misc
+.DS_Store
+*.log
