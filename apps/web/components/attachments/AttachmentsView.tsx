@@ -267,11 +267,16 @@ export function AttachmentsView({
               </Callout>
             )}
             <div className={styles.actions}>
-              <a href={selected.url} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
-                <Button variant="secondary" icon={<Download size={14} />} style={{ width: "100%" }}>
-                  Download
-                </Button>
-              </a>
+              <Button
+                href={selected.url}
+                target="_blank"
+                rel="noreferrer"
+                variant="secondary"
+                icon={<Download size={14} />}
+                style={{ flex: 1 }}
+              >
+                Download
+              </Button>
               <Button
                 variant="danger"
                 icon={<Trash2 size={14} />}

@@ -55,11 +55,13 @@ export default function SignInPage() {
           {/* One provider, one button (ADR 0011). The design showed a second
               one, but both pointed at this same URL — a choice that was not a
               choice. Multi-IdP is a config change if it ever becomes real. */}
-          <a href={`${API_URL}/auth/login`}>
-            <Button icon={<ShieldCheck size={15} />} style={{ width: "100%" }}>
-              Continue with Authentik
-            </Button>
-          </a>
+          <Button
+            href={`${API_URL}/auth/login`}
+            icon={<ShieldCheck size={15} />}
+            style={{ width: "100%" }}
+          >
+            Continue with Authentik
+          </Button>
           <div className={styles.divider}>workspace access</div>
           <Callout tone="note">
             Accounts are provisioned by your directory. If you can&apos;t sign in, ask your
