@@ -167,6 +167,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/env.md + .env.example — canonical environment variables
 - docs/roadmap.md — V1/V2/V3 sequencing
 - docs/implementation-plan.md — phased V1 build plan mapping frontend.pen screens to workstreams
+- docs/TODO.md — actionable checklist of remaining work (waves, dependencies, decision gates)
 - docs/runbooks/compaction.md — operating the Y.Doc compaction worker
 - docs/runbooks/dev-debugging.md — local debugging recipes
 - docs/runbooks/alerts.md — log-based alert signals ([alert] lines) and responses
