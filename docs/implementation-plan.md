@@ -165,3 +165,50 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - No clean-deploy rehearsal: images build and the API container smoke-tests, but `kubectl apply` has never been exercised; runtime images carry the whole workspace (~1.5 GB — slimming via `pnpm deploy` + a second generate pass is the noted follow-up).
 
 The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. What remains is either V2-shaped (tags, Recent/Starred, space administration — data-model decisions first), polish (editor affordances, dialog search, mobile items, frame-D interaction spec), or ops (retention policies, rotation runbook, terraform, e2e-in-CI, image slimming).
+
+## V2 sequencing (dependency-ordered, planned 2026-08-06)
+
+Every remaining item from § Open gaps, arranged by what actually blocks what.
+Three real chains exist — testing/deploy (A1 → A2 → A3 → G), per-user models
+(C1 → C2 → C3), and the search surfaces (model/index before facet/tab, D1
+adjacent to D2 to avoid editing tenant-token searchRules twice). Everything
+else is independent.
+
+**Decision gates before their wave starts:** space-settings screen design (no
+frame exists), tag semantics (freeform vs curated), whether multi-IdP is a
+real requirement, and the cloud provider for terraform/CDN.
+
+**Hidden prerequisite:** space administration needs *space-wide* permission-
+bitmap invalidation first — membership changes only ever happened via seed,
+so the existing invalidation path is page-scoped (closure-table walk) only.
+
+- **Wave A — foundations (start immediately, parallel to all):**
+  A1 e2e-in-CI (compose services in Actions, boot the apps, run the suite);
+  A2 image slimming (pnpm deploy + second generate pass) → A3 deploy
+  rehearsal (kubectl apply on kind/minikube with a real angy-env Secret).
+- **Wave B — independent polish (parallelize freely):** link UI in the bubble
+  menu; table row/column controls; `+` inserter + drag handles (reuse
+  SLASH_ITEMS); "Used on N pages" (group by sha256); tree arrow keys;
+  density preference; mobile Search/Page tabs.
+- **Wave C — per-user models:** C1 page_visit + page_star migration, visit
+  write on reader render, star toggle in the rail → C2 Recent/Starred
+  sidebar lists → C3 mobile "Me" tab (completes frame E's tab bar).
+- **Wave D — search surfaces (gate: tag semantics):** D1 tag model +
+  page_tag → assignment UI → index field → Tags facet; D2 attachments index
+  → tenant-token searchRules for both indexes → functional Attachments tab.
+- **Wave E — administration & auth (gates: settings design, IdP answer):**
+  E1 space-wide bitmap invalidation → E2 member management + space CRUD →
+  E3 settings screen + create-space flow, wiring the two dead buttons;
+  E4 config-driven multi-IdP or removal of the decorative button.
+- **Wave F — deep editor (any time after A1; isolated but risky):**
+  collaborative title as a Y.Text field in the page's Y.Doc, synced to
+  page.title on store, with PATCH rename re-routed through the doc-command
+  channel. Wants CI e2e in place before touching the store path.
+- **Wave G — cloud (last, after A3 + provider decision):** terraform for
+  bucket/CDN/DNS; CloudFront edge-signed cookies for media-private/* per
+  ADR 0007, replacing S3 presigning in production config.
+
+Critical path with full parallelism: A1 → (B, C, F) → D → E → G, with
+A2 → A3 alongside on the ops side. Accepted deviation carried forward:
+search-token TTL stays a flat 15 minutes (sessions have no refresh
+interval to bind to).
