@@ -1,0 +1,32 @@
+{
+  "name": "@angy/realtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@angy/blocks": "workspace:*",
+    "@angy/db": "workspace:*",
+    "@angy/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1104.0",
+    "@hocuspocus/server": "^4",
+    "bullmq": "^5.81.3",
+    "dotenv": "^17.4.2",
+    "ioredis": "^5.11.1",
+    "jose": "^6.2.8",
+    "yjs": "^13"
+  },
+  "devDependencies": {
+    "@hocuspocus/provider": "^4.5.0",
+    "@types/node": "^24",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  }
+}
