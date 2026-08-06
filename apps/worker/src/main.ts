@@ -3,6 +3,7 @@ import { Redis } from "ioredis";
 import {
   JOB_COMPACT_PAGE,
   JOB_GC_PAGE,
+  JOB_MEDIA_REEMIT,
   JOB_PROJECTION_INIT,
   JOB_PROJECTION_REBUILD,
   JOB_REVISION_CHECKPOINT,
@@ -11,6 +12,7 @@ import {
   QUEUE_PROJECTIONS,
   type CompactPageJobData,
   type GcPageJobData,
+  type MediaReemitJobData,
   type ProjectionJobData,
   type RevisionCheckpointJobData,
   type ThumbnailJobData,
@@ -132,6 +134,9 @@ const maintenanceWorker = new Worker(
     } else if (job.name === JOB_GC_PAGE) {
       const { hardDeletePage } = await import("./gc.js");
       await hardDeletePage((job.data as GcPageJobData).pageId);
+    } else if (job.name === JOB_MEDIA_REEMIT) {
+      const { reemitMediaForPage } = await import("./media-reemit.js");
+      await reemitMediaForPage((job.data as MediaReemitJobData).pageId);
     } else if (job.name === GC_SCAN_JOB) {
       const { gcTrash } = await import("./gc.js");
       const swept = await gcTrash();

@@ -24,7 +24,14 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return body.data as T;
 }
 
+interface Destination {
+  spaceId: string;
+  parentId: string | null;
+}
+
 interface Row {
+  kind: "space" | "page";
+  spaceId: string;
   id: string | null;
   title: string;
   depth: number;
@@ -32,7 +39,7 @@ interface Row {
   isCurrent: boolean;
 }
 
-/** Move-page dialog per frontend.pen frame 10. */
+/** Move-page dialog per frontend.pen frame 10 — destinations span all spaces. */
 export function MoveDialog({
   pageId,
   pageTitle,
@@ -45,65 +52,91 @@ export function MoveDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [pages, setPages] = useState<PageSummaryDto[] | null>(null);
-  const [space, setSpace] = useState<SpaceDto | null>(null);
-  const [destination, setDestination] = useState<string | null | undefined>(undefined);
+  const [spaces, setSpaces] = useState<SpaceDto[] | null>(null);
+  const [pagesBySpace, setPagesBySpace] = useState<Map<string, PageSummaryDto[]>>(new Map());
+  const [destination, setDestination] = useState<Destination | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void (async () => {
       try {
-        const spaces = await call<SpaceDto[]>("/spaces");
-        const current = spaces.find((s) => s.key === spaceKey);
-        if (!current) throw new Error("Space not found");
-        setSpace(current);
-        setPages(await call<PageSummaryDto[]>(`/spaces/${current.id}/pages`));
+        const all = await call<SpaceDto[]>("/spaces");
+        setSpaces(all);
+        const entries = await Promise.all(
+          all.map(async (space) => {
+            const pages = await call<PageSummaryDto[]>(`/spaces/${space.id}/pages`).catch(
+              () => [] as PageSummaryDto[],
+            );
+            return [space.id, pages] as const;
+          }),
+        );
+        setPagesBySpace(new Map(entries));
       } catch (err) {
         setError((err as Error).message);
       }
     })();
-  }, [spaceKey]);
+  }, []);
 
-  const { rows, childCount, currentParentId } = useMemo(() => {
-    if (!pages) return { rows: [] as Row[], childCount: 0, currentParentId: null };
-    const childrenOf = new Map<string | null, PageSummaryDto[]>();
-    for (const page of pages) {
-      const list = childrenOf.get(page.parentId) ?? [];
-      list.push(page);
-      childrenOf.set(page.parentId, list);
-    }
-    // The page's own subtree is not a legal destination.
-    const subtree = new Set<string>([pageId]);
-    const walk = (id: string) => {
-      for (const child of childrenOf.get(id) ?? []) {
-        subtree.add(child.id);
-        walk(child.id);
-      }
-    };
-    walk(pageId);
-    const self = pages.find((p) => p.id === pageId);
-
+  const { rows, childCount, currentSpaceId, currentParentId } = useMemo(() => {
+    if (!spaces) return { rows: [] as Row[], childCount: 0, currentSpaceId: "", currentParentId: null };
+    let childCount = 0;
+    let currentSpaceId = "";
+    let currentParentId: string | null = null;
     const rows: Row[] = [];
-    const emit = (parentId: string | null, depth: number) => {
-      for (const page of childrenOf.get(parentId) ?? []) {
-        rows.push({
-          id: page.id,
-          title: page.title,
-          depth,
-          disabled: subtree.has(page.id),
-          isCurrent: page.id === self?.parentId,
-        });
-        emit(page.id, depth + 1);
+
+    for (const space of spaces) {
+      const pages = pagesBySpace.get(space.id) ?? [];
+      const childrenOf = new Map<string | null, PageSummaryDto[]>();
+      for (const page of pages) {
+        const list = childrenOf.get(page.parentId) ?? [];
+        list.push(page);
+        childrenOf.set(page.parentId, list);
       }
-    };
-    emit(null, 1);
-    return {
-      rows,
-      childCount: subtree.size - 1,
-      currentParentId: self?.parentId ?? null,
-    };
-  }, [pages, pageId]);
+      const self = pages.find((p) => p.id === pageId);
+      // The page's own subtree is never a legal destination.
+      const subtree = new Set<string>();
+      if (self) {
+        currentSpaceId = space.id;
+        currentParentId = self.parentId;
+        subtree.add(pageId);
+        const walk = (id: string) => {
+          for (const child of childrenOf.get(id) ?? []) {
+            subtree.add(child.id);
+            walk(child.id);
+          }
+        };
+        walk(pageId);
+        childCount = subtree.size - 1;
+      }
+
+      rows.push({
+        kind: "space",
+        spaceId: space.id,
+        id: null,
+        title: space.name,
+        depth: 0,
+        disabled: false,
+        isCurrent: Boolean(self && self.parentId === null),
+      });
+      const emit = (parentId: string | null, depth: number) => {
+        for (const page of childrenOf.get(parentId) ?? []) {
+          rows.push({
+            kind: "page",
+            spaceId: space.id,
+            id: page.id,
+            title: page.title,
+            depth,
+            disabled: subtree.has(page.id),
+            isCurrent: Boolean(self && page.id === self.parentId),
+          });
+          emit(page.id, depth + 1);
+        }
+      };
+      emit(null, 1);
+    }
+    return { rows, childCount, currentSpaceId, currentParentId };
+  }, [spaces, pagesBySpace, pageId]);
 
   async function move() {
     if (destination === undefined) return;
@@ -112,8 +145,11 @@ export function MoveDialog({
     try {
       await call(`/pages/${pageId}/move`, {
         method: "POST",
-        body: JSON.stringify({ parentId: destination }),
+        body: JSON.stringify({ parentId: destination.parentId, spaceId: destination.spaceId }),
       });
+      const targetSpace = spaces?.find((s) => s.id === destination.spaceId);
+      const key = targetSpace?.key ?? spaceKey;
+      router.push(`/s/${key}/${pageId}`);
       router.refresh();
       onClose();
     } catch (err) {
@@ -122,10 +158,12 @@ export function MoveDialog({
     }
   }
 
-  const destinationTitle =
-    destination === null
-      ? space?.name
-      : rows.find((r) => r.id === destination)?.title;
+  const isSelected = (row: Row) =>
+    destination !== undefined &&
+    destination.spaceId === row.spaceId &&
+    destination.parentId === row.id;
+
+  const destinationRow = rows.find(isSelected);
 
   return (
     <div className={share.overlay} onClick={onClose}>
@@ -146,36 +184,22 @@ export function MoveDialog({
 
         <div className="t-caption">Move to</div>
         <div className={styles.tree}>
-          <button
-            className={cx(
-              styles.treeRow,
-              destination === null && styles.treeRowSelected,
-              currentParentId === null && styles.treeRowDisabled,
-            )}
-            disabled={currentParentId === null}
-            onClick={() => setDestination(null)}
-          >
-            <Cpu size={15} />
-            {space?.name ?? "Space root"}
-            {currentParentId === null && <Badge hue="neutral">current</Badge>}
-            {destination === null && <Badge hue="accent">destination</Badge>}
-          </button>
           {rows.map((row) => (
             <button
-              key={row.id}
+              key={`${row.spaceId}:${row.id ?? "root"}`}
               className={cx(
                 styles.treeRow,
-                destination === row.id && styles.treeRowSelected,
+                isSelected(row) && styles.treeRowSelected,
                 (row.disabled || row.isCurrent) && styles.treeRowDisabled,
               )}
               style={{ paddingLeft: 12 + row.depth * 22 }}
               disabled={row.disabled || row.isCurrent}
-              onClick={() => setDestination(row.id)}
+              onClick={() => setDestination({ spaceId: row.spaceId, parentId: row.id })}
             >
-              <Folder size={15} />
+              {row.kind === "space" ? <Cpu size={15} /> : <Folder size={15} />}
               {row.title}
               {row.isCurrent && <Badge hue="neutral">current</Badge>}
-              {destination === row.id && <Badge hue="accent">destination</Badge>}
+              {isSelected(row) && <Badge hue="accent">destination</Badge>}
             </button>
           ))}
         </div>
@@ -183,23 +207,28 @@ export function MoveDialog({
         <div className={share.warning}>
           Moving rewrites the page tree for this page and its {childCount} child
           {childCount === 1 ? "" : "ren"}, and re-evaluates their permissions from the new parent.
-          Links to the page keep working.
+          Moving between spaces of different visibility re-issues media URLs. Links to the page
+          keep working.
         </div>
 
         <footer className={share.footer}>
           <span className={share.footerNote}>
-            {space?.name}
-            {destination !== undefined && destinationTitle && destination !== null
-              ? ` › ${destinationTitle}`
-              : ""}{" "}
-            › {pageTitle}
+            {destinationRow
+              ? `${spaces?.find((s) => s.id === destinationRow.spaceId)?.name}${
+                  destinationRow.kind === "page" ? ` › ${destinationRow.title}` : ""
+                } › ${pageTitle}`
+              : `${spaces?.find((s) => s.id === currentSpaceId)?.name ?? ""} › ${pageTitle}`}
           </span>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button
             icon={<CornerDownRight size={14} />}
-            disabled={busy || destination === undefined}
+            disabled={
+              busy ||
+              destination === undefined ||
+              (destination.spaceId === currentSpaceId && destination.parentId === currentParentId)
+            }
             onClick={() => void move()}
           >
             Move here

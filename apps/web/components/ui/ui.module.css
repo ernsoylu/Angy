@@ -439,6 +439,19 @@
   color: var(--text-3);
 }
 
+/* Bottom-centre toast stack (frame C) */
+.toastStack {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
 /* ---------- Skeleton: $border-soft · 5px radius ---------- */
 .skeleton {
   background: var(--border-soft);

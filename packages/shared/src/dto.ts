@@ -149,6 +149,8 @@ export type RenamePageDto = z.infer<typeof renamePageSchema>;
 
 export const movePageSchema = z.object({
   parentId: z.uuid().nullable(),
+  /** Target space for cross-space root moves; ignored when parentId is set. */
+  spaceId: z.string().regex(/^\d+$/).optional(),
 });
 export type MovePageDto = z.infer<typeof movePageSchema>;
 

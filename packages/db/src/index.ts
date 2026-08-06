@@ -12,5 +12,6 @@ export {
   restorePage,
   trashPage,
   type CreatePageInput,
+  type MoveResult,
 } from "./closure.js";
 export { getEffectivePageLevel, getEffectiveSpaceLevel } from "./permissions.js";

@@ -80,10 +80,48 @@ describe("movePage", () => {
     await expect(movePage(prisma, top.id, top.id)).rejects.toThrow(PageMoveError);
   });
 
-  it("rejects cross-space destinations", async () => {
-    const local = await make("Local");
-    const foreign = await make("Foreign", null, otherSpaceId);
-    await expect(movePage(prisma, local.id, foreign.id)).rejects.toThrow(PageMoveError);
+  it("moves a subtree into another space, carrying space_id and deduping slugs", async () => {
+    const root = await make("Traveler");
+    const kid = await make("Traveler kid", root.id);
+    // A slug collision waiting in the target space.
+    const clash = await prisma.page.create({
+      data: {
+        spaceId: otherSpaceId,
+        title: "Clash",
+        slug: root.slug,
+        createdBy: userId,
+      },
+    });
+    await prisma.pageAncestor.create({
+      data: { ancestorId: clash.id, descendantId: clash.id, depth: 0 },
+    });
+
+    const result = await movePage(prisma, root.id, null, otherSpaceId);
+    expect(result.spaceChanged).toBe(true);
+    expect(result.movedIds.sort()).toEqual([root.id, kid.id].sort());
+
+    const moved = await prisma.page.findMany({ where: { id: { in: result.movedIds } } });
+    expect(moved.every((p) => p.spaceId === otherSpaceId)).toBe(true);
+    const movedRoot = moved.find((p) => p.id === root.id)!;
+    expect(movedRoot.slug).not.toBe(clash.slug); // de-duplicated
+    expect((await getBreadcrumb(prisma, kid.id)).map((r) => r.title)).toEqual([
+      "Traveler",
+      "Traveler kid",
+    ]);
+  });
+
+  it("moves under a parent in another space", async () => {
+    const local = await make("Local child");
+    const foreign = await make("Foreign parent", null, otherSpaceId);
+    const result = await movePage(prisma, local.id, foreign.id);
+    expect(result.spaceChanged).toBe(true);
+    expect((await prisma.page.findUnique({ where: { id: local.id } }))?.spaceId).toBe(
+      otherSpaceId,
+    );
+    expect((await getBreadcrumb(prisma, local.id)).map((r) => r.title)).toEqual([
+      "Foreign parent",
+      "Local child",
+    ]);
   });
 });
 

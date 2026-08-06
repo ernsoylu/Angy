@@ -30,6 +30,7 @@ import { UserMenu } from "./UserMenu";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { SearchField } from "../ui/SearchField";
+import { ToastProvider } from "../ui/ToastProvider";
 import { ThemeToggle } from "./ThemeToggle";
 import styles from "./shell.module.css";
 
@@ -91,6 +92,7 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
   const currentPageId = pathname.match(/([0-9a-f-]{36})/)?.[1] ?? null;
 
   return (
+    <ToastProvider>
     <div className={styles.shell}>
       <header className={styles.topbar}>
         <span className={styles.menuBtn}>
@@ -241,5 +243,6 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
         </a>
       </nav>
     </div>
+    </ToastProvider>
   );
 }

@@ -126,7 +126,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 ### Design-frame features not built
 
-- **Cross-space move** — frame 10 lists other spaces as destinations; `movePage` rejects them. Implementing it also triggers the ADR 0007 media re-emission obligation below.
+- ~~**Cross-space move**~~ — **done (2026-08-06)**: `movePage` carries the subtree's `space_id` under dual advisory locks with slug de-duplication; the dialog lists every space; moving requires EDIT in the destination space.
 - **Tags** — no tag model; frames 1 (byline chips) and 3 (search facet) both show them.
 - **Recent / Starred** — sidebar stubs; need visit-tracking and star models.
 - **Search over attachments** — frame 3's Attachments tab is decorative; only pages are indexed (Phase 7 text also promised attachment metadata).
@@ -139,13 +139,13 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 ### Frame-11 mandate only half-wired
 
-- No route-level `loading.tsx` / `error.tsx` / `not-found.tsx` — Next defaults render instead of the design-system Loading/Error/Restricted states.
-- The Toast component is never mounted; no action feedback anywhere.
+- ~~Route-level states~~ — **done (2026-08-06)**: `loading.tsx`, `error.tsx`, and `not-found.tsx` now render the design-system states.
+- ~~Toasts~~ — **done (2026-08-06)**: `ToastProvider` mounted in the shell; uploads, trash actions, restores, and grants report through it.
 
 ### ADR / runbook obligations
 
 - Revision retention/thinning (ADR 0006 operational TODO) — revisions accumulate forever.
-- Media URL re-emission on cross-visibility moves (ADR 0007, worker responsibility) — moot until cross-space move exists; they ship together.
+- ~~Media URL re-emission on cross-visibility moves~~ — **done (2026-08-06)**: the worker moves objects between access-class prefixes and realtime rewrites embedded srcs in the live doc; verified in both directions.
 - CDN key-rotation runbook (ADR 0007, "before GA"); the CDN layer itself is unprovisioned.
 - Search-token guardrail for oversized grant lists + session-tied TTL (ADR 0009) — flat 15-minute tokens, no proxy fallback.
 - Size-triggered compaction and the repeated-failure alert (compaction runbook) — interval scan only, alerts are manual log-watching.
@@ -153,7 +153,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 ### Robustness
 
-- **Realtime token refresh on reconnect** — connect tokens last 15 minutes; a network blip after expiry strands the provider in a dead reconnect loop. The one latent user-facing bug in this list.
+- ~~**Realtime token refresh on reconnect**~~ — **done (2026-08-06)**: the provider now takes a token *function*, fetching a fresh page-scoped JWT on every (re)connect.
 - Page title is PATCH-based last-write-wins, not collaborative like the body.
 - Revoked live editors see "offline", not the restricted state.
 - Reader TOC has no scroll-spy (first heading statically active).
@@ -164,4 +164,4 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 - e2e suite is local-only; CI runs unit/integration tests (e2e needs the full compose stack as services).
 - No clean-deploy rehearsal: images build and the API container smoke-tests, but `kubectl apply` has never been exercised; runtime images carry the whole workspace (~1.5 GB — slimming via `pnpm deploy` + a second generate pass is the noted follow-up).
 
-Suggested burn-down order: cross-space move + media re-emission → route-level states + toasts (cheap, closes the frame-11 mandate) → realtime token refresh. Tags, Recent/Starred, and space administration are V2-shaped: they need data-model decisions first.
+The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. What remains is either V2-shaped (tags, Recent/Starred, space administration — data-model decisions first), polish (editor affordances, dialog search, mobile items, frame-D interaction spec), or ops (retention policies, rotation runbook, terraform, e2e-in-CI, image slimming).

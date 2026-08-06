@@ -42,7 +42,7 @@ export interface GcPageJobData {
   pageId: string;
 }
 
-/** Redis pub/sub channel for document commands (restore) consumed by realtime. */
+/** Redis pub/sub channel for document commands consumed by realtime. */
 export const DOC_COMMAND_CHANNEL = "doc-command";
 
 export interface RestoreCommand {
@@ -51,4 +51,24 @@ export interface RestoreCommand {
   version: number;
   /** User performing the restore, decimal string. */
   userId: string;
+}
+
+/**
+ * Rewrite embedded media srcs after a page crossed a visibility class
+ * (ADR 0007): the worker moves the S3 objects, then realtime applies the
+ * src mapping to the live doc like any other edit.
+ */
+export interface RewriteMediaCommand {
+  type: "rewrite-media";
+  pageId: string;
+  mappings: { from: string; to: string }[];
+}
+
+export type DocCommand = RestoreCommand | RewriteMediaCommand;
+
+/** Re-emit a page's media URL forms after a cross-visibility move (ADR 0007). */
+export const JOB_MEDIA_REEMIT = "media-reemit";
+
+export interface MediaReemitJobData {
+  pageId: string;
 }

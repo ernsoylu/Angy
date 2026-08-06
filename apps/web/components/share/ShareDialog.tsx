@@ -8,6 +8,7 @@ import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Select } from "../ui/Select";
+import { useToast } from "../ui/ToastProvider";
 import styles from "./share.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -37,6 +38,7 @@ export function ShareDialog({ pageId, onClose }: { pageId: string; onClose: () =
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLevel, setInviteLevel] = useState("EDIT");
   const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
 
   const reload = useCallback(() => {
     call<PagePermissionsDto>(`/pages/${pageId}/permissions`)
@@ -96,6 +98,7 @@ export function ShareDialog({ pageId, onClose }: { pageId: string; onClose: () =
                   method: "POST",
                   body: JSON.stringify({ email: inviteEmail, level: inviteLevel }),
                 });
+                toast("success", "Access granted", inviteEmail);
                 setInviteEmail("");
               })
             }

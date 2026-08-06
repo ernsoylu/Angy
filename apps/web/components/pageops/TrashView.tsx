@@ -11,6 +11,7 @@ import { Button } from "../ui/Button";
 import { Callout } from "../ui/Callout";
 import { IconButton } from "../ui/IconButton";
 import { EmptyState } from "../ui/SystemState";
+import { useToast } from "../ui/ToastProvider";
 import styles from "./trash.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -24,6 +25,7 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
 
   async function act(path: string, removeId: string) {
     setBusy(true);
@@ -33,6 +35,15 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
       if (body.success) {
         setItems((prev) => prev.filter((i) => i.id !== removeId));
         router.refresh();
+        toast(
+          "success",
+          path.endsWith("/restore") ? "Page restored" : "Deleted permanently",
+          path.endsWith("/restore")
+            ? "Its children and place in the tree came back with it."
+            : undefined,
+        );
+      } else {
+        toast("error", "Action failed", body.error.message);
       }
     } finally {
       setBusy(false);
@@ -50,6 +61,7 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
       }
       setItems([]);
       router.refresh();
+      toast("success", "Trash emptied");
     } finally {
       setBusy(false);
     }

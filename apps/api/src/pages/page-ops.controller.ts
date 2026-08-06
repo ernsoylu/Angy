@@ -22,6 +22,7 @@ import {
 } from "@angy/db";
 import {
   JOB_GC_PAGE,
+  JOB_MEDIA_REEMIT,
   JOB_PROJECTION_REBUILD,
   movePageSchema,
   ok,
@@ -59,22 +60,52 @@ async function enqueueRebuilds(pageIds: string[]): Promise<void> {
 @Controller()
 @UseGuards(SessionGuard, PagePermissionGuard)
 export class PageOpsController {
-  /** Move a page (and its subtree) — advisory-locked closure rewrite. */
+  /** Move a page (and its subtree) — advisory-locked closure rewrite; cross-space allowed. */
   @Post("pages/:id/move")
   @RequirePageLevel("EDIT")
   async move(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(movePageSchema)) body: MovePageDto,
+    @Req() req: AuthedRequest,
   ): Promise<ApiOk<{ moved: true }>> {
+    const prisma = getPrisma();
+
+    // Moving INTO a space needs edit rights there, not just on the page.
+    let targetSpaceId: bigint;
+    if (body.parentId) {
+      const parent = await prisma.page.findFirst({
+        where: { id: body.parentId, deletedAt: null },
+      });
+      if (!parent) throw new NotFoundException("Destination page not found");
+      targetSpaceId = parent.spaceId;
+    } else if (body.spaceId) {
+      targetSpaceId = BigInt(body.spaceId);
+    } else {
+      const page = await prisma.page.findUnique({ where: { id } });
+      if (!page) throw new NotFoundException("Page not found");
+      targetSpaceId = page.spaceId;
+    }
+    const targetLevel = await getEffectiveSpaceLevel(prisma, req.user.id, targetSpaceId);
+    if (!satisfies(targetLevel, "EDIT")) {
+      throw new ForbiddenException("You need edit access in the destination space");
+    }
+
+    let result;
     try {
-      await movePage(getPrisma(), id, body.parentId);
+      result = await movePage(prisma, id, body.parentId, targetSpaceId);
     } catch (err) {
       if (err instanceof PageMoveError) throw new BadRequestException(err.message);
       throw err;
     }
     // Permissions and search both depend on the ancestor chain.
-    const affected = await invalidatePagePermissions(id);
-    await enqueueRebuilds(affected);
+    await invalidatePagePermissions(id);
+    await enqueueRebuilds(result.movedIds);
+    // Crossing a visibility class re-emits media URL forms (ADR 0007).
+    if (result.visibilityChanged) {
+      for (const pageId of result.movedIds) {
+        await maintenanceQueue().add(JOB_MEDIA_REEMIT, { pageId });
+      }
+    }
     return ok({ moved: true });
   }
 

@@ -25,7 +25,6 @@ export interface PresenceUser {
 
 interface EditorProps {
   pageId: string;
-  token: string;
   user: { name: string };
   onPresenceChange?: (users: PresenceUser[], status: string) => void;
 }
@@ -35,13 +34,27 @@ interface EditorProps {
  * the explicit Edit action — immediatelyRender: false is mandatory in Next.js
  * (hard rule 6). Undo/redo comes from Collaboration, not StarterKit.
  */
-export function Editor({ pageId, token, user, onPresenceChange }: EditorProps) {
+export function Editor({ pageId, user, onPresenceChange }: EditorProps) {
   const [status, setStatus] = useState("connecting");
 
-  // The provider lives for the lifetime of the mounted editor; the token is
-  // only consumed on the initial connect, so pageId is the true dependency.
+  // The provider lives for the lifetime of the mounted editor. Tokens are
+  // 15-minute page-scoped JWTs, so every (re)connect fetches a fresh one —
+  // otherwise a network blip past expiry strands the reconnect loop.
   const provider = useMemo(
-    () => new HocuspocusProvider({ url: REALTIME_URL, name: pageId, token }),
+    () =>
+      new HocuspocusProvider({
+        url: REALTIME_URL,
+        name: pageId,
+        token: async () => {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/pages/${pageId}/realtime-token`,
+            { credentials: "include" },
+          );
+          const body = await res.json();
+          if (!body.success) throw new Error(body.error.message);
+          return body.data.token as string;
+        },
+      }),
     [pageId],
   );
 

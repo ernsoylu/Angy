@@ -11,7 +11,8 @@ import {
   QUEUE_MAINTENANCE,
   QUEUE_PROJECTIONS,
   satisfies,
-  type RestoreCommand,
+  type DocCommand,
+  type RewriteMediaCommand,
 } from "@angy/shared";
 import { env } from "./env.js";
 import { getObject, putObject } from "./s3.js";
@@ -100,6 +101,41 @@ function subscribeToPermChanges(server: Server, subscriber: Redis): void {
 }
 
 /**
+ * Media re-emission (ADR 0007): after the worker moved a page's objects to
+ * a new access-class prefix, rewrite embedded image srcs in the live doc.
+ * Applied as a normal edit via a direct connection, so open editors converge
+ * and the store/projection pipeline republishes the reader HTML.
+ */
+async function rewriteMedia(server: Server, command: RewriteMediaCommand): Promise<void> {
+  const map = new Map(command.mappings.map((m) => [m.from, m.to]));
+  const connection = await server.hocuspocus.openDirectConnection(command.pageId, {
+    name: "media-reemit",
+  });
+  try {
+    await connection.transact((document) => {
+      const walk = (node: Y.XmlFragment | Y.XmlElement): void => {
+        for (const child of node.toArray()) {
+          if (child instanceof Y.XmlElement) {
+            if (child.nodeName === "image") {
+              const src = child.getAttribute("src");
+              const next = typeof src === "string" ? map.get(src) : undefined;
+              if (next) child.setAttribute("src", next);
+            }
+            walk(child);
+          }
+        }
+      };
+      walk(document.getXmlFragment("default"));
+    });
+  } finally {
+    await connection.disconnect();
+  }
+  console.log(
+    `[realtime] rewrote ${command.mappings.length} media src(s) on ${command.pageId}`,
+  );
+}
+
+/**
  * Restore commands (ADR 0006): apply the old revision's content to the live
  * doc as a normal forward update via a server-side direct connection — open
  * editors converge on it like any other edit; history is never rewritten.
@@ -113,7 +149,11 @@ function subscribeToDocCommands(
   subscriber.on("message", (channel, message) => {
     if (channel !== DOC_COMMAND_CHANNEL) return;
     void (async () => {
-      const command = JSON.parse(message) as RestoreCommand;
+      const command = JSON.parse(message) as DocCommand;
+      if (command.type === "rewrite-media") {
+        await rewriteMedia(server, command);
+        return;
+      }
       if (command.type !== "restore") return;
       const revision = await getPrisma().pageRevision.findUnique({
         where: { pageId_version: { pageId: command.pageId, version: command.version } },

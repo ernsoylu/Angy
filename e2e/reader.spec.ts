@@ -40,6 +40,14 @@ test.describe("reader SSR + edit-on-click", () => {
     await context.close();
   });
 
+  test("unknown pages render the styled not-found state", async ({ browser }) => {
+    const context = await sessionContext(browser, "e2e-eren");
+    const page = await context.newPage();
+    await page.goto("/s/eng/00000000-0000-4000-8000-000000000000");
+    await expect(page.getByText("This page doesn't exist")).toBeVisible();
+    await context.close();
+  });
+
   test("a view-only user cannot open the editor", async ({ browser }) => {
     const context = await sessionContext(browser, "e2e-ada");
     const page = await context.newPage();

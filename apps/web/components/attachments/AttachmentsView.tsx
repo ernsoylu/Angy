@@ -18,6 +18,7 @@ import { Button } from "../ui/Button";
 import { Callout } from "../ui/Callout";
 import { Progress } from "../ui/Feedback";
 import { Chip } from "../ui/Tag";
+import { useToast } from "../ui/ToastProvider";
 import styles from "./attachments.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -60,6 +61,7 @@ export function AttachmentsView({
   const [targetPage, setTargetPage] = useState(pages[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const visible = useMemo(
     () => (filter === "all" ? items : items.filter((a) => kind(a) === filter)),
@@ -83,6 +85,9 @@ export function AttachmentsView({
       if (body.success) {
         setItems((prev) => [body.data as AttachmentDto, ...prev]);
         setSelectedId((body.data as AttachmentDto).id);
+        toast("success", "File uploaded", (body.data as AttachmentDto).fileName);
+      } else {
+        toast("error", "Upload failed", body.error.message);
       }
     } finally {
       setBusy(false);
@@ -100,6 +105,9 @@ export function AttachmentsView({
       if (body.success) {
         setItems((prev) => prev.filter((a) => a.id !== attachment.id));
         setSelectedId(null);
+        toast("success", "Moved to trash", `${attachment.fileName} is swept with the 30-day GC.`);
+      } else {
+        toast("error", "Delete failed", body.error.message);
       }
     } finally {
       setBusy(false);

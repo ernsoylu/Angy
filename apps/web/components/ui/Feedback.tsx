@@ -16,10 +16,12 @@ export function Toast({
   tone,
   title,
   children,
+  onClose,
 }: {
   tone: "success" | "error";
   title: string;
   children?: ReactNode;
+  onClose?: () => void;
 }) {
   return (
     <div className={styles.toast} role="status">
@@ -35,7 +37,7 @@ export function Toast({
         <div className={styles.toastTitle}>{title}</div>
         {children && <div className={styles.toastBody}>{children}</div>}
       </div>
-      <button className={styles.toastClose} aria-label="Dismiss">
+      <button className={styles.toastClose} aria-label="Dismiss" onClick={onClose}>
         <X size={15} />
       </button>
     </div>

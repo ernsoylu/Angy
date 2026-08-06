@@ -12,7 +12,6 @@ import { Editor, type PresenceUser } from "./Editor";
 
 interface EditorViewProps {
   pageId: string;
-  token: string;
   title: string;
   version: number | null;
   spaceKey: string;
@@ -69,7 +68,6 @@ function EditableTitle({ pageId, initial }: { pageId: string; initial: string })
 
 export function EditorView({
   pageId,
-  token,
   title,
   version,
   spaceKey,
@@ -101,7 +99,6 @@ export function EditorView({
           <EditableTitle pageId={pageId} initial={title} />
           <Editor
             pageId={pageId}
-            token={token}
             user={user}
             onPresenceChange={(users, s) => {
               setPresence(users);

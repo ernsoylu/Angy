@@ -37,6 +37,8 @@ test.describe("page move + trash/restore", () => {
     await expect(row.getByText(movableTitle)).toBeVisible();
     await expect(page.getByText(/30 days|29 days/).first()).toBeVisible();
     await row.getByRole("button", { name: "Restore" }).click();
+    // Frame C toast confirms the action.
+    await expect(page.getByText("Page restored")).toBeVisible();
     // Scope to the listing — the restored page reappears in the sidebar tree.
     await expect(page.locator("main").getByText(movableTitle)).toHaveCount(0);
 

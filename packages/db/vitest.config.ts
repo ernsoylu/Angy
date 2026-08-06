@@ -5,5 +5,7 @@ export default defineConfig({
     globalSetup: "./test/global-setup.ts",
     testTimeout: 30000,
     hookTimeout: 60000,
+    // Advisory locks + interactive transactions across files must not race.
+    fileParallelism: false,
   },
 });
