@@ -11,6 +11,7 @@ import { env } from "./env";
 const SIGNED_URL_TTL_SECONDS = 300;
 
 let client: S3Client | undefined;
+let signer: S3Client | undefined;
 
 function s3(): S3Client {
   client ??= new S3Client({
@@ -23,6 +24,24 @@ function s3(): S3Client {
     },
   });
   return client;
+}
+
+/**
+ * A second client pointed at the public endpoint, used *only* to presign.
+ * SigV4 covers the Host header, so a URL signed against the internal address
+ * is rejected when the browser presents it to the public one.
+ */
+function s3Signer(): S3Client {
+  signer ??= new S3Client({
+    endpoint: env.s3.publicEndpoint(),
+    region: env.s3.region,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: env.s3.accessKeyId,
+      secretAccessKey: env.s3.secretAccessKey,
+    },
+  });
+  return signer;
 }
 
 export async function putMediaObject(
@@ -43,12 +62,12 @@ export async function putMediaObject(
 }
 
 export function bareMediaUrl(key: string): string {
-  return `${env.s3.endpoint}/${env.s3.bucket}/${key}`;
+  return `${env.s3.publicEndpoint()}/${env.s3.bucket}/${key}`;
 }
 
 export async function signedMediaUrl(key: string): Promise<string> {
   return getSignedUrl(
-    s3(),
+    s3Signer(),
     new GetObjectCommand({ Bucket: env.s3.bucket, Key: key }),
     { expiresIn: SIGNED_URL_TTL_SECONDS },
   );

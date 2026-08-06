@@ -120,6 +120,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **Compaction candidacy compares state vectors, never timestamps** — compaction itself touches page.updated_at, so a timestamp check re-enqueues every page forever.
 - **Crashed browser tabs reap at Hocuspocus's ~30s health timeout** (no WS close frame), so idle-cutoff checkpoints from them arrive late — the Done button's explicit checkpoint is the deterministic save path.
 - **pg_advisory_xact_lock returns void** — cast it (`::text`) under Prisma $queryRaw or deserialization fails.
+- **Public ≠ internal origins behind a proxy.** `S3_ENDPOINT` is for SDK calls; `S3_PUBLIC_ENDPOINT` is for anything a browser fetches — bare media URLs *and presigning*, since SigV4 signs the Host header. `PUBLIC_API_URL` (not the listen port) forms the OIDC redirect_uri and drives the session cookie's `Secure` flag. Collapsing either pair works on localhost and breaks everywhere else (ADR 0012).
 - **`NEXT_PUBLIC_*` are baked into the web image at build time**, so the `angy-env` Secret cannot change what the browser talks to — pass them to infra/docker/build.sh per deployment target. Server-side code uses `API_INTERNAL_URL`, which *is* runtime env.
 - **Editor plugins registered from React (drag handle) must take referentially stable props** — a new `onNodeChange` identity each render re-registers the ProseMirror plugin, and the reconfigure tears down every other plugin's view (the slash menu silently stops opening).
 - **The page title is a `title` Y.Text in the page's own Y.Doc** (`TITLE_FIELD`), not a plain column write: `onStoreDocument` copies it into `page.title`, so anything renaming a page must go through the doc (`rename` doc command) or the next store overwrites it. Never persist an empty title — reseed the doc from the row instead.
@@ -167,6 +168,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/adr/0009-search-authz-tenant-tokens.md — Meilisearch tenant-token filters
 - docs/adr/0010-live-editing-vs-publish.md — live-by-default, no draft state in V1
 - docs/adr/0011-authentik-single-idp.md — Authentik as the one IdP; why not multi-IdP
+- docs/adr/0012-homelab-tunnel-topology.md — five public hostnames behind a Pangolin tunnel
 - docs/architecture.md — system narrative, data flow, consistency & backup model
 - docs/schema.md — table inventory (DDL TODO)
 - docs/env.md + .env.example — canonical environment variables
@@ -177,6 +179,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/runbooks/dev-debugging.md — local debugging recipes
 - docs/runbooks/alerts.md — log-based alert signals ([alert] lines) and responses
 - docs/runbooks/key-rotation.md — rotation procedures for every deployment secret
+- docs/runbooks/homelab.md — deploying to the home server behind the tunnel
 
 ## UI Design Source
 

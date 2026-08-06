@@ -1,0 +1,261 @@
+name: angy
+
+# Homelab production stack (ADR 0012). Runs on the home server; reached from
+# the internet only through the Pangolin tunnel, never through a port forward.
+#
+#   docker compose -f infra/compose.prod.yml up -d
+#
+# Secrets come from /opt/angy/.env (chmod 600, never committed). Every variable
+# below is required — there are deliberately no inline defaults, so a missing
+# one fails loudly at `up` instead of silently starting with a dev password.
+# See docs/runbooks/homelab.md for the full procedure.
+#
+# ── Why nothing publishes a port ──────────────────────────────────────────────
+# `newt` sits on this same network and dials Pangolin outbound, then proxies
+# inbound requests to `web:3000`, `api:3001`, `realtime:3002`,
+# `authentik-server:9000` and `minio:9000` by service name. Publishing those to
+# the host would add a second, unauthenticated way in from the LAN for no gain.
+# Postgres, Redis and Meilisearch are not tunnel targets at all: they have no
+# public hostname and are reachable only from sibling containers.
+
+x-env: &app-env
+  DATABASE_URL: postgresql://angy:${POSTGRES_PASSWORD}@postgres:5432/angy
+  REDIS_URL: redis://redis:6379
+  MEILISEARCH_URL: http://meilisearch:7700
+  MEILISEARCH_API_KEY: ${MEILI_MASTER_KEY}
+  # Internal address: every SDK call (Y.Doc blobs, revisions, thumbnails) goes
+  # here and stays on this network.
+  S3_ENDPOINT: http://minio:9000
+  # Browser-facing address: bare media URLs and presigned URLs are built from
+  # this. Different value, same bucket — see ADR 0007 amendment.
+  S3_PUBLIC_ENDPOINT: https://${MEDIA_HOST}
+  S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+  S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+  S3_BUCKET: angy-docs
+  S3_REGION: us-east-1
+  JWT_SECRET: ${JWT_SECRET}
+
+services:
+  # ──────────────────────────────────────────────────────────── Angy services
+  web:
+    image: angy/web:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      # Server-side rendering talks to the API over the internal network; only
+      # the browser goes out through the tunnel. NEXT_PUBLIC_* are absent on
+      # purpose — Next inlined them at build time (infra/docker/build.sh).
+      API_INTERNAL_URL: http://api:3001
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3000/signin || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    image: angy/api:${TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      WEB_ORIGIN: https://${WEB_HOST}
+      # The origin the browser uses. Sets the OIDC redirect_uri, the URL
+      # openid-client validates the callback against, and — being https — the
+      # session cookie's Secure flag.
+      PUBLIC_API_URL: https://${API_HOST}
+      OIDC_ISSUER_URL: https://${ID_HOST}/application/o/angy/
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      meilisearch: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  realtime:
+    image: angy/realtime:${TAG:-latest}
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:3002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    image: angy/worker:${TAG:-latest}
+    restart: unless-stopped
+    # No HTTP surface, so no healthcheck — liveness shows up as jobs draining.
+    # docs/runbooks/alerts.md covers the [alert] lines to watch.
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      meilisearch: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  # ───────────────────────────────────────────────────────────── Data tier
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: angy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: angy
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U angy -d angy"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    # noeviction is not optional: this holds live Y.Docs, and an eviction is
+    # silent data loss for whoever is editing that page (CLAUDE.md gotcha).
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory-policy noeviction --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - meilidata:/meili_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:7700/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    entrypoint: /bin/sh -c "mkdir -p /data/angy-docs && exec minio server /data --console-address ':9001'"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # MinIO answers on the public hostname too, and rewrites redirect/location
+      # headers to it. Without this, browser-visible URLs leak `minio:9000`.
+      MINIO_SERVER_URL: https://${MEDIA_HOST}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || curl -sf http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ──────────────────────────────────────────────────────────────── Authentik
+  authentik-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      POSTGRES_DB: authentik
+    volumes:
+      - authentikdb:/var/lib/postgresql/data
+      - ./backup:/backup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2025.8
+    restart: unless-stopped
+    command: server
+    environment: &authentik-env
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD}
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_REDIS__DB: 1
+      # Served over https through the tunnel, unlike dev.
+      AUTHENTIK_COOKIE_SECURE: "true"
+      # Traefik terminates TLS and forwards plain http; without trusting the
+      # X-Forwarded-* headers Authentik builds http:// URLs and the OIDC issuer
+      # stops matching what the browser sees.
+      AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+      AUTHENTIK_DISABLE_STARTUP_ANALYTICS: "true"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    # The dev blueprint is deliberately NOT mounted: it carries the well-known
+    # client secret and the shared `angy` password. Configure the production
+    # provider through the admin UI, or write a separate blueprint whose
+    # secrets come from the environment.
+    depends_on:
+      authentik-postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2025.8
+    restart: unless-stopped
+    command: worker
+    environment: *authentik-env
+    depends_on:
+      authentik-postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # ─────────────────────────────────────────────────────────────────── Tunnel
+  # Pangolin's tunnel client. Dials the VPS outbound over WireGuard, so the
+  # home network needs no inbound port, no static IP, and no firewall hole.
+  # NEWT_ID/NEWT_SECRET come from the site created in the Pangolin dashboard.
+  newt:
+    image: fosrl/newt:latest
+    restart: unless-stopped
+    environment:
+      PANGOLIN_ENDPOINT: ${PANGOLIN_ENDPOINT}
+      NEWT_ID: ${NEWT_ID}
+      NEWT_SECRET: ${NEWT_SECRET}
+    depends_on:
+      web: { condition: service_started }
+      api: { condition: service_started }
+      realtime: { condition: service_started }
+
+volumes:
+  pgdata:
+  authentikdb:
+  redisdata:
+  meilidata:
+  miniodata:

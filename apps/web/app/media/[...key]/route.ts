@@ -16,9 +16,18 @@ const API_URL =
 
 let s3: S3Client | undefined;
 
+/**
+ * Presigning only — never used to fetch bytes, so it points at the public
+ * origin. SigV4 signs the Host header, so a URL signed against the internal
+ * endpoint is rejected when the browser presents it to the public one.
+ */
 function client(): S3Client {
   s3 ??= new S3Client({
-    endpoint: process.env.S3_ENDPOINT ?? "http://localhost:9000",
+    endpoint: (
+      process.env.S3_PUBLIC_ENDPOINT ??
+      process.env.S3_ENDPOINT ??
+      "http://localhost:9000"
+    ).replace(/\/+$/, ""),
     region: process.env.S3_REGION ?? "us-east-1",
     forcePathStyle: true,
     credentials: {

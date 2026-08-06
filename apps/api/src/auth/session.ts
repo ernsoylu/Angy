@@ -46,10 +46,24 @@ export async function resolveSessionUser(
   return BigInt(raw);
 }
 
-export function sessionCookie(sessionId: string): string {
-  return `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`;
+/**
+ * `Secure` is driven by the public origin rather than hardcoded: local dev is
+ * plain http, where a Secure cookie would simply never be stored, and any
+ * https deployment must have it or the session travels in the clear on a
+ * downgrade.
+ *
+ * SameSite stays Lax. The web app and the API sit on sibling subdomains of one
+ * registrable domain, so credentialed XHR between them is same-site and Lax
+ * permits it; it also survives the top-level OIDC redirect back from the IdP.
+ */
+function attributes(secure: boolean): string {
+  return `Path=/; HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`;
 }
 
-export function clearedSessionCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+export function sessionCookie(sessionId: string, secure = false): string {
+  return `${SESSION_COOKIE}=${sessionId}; ${attributes(secure)}; Max-Age=${SESSION_TTL_SECONDS}`;
+}
+
+export function clearedSessionCookie(secure = false): string {
+  return `${SESSION_COOKIE}=; ${attributes(secure)}; Max-Age=0`;
 }

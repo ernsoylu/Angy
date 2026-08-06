@@ -28,8 +28,9 @@ export class OidcService {
     return this.config;
   }
 
+  /** Must match a redirect URI registered on the provider (ADR 0011). */
   redirectUri(): string {
-    return `http://localhost:${env.port}/auth/callback`;
+    return `${env.publicApiUrl()}/auth/callback`;
   }
 
   /** Build the authorization URL; PKCE verifier is parked in Redis keyed by state. */

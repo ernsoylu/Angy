@@ -63,4 +63,15 @@ describe("session auth", () => {
     expect(sessionCookie("abc")).toContain("SameSite=Lax");
     expect(clearedSessionCookie()).toContain("Max-Age=0");
   });
+
+  // Secure is derived from the public origin's scheme (ADR 0012). Both
+  // directions matter: omitting it on https leaks the session on a downgrade,
+  // and forcing it on plain-http dev means the browser never stores the cookie
+  // at all — a failure that presents as "sign-in silently does nothing".
+  it("adds Secure only when asked, on both the set and clear cookies", () => {
+    expect(sessionCookie("abc", true)).toContain("; Secure");
+    expect(sessionCookie("abc", false)).not.toContain("Secure");
+    expect(clearedSessionCookie(true)).toContain("; Secure");
+    expect(clearedSessionCookie(false)).not.toContain("Secure");
+  });
 });

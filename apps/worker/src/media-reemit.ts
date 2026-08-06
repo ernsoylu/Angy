@@ -4,7 +4,7 @@ import { DOC_COMMAND_CHANNEL, type RewriteMediaCommand } from "@angy/shared";
 import { env } from "./env.js";
 import { deleteObject, getObject, putObject } from "./s3.js";
 
-const bareUrl = (key: string) => `${env.s3.endpoint}/${env.s3.bucket}/${key}`;
+const bareUrl = (key: string) => `${env.s3.publicEndpoint()}/${env.s3.bucket}/${key}`;
 const docSrcFor = (key: string) =>
   key.startsWith("media-private/") ? `/media/${key}` : bareUrl(key);
 

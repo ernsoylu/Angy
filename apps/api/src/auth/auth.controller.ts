@@ -27,7 +27,10 @@ export class AuthController {
 
   @Get("callback")
   async callback(@Req() req: Request, @Res() res: Response) {
-    const url = new URL(req.originalUrl, `http://localhost:${env.port}`);
+    // openid-client validates the callback URL it is handed, so it has to be
+    // the public one the IdP actually redirected the browser to — not the
+    // address this process happens to listen on.
+    const url = new URL(req.originalUrl, env.publicApiUrl());
     const identity = await this.oidc.completeLogin(url);
     const prisma = getPrisma();
     const bySubject = await prisma.appUser.findUnique({
@@ -50,7 +53,7 @@ export class AuthController {
           },
         });
     const sessionId = await createSession(getRedis(), user.id);
-    res.setHeader("Set-Cookie", sessionCookie(sessionId));
+    res.setHeader("Set-Cookie", sessionCookie(sessionId, env.publicApiUrl().startsWith("https:")));
     res.redirect(env.webOrigin);
   }
 
@@ -58,7 +61,7 @@ export class AuthController {
   async logout(@Req() req: Request, @Res() res: Response) {
     const sessionId = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     if (sessionId) await destroySession(getRedis(), sessionId);
-    res.setHeader("Set-Cookie", clearedSessionCookie());
+    res.setHeader("Set-Cookie", clearedSessionCookie(env.publicApiUrl().startsWith("https:")));
     res.json(ok({ signedOut: true }));
   }
 

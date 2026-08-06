@@ -57,18 +57,26 @@
 
 The original wave assumed a cloud provider, terraform for bucket/CDN/DNS, and
 CloudFront signed cookies. None of that applies to a self-hosted homelab
-reached through Pangolin tunnels. What the goal actually decomposes into:
+reached through Pangolin tunnels. Topology decided in **ADR 0012** — five
+public hostnames, tunnel as sole ingress. Procedure:
+**docs/runbooks/homelab.md**.
 
-- [ ] G1 · Ingress: Pangolin/newt tunnel to the three HTTP tiers, with the realtime WebSocket tier proven to survive it (ADR 0008 needs sticky sessions and long-lived upgrades — the thing most likely to break through a tunnel)
-- [ ] G2 · Public origin config: `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_REALTIME_URL` are baked at image build (see docs/env.md), so the tunnel hostnames must be known before the web image is built
-- [ ] G3 · Private-space media without a CDN: ADR 0007 assumed CloudFront edge-signed cookies. Behind a tunnel the options are S3/MinIO presigning (already implemented) or serving through the app — needs an ADR amendment either way
-- [ ] G4 · Persistence and backup on the homelab: Postgres PITR, MinIO durability, and where the Y.Doc blobs actually live
-- [ ] G5 · Whether terraform earns its place at all here, or whether compose/k8s manifests plus the existing `infra/k8s/rehearse.sh` are the honest tool
+- [x] **G0 · Tunnel-hostile assumptions in the code** *(2026-08-06)* — an audit found five places where "internal", "public" and "what the browser uses" had been collapsed into one address. Two were blockers: the OIDC `redirect_uri` and the callback URL were built from `http://localhost:${env.port}`, so sign-in would have redirected users to a host that does not exist. Fixed via `PUBLIC_API_URL`, which also drives the session cookie's `Secure` flag.
+- [x] **G2 · Public origin config** *(2026-08-06)* — `infra/docker/build.sh` already takes the two `NEXT_PUBLIC_*` values as build args; the runbook records that the web image is therefore environment-specific and cannot be promoted across deployments.
+- [x] **G3 · Media without a CDN** *(2026-08-06)* — decided in favour of exposing MinIO as `media.angy.<domain>`, a fifth public hostname (ADR 0007 amendment). This required the `S3_ENDPOINT` / `S3_PUBLIC_ENDPOINT` split: SigV4 signs the Host header, so presigning must happen against the public origin while all SDK traffic stays internal.
+- [ ] **G1 · Prove the WebSocket tier survives the tunnel** — the one gate that cannot be closed from here. Hocuspocus's server `timeout` is 60s and the provider's `messageReconnectTimeout` is 30s; a proxy that closes idle upgrades sooner turns collaboration into a reconnect loop that looks like a CRDT bug. Verification procedure: runbooks/homelab.md §5.1. **Blocked on the home server being stood up.**
+- [ ] **G4 · Persistence and backup** — volume inventory and the Postgres dump procedure are in runbooks/homelab.md §6; Postgres PITR and a *tested* restore drill are still open.
+- [ ] **G5 · Does terraform earn its place** — leaning no. `infra/compose.prod.yml` covers the homelab, and `infra/k8s/rehearse.sh` covers the k8s path. Revisit only if a second deployment target appears.
+
+**Not blocking, worth knowing:** Pangolin's Integration API listens on port
+3003 (not 443) behind `flags.enable_integration_api`, and was unreachable from
+outside during setup — so the site and its five resources get created through
+the dashboard rather than scripted.
 
 ## Accepted deviations (not TODO — recorded so they aren't re-litigated)
 
 - Search-token TTL is a flat 15 minutes; ADR 0009's "session refresh interval" binding has no refresh concept to attach to.
-- Dev/prod media access classes are storage prefixes (`media/` vs `media-private/`); the CDN tier supersedes the anonymous-read bucket policy in production (Wave G).
+- Dev/prod media access classes are storage prefixes (`media/` vs `media-private/`). In the homelab there is no CDN tier to supersede the anonymous-read policy on `media/` — tunnel-exposed MinIO takes its place, so public-space media is internet-readable by design (ADR 0007 amendment).
 - The pruned runtime tree keeps `typescript` and the full `@prisma/client` engine set (~97 MB of the 602 MB). Both arrive as optional peers of production dependencies; trimming them means pruning inside the store, which is more fragile than the size is worth.
 - Recent and Starred are **space-scoped routes**, not expanding sidebar trays. No frame specifies either surface; routing matches the sibling rows in the same nav group (Home, Attachments, Trash) and gives the Me tab something to link to.
 - Tag admin lives in *space* settings even though tags are workspace-wide — it is the only admin surface there is. A workspace-settings screen would be its proper home if one is ever designed.
@@ -76,7 +84,7 @@ reached through Pangolin tunnels. What the goal actually decomposes into:
 
 **Critical path:** ~~A1~~ → (~~B~~, ~~C~~, ~~F~~) → ~~D~~ → ~~E~~ → G.
 
-Waves A through F are done. **Wave G is all that remains**, and it is now a
-homelab-and-tunnel problem rather than a cloud one — G1 (does the WebSocket
-tier survive Pangolin) and G3 (private media without a CDN) are the two that
-could force real code changes; the rest is configuration.
+Waves A through F are done. **Wave G is all that remains.** Its code half is
+now closed: G0's origin split, G2's build-time inlining and G3's media
+decision are in. What is left needs the home server to exist — G1 is a
+measurement, not a change, and G4 is a drill.
