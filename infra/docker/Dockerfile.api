@@ -11,13 +11,13 @@ RUN pnpm install --frozen-lockfile
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm build:packages && pnpm --filter @angy/api build
+RUN infra/docker/prune.sh api
 
-# V1 runtime keeps the workspace as-built (generated Prisma client included).
-# Slimming via pnpm deploy is a follow-up: it re-installs, which would need
-# another generate pass.
+# Runtime carries only the pruned tree: this app's dist, the three workspace
+# packages, and production dependencies (see infra/docker/prune.sh).
 FROM node:24-slim
 ENV NODE_ENV=production
-WORKDIR /app/apps/api
-COPY --from=build /app /app
+WORKDIR /app
+COPY --from=build /deploy /app
 EXPOSE 3001
 CMD ["node", "dist/main.js"]

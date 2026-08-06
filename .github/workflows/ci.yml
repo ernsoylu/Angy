@@ -38,3 +38,63 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  e2e:
+    runs-on: ubuntu-latest
+    # The suite needs the whole stack (Postgres, Redis, Meilisearch, MinIO) plus
+    # all four apps, so it runs the compose file rather than Actions `services:`
+    # — MinIO needs its entrypoint overridden to pre-create the bucket, which a
+    # service container cannot express. Keycloak stays down: e2e plants session
+    # cookies straight into Redis (e2e/global-setup.ts), never touching OIDC.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start backing services
+        run: docker compose -f infra/docker-compose.yml up -d --wait postgres redis meilisearch minio
+
+      # Every app reads the root .env.local (see docs/env.md); the committed
+      # defaults already point at the compose ports.
+      - name: Configure environment
+        run: cp .env.example .env.local
+
+      - run: pnpm --filter @angy/db exec prisma migrate deploy
+      - run: pnpm db:generate
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chrome
+
+      # Boot and test in one step so the backgrounded apps are guaranteed to
+      # outlive the shell that started them.
+      - name: Boot the four apps and run the suite
+        run: |
+          mkdir -p /tmp/angy-logs
+          for app in api realtime worker web; do
+            pnpm --filter "@angy/$app" start > "/tmp/angy-logs/$app.log" 2>&1 &
+          done
+          # The worker has no HTTP surface — global-setup proves it is alive by
+          # waiting for the seed to reach the search index.
+          for probe in localhost:3001/health localhost:3002/health localhost:3000/signin; do
+            for attempt in $(seq 1 60); do
+              curl -sf "http://$probe" > /dev/null && break
+              if [ "$attempt" = 60 ]; then
+                echo "::error::$probe never came up"; tail -n 50 /tmp/angy-logs/*.log; exit 1
+              fi
+              sleep 2
+            done
+          done
+          pnpm test:e2e
+
+      - name: Collect diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-diagnostics
+          path: |
+            /tmp/angy-logs
+            test-results
+          if-no-files-found: ignore

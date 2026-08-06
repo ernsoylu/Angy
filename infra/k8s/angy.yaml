@@ -1,5 +1,10 @@
 # Angy V1 deployment topology. Secrets/config come from the `angy-env` Secret
 # (one key per variable in docs/env.md) — create it out of band.
+#
+# Every container pins imagePullPolicy: IfNotPresent, so rolling out means
+# changing the tag, never repushing one. It is also what lets a local
+# `kind load docker-image` rehearsal work — :latest would otherwise default to
+# Always and go looking on Docker Hub (infra/k8s/rehearse.sh).
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -21,6 +26,7 @@ spec:
       containers:
         - name: web
           image: angy/web:latest
+          imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3000 }]
           envFrom: [{ secretRef: { name: angy-env } }]
           readinessProbe:
@@ -43,6 +49,7 @@ spec:
       containers:
         - name: api
           image: angy/api:latest
+          imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3001 }]
           envFrom: [{ secretRef: { name: angy-env } }]
           readinessProbe:
@@ -70,6 +77,7 @@ spec:
       containers:
         - name: realtime
           image: angy/realtime:latest
+          imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3002 }]
           envFrom: [{ secretRef: { name: angy-env } }]
           readinessProbe:
@@ -92,6 +100,7 @@ spec:
       containers:
         - name: worker
           image: angy/worker:latest
+          imagePullPolicy: IfNotPresent
           envFrom: [{ secretRef: { name: angy-env } }]
           resources:
             # Compaction can transiently need ~75× doc size (runbook) — give

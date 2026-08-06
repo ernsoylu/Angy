@@ -2,6 +2,9 @@
   "name": "@angy/blocks",
   "version": "0.0.0",
   "private": true,
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "exports": {
     ".": {
@@ -22,6 +25,7 @@
   "dependencies": {
     "@tiptap/core": "^3.29.2",
     "@tiptap/extension-image": "^3.29.2",
+    "@tiptap/extension-link": "3.29.2",
     "@tiptap/extension-table": "^3.29.2",
     "@tiptap/pm": "^3.29.2",
     "@tiptap/starter-kit": "^3.29.2",

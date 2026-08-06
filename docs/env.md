@@ -17,8 +17,8 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `OIDC_ISSUER_URL` | ✅ | api | Keycloak/Authentik realm URL |
 | `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | ✅ | api | — |
 | `JWT_SECRET` | ✅ | api, realtime | Signs **short-lived realtime connect tokens and media access tokens** (ADR 0007/0008) — *not* user authentication, which is OIDC + Redis sessions. Random, ≥32 chars |
-| `NEXT_PUBLIC_API_URL` | ✅ | web | Public API endpoint |
-| `NEXT_PUBLIC_REALTIME_URL` | ✅ | web | Public WebSocket endpoint |
+| `NEXT_PUBLIC_API_URL` | ✅ | web | Public API endpoint. **Build-time**: Next inlines it into the client bundle, so pass it to `infra/docker/build.sh` — setting it in `angy-env` does nothing for the browser |
+| `NEXT_PUBLIC_REALTIME_URL` | ✅ | web | Public WebSocket endpoint. Build-time, same as above |
 | `API_INTERNAL_URL` | — | web | Server-side API endpoint when it differs from the public one (defaults to `NEXT_PUBLIC_API_URL`) |
 | `WEB_ORIGIN` | — | api | CORS origin for the web app (default `http://localhost:3000`) |
 | `TRASH_RETENTION_MS` | — | api, worker | Trash hard-delete retention (default 30 days) |

@@ -7,9 +7,10 @@ RUN pnpm install --frozen-lockfile
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm build:packages && pnpm --filter @angy/worker build
+RUN infra/docker/prune.sh worker
 
 FROM node:24-slim
 ENV NODE_ENV=production
-WORKDIR /app/apps/worker
-COPY --from=build /app /app
+WORKDIR /app
+COPY --from=build /deploy /app
 CMD ["node", "dist/main.js"]

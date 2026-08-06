@@ -6,6 +6,14 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
+# Next inlines NEXT_PUBLIC_* into the client bundle at build time, so these are
+# baked per image and CANNOT be overridden by the runtime `angy-env` Secret —
+# the browser talks to whatever was compiled in. Server-only endpoints
+# (API_INTERNAL_URL) stay runtime env.
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_REALTIME_URL=ws://localhost:3002
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_REALTIME_URL=$NEXT_PUBLIC_REALTIME_URL
 RUN pnpm build:packages && pnpm --filter @angy/web build
 
 # Next standalone output is self-contained (traced node_modules included).
