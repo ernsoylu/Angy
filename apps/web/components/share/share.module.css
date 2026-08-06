@@ -54,8 +54,16 @@
   gap: 10px;
 }
 
+/* Despite the name this is the generic dialog text input — Share uses it in a
+   row, the other three dialogs stack it in a column. */
 .inviteInput {
-  flex: 1;
+  /* `flex: 1` expands to `flex-basis: 0%`, and flex-basis governs the MAIN
+     axis. In Share's row that is the width, which is what was intended. In a
+     column dialog the main axis is the height, so the basis of 0 overrode
+     `height: 38px` and every field collapsed to a thin pill with the text
+     spilling out. `auto` defers to the height property on the main axis while
+     still filling the row, so one declaration is right in both directions. */
+  flex: 1 1 auto;
   height: 38px;
   padding: 0 12px;
   border-radius: var(--r-btn);
