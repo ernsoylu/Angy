@@ -74,9 +74,15 @@ export function EmptyState({
       iconBg="var(--sage-soft)"
       title={title}
       body={body}
-      action={
-        action === undefined ? <Button onClick={onAction}>{actionLabel}</Button> : action
-      }
+      /*
+       * No handler, no button. The default used to render
+       * `<Button onClick={onAction}>` regardless, so any caller that forgot
+       * `onAction` shipped a button that looked live and did nothing — which
+       * three of them did, including the "Create the first page" button that
+       * is the only route out of an empty space. An absent affordance is a
+       * smaller lie than a dead one.
+       */
+      action={action !== undefined ? action : onAction ? <Button onClick={onAction}>{actionLabel}</Button> : null}
     />
   );
 }

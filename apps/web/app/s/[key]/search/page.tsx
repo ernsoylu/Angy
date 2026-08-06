@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, FileText, Paperclip } from "lucide-react";
 import { Avatar } from "../../../../components/ui/Avatar";
 import { Callout } from "../../../../components/ui/Callout";
+import { Button } from "../../../../components/ui/Button";
 import { EmptyState } from "../../../../components/ui/SystemState";
 import { cx } from "../../../../lib/cx";
 import { getSpaces } from "../../../../lib/api";
@@ -120,7 +121,11 @@ export default async function SearchPage({
       <EmptyState
         title="Search your knowledge base"
         body="Typo-tolerant search across every space you can read. Try the search field above."
-        actionLabel="Back to space"
+        action={
+          <Button href={`/s/${key}`} variant="secondary">
+            Back to space
+          </Button>
+        }
       />
     );
   }

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/SystemState";
 
 export default function NotFound() {
@@ -8,11 +8,8 @@ export default function NotFound() {
         <EmptyState
           title="This page doesn't exist"
           body="It may have been moved to another space, renamed, or hard-deleted from the trash."
-          actionLabel="Go home"
+          action={<Button href="/">Back to your workspace</Button>}
         />
-        <p style={{ textAlign: "center", marginTop: -24 }}>
-          <Link href="/">Back to your workspace</Link>
-        </p>
       </div>
     </main>
   );

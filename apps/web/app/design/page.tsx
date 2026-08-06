@@ -231,7 +231,10 @@ export default function DesignPage() {
           <LoadingState />
         </Section>
         <Section title="System state · empty">
-          <EmptyState />
+          {/* The gallery has nowhere to navigate to, so the action is a link
+              back to the workspace rather than an inert button — the component
+              no longer renders one without a destination. */}
+          <EmptyState action={<Button href="/">Create the first page</Button>} />
         </Section>
         <Section title="System state · restricted">
           <RestrictedState />

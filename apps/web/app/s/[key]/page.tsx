@@ -61,7 +61,16 @@ export default async function SpaceHomePage({ params }: { params: Promise<{ key:
 
         <div className={`t-caption ${styles.sectionCaption}`}>Recently updated</div>
         {home.recentlyUpdated.length === 0 ? (
-          <EmptyState />
+          <EmptyState
+            action={
+              <NewPageButton
+                spaceId={space.id}
+                spaceKey={key}
+                spaceName={home.space.name}
+                label="Create the first page"
+              />
+            }
+          />
         ) : (
           <div className={styles.recentList}>
             {home.recentlyUpdated.map((page) => (

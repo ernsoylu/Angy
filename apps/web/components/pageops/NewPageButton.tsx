@@ -17,16 +17,20 @@ export function NewPageButton({
   spaceId,
   spaceKey,
   spaceName,
+  /** Frame 11's empty state asks for "Create the first page"; the header
+      wants the shorter "New page". Same action, different sentence. */
+  label = "New page",
 }: {
   spaceId: string;
   spaceKey: string;
   spaceName: string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button icon={<Plus size={14} />} onClick={() => setOpen(true)}>
-        New page
+        {label}
       </Button>
       {open && (
         <NewPageDialog
