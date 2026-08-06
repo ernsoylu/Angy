@@ -2,6 +2,8 @@
 
 > Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
 
+> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (53 unit/integration tests, 12 Playwright e2e tests, all builds green), plus a post-V1 punch list: editor image embedding with the serve-time media route, page rename, sign-out, slash-command menu, New-page dialog, and production Dockerfiles. Remaining work is tracked in **§ Open gaps** at the end of this document.
+
 ## Design inputs
 
 `frontend.pen` contains 11 product screens and 5 design-system frames, each in light and dark (theme axis `mode: light|dark`):
@@ -117,3 +119,49 @@ Full Playwright suite (reader SSR, edit-on-click, multi-user collab, history res
 ```
 
 Phases 7 and 8 are parallelizable after 3 (5 only gates their authz edges); 6 needs 4's persistence path.
+
+## Open gaps (audit of 2026-08-06)
+
+Everything the plan, the frames, the ADRs, or the runbooks call for — directly or by clear implication — that is not implemented. Ordered by leverage within each group.
+
+### Design-frame features not built
+
+- **Cross-space move** — frame 10 lists other spaces as destinations; `movePage` rejects them. Implementing it also triggers the ADR 0007 media re-emission obligation below.
+- **Tags** — no tag model; frames 1 (byline chips) and 3 (search facet) both show them.
+- **Recent / Starred** — sidebar stubs; need visit-tracking and star models.
+- **Search over attachments** — frame 3's Attachments tab is decorative; only pages are indexed (Phase 7 text also promised attachment metadata).
+- **Space administration** — no create-space flow or member management; space-home "New page" header button and "Space settings" are unwired.
+- **Editor block affordances** — frame 2's `+` inserter and drag handles, bubble-menu link button, table row/column editing.
+- **Dialog search fields** — frame 10 "Search spaces and pages…", frame 9 "Search trash".
+- **Mobile** — frame E's full-width "Edit this page" button; tab-bar Search/Page/Me are stubs.
+- **Frame D interaction spec** — ⌘K binding, skip-to-content, page-tree arrow keys, Esc-closes-topmost; compact density preference.
+- **Misc** — second IdP button is decorative (single issuer); attachment "Used on N pages" shows one page.
+
+### Frame-11 mandate only half-wired
+
+- No route-level `loading.tsx` / `error.tsx` / `not-found.tsx` — Next defaults render instead of the design-system Loading/Error/Restricted states.
+- The Toast component is never mounted; no action feedback anywhere.
+
+### ADR / runbook obligations
+
+- Revision retention/thinning (ADR 0006 operational TODO) — revisions accumulate forever.
+- Media URL re-emission on cross-visibility moves (ADR 0007, worker responsibility) — moot until cross-space move exists; they ship together.
+- CDN key-rotation runbook (ADR 0007, "before GA"); the CDN layer itself is unprovisioned.
+- Search-token guardrail for oversized grant lists + session-tied TTL (ADR 0009) — flat 15-minute tokens, no proxy fallback.
+- Size-triggered compaction and the repeated-failure alert (compaction runbook) — interval scan only, alerts are manual log-watching.
+- Realtime health endpoint (alerts runbook TODO) — the WS tier is monitored by port only.
+
+### Robustness
+
+- **Realtime token refresh on reconnect** — connect tokens last 15 minutes; a network blip after expiry strands the provider in a dead reconnect loop. The one latent user-facing bug in this list.
+- Page title is PATCH-based last-write-wins, not collaborative like the body.
+- Revoked live editors see "offline", not the restricted state.
+- Reader TOC has no scroll-spy (first heading statically active).
+
+### Ops / infra
+
+- `infra/terraform/` (named in CLAUDE.md's layout) does not exist.
+- e2e suite is local-only; CI runs unit/integration tests (e2e needs the full compose stack as services).
+- No clean-deploy rehearsal: images build and the API container smoke-tests, but `kubectl apply` has never been exercised; runtime images carry the whole workspace (~1.5 GB — slimming via `pnpm deploy` + a second generate pass is the noted follow-up).
+
+Suggested burn-down order: cross-space move + media re-emission → route-level states + toasts (cheap, closes the frame-11 mandate) → realtime token refresh. Tags, Recent/Starred, and space administration are V2-shaped: they need data-model decisions first.
