@@ -1,6 +1,6 @@
 # Build from the repo root: infra/docker/build.sh worker
 FROM node:24-slim AS build
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@10.34.5
 WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
@@ -12,5 +12,10 @@ RUN infra/docker/prune.sh worker
 FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app
-COPY --from=build /deploy /app
+COPY --from=build --chown=node:node /deploy /app
+
+# Drop root: nothing here needs it, and a container escape should not
+# start from uid 0.
+USER node
+
 CMD ["node", "dist/main.js"]

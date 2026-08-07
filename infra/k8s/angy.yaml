@@ -23,10 +23,16 @@ spec:
     metadata:
       labels: { app: web }
     spec:
+      # None of these call the Kubernetes API, so the token is pure downside:
+      # a credential sitting in every pod for an attacker to find.
+      automountServiceAccountToken: false
       containers:
         - name: web
           image: angy/web:latest
           imagePullPolicy: IfNotPresent
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
           ports: [{ containerPort: 3000 }]
           envFrom: [{ secretRef: { name: angy-env } }]
           readinessProbe:
@@ -46,10 +52,16 @@ spec:
     metadata:
       labels: { app: api }
     spec:
+      # None of these call the Kubernetes API, so the token is pure downside:
+      # a credential sitting in every pod for an attacker to find.
+      automountServiceAccountToken: false
       containers:
         - name: api
           image: angy/api:latest
           imagePullPolicy: IfNotPresent
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 512Mi }
           ports: [{ containerPort: 3001 }]
           envFrom: [{ secretRef: { name: angy-env } }]
           readinessProbe:
@@ -74,10 +86,16 @@ spec:
     metadata:
       labels: { app: realtime }
     spec:
+      # None of these call the Kubernetes API, so the token is pure downside:
+      # a credential sitting in every pod for an attacker to find.
+      automountServiceAccountToken: false
       containers:
         - name: realtime
           image: angy/realtime:latest
           imagePullPolicy: IfNotPresent
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 768Mi }
           ports: [{ containerPort: 3002 }]
           envFrom: [{ secretRef: { name: angy-env } }]
           readinessProbe:
@@ -97,6 +115,9 @@ spec:
     metadata:
       labels: { app: worker }
     spec:
+      # None of these call the Kubernetes API, so the token is pure downside:
+      # a credential sitting in every pod for an attacker to find.
+      automountServiceAccountToken: false
       containers:
         - name: worker
           image: angy/worker:latest
@@ -105,7 +126,7 @@ spec:
           resources:
             # Compaction can transiently need ~75× doc size (runbook) — give
             # the worker real headroom and keep its concurrency bounded.
-            requests: { memory: 512Mi }
+            requests: { memory: 512Mi, cpu: 100m }
             limits: { memory: 2Gi }
 ---
 apiVersion: v1

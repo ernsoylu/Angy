@@ -4,7 +4,7 @@
 # the build needs DATABASE_URL reachable from the build container (local dev:
 # host.docker.internal via --network host; CI: a service container).
 FROM node:24-slim AS build
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@10.34.5
 WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
@@ -18,6 +18,11 @@ RUN infra/docker/prune.sh api
 FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app
-COPY --from=build /deploy /app
+COPY --from=build --chown=node:node /deploy /app
+
+# Drop root: nothing here needs it, and a container escape should not
+# start from uid 0.
+USER node
+
 EXPOSE 3001
 CMD ["node", "dist/main.js"]

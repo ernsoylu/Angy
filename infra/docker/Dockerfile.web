@@ -1,6 +1,6 @@
 # Build from the repo root: infra/docker/build.sh web
 FROM node:24-slim AS build
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@10.34.5
 WORKDIR /app
 COPY . .
 RUN pnpm install --frozen-lockfile
@@ -20,8 +20,13 @@ RUN pnpm build:packages && pnpm --filter @angy/web build
 FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app
-COPY --from=build /app/apps/web/.next/standalone ./
-COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
+COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
+
+# Drop root: nothing here needs it, and a container escape should not
+# start from uid 0.
+USER node
+
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0
 CMD ["node", "apps/web/server.js"]

@@ -377,6 +377,31 @@ server costs up to a day of edits. Continuous archiving (`wal_level=replica`
 plus an archive command) is the upgrade when the content justifies it. The
 share also sits on the same LAN, which covers disk failure but not the room.
 
+## 7. Container hardening
+
+The runtime stages run as the image's unprivileged `node` user (uid 1000), not
+root, and the files are chowned on the way in — Next writes `.next/cache` at
+runtime and cannot do so from a root-owned tree.
+
+`pnpm` is pinned to the exact version in `package.json`'s `packageManager`
+field. `pnpm@10` floats across minors, so two builds of the same commit could
+resolve dependencies with different resolvers.
+
+**Install scripts are already restricted, and `--ignore-scripts` is the wrong
+tool here.** `package.json` sets `onlyBuiltDependencies` to six packages;
+pnpm 10 blocks lifecycle scripts for everything else by default. That is
+narrower than `--ignore-scripts`, which would also block the six that genuinely
+need them — Prisma's engine download and sharp's binaries — and break the
+build. A scanner flagging the missing flag is not seeing the allowlist.
+
+Two other scanner findings are accepted rather than fixed:
+
+- `http://` inside `infra/k8s/rehearse.sh` and the CI probes is loopback and
+  in-cluster traffic. Nothing crosses a network an attacker could sit on.
+- `execSync("pnpm db:seed")` in the e2e setup resolves pnpm through `PATH`.
+  Hardcoding a path would break portability to buy protection against an
+  attacker who already controls the environment running the tests.
+
 ## Related
 
 - [ADR 0012](../adr/0012-homelab-tunnel-topology.md) — topology and the five hostnames
