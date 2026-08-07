@@ -23,7 +23,10 @@ export function ThemeToggle() {
   }
 
   return (
-    <IconButton label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={toggle}>
+    <IconButton
+      label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      onClick={toggle}
+    >
       {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
     </IconButton>
   );

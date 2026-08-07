@@ -67,15 +67,25 @@ export function NewPageDialog({
     }
   }
 
+  /*
+   * Click-outside-to-dismiss is a mouse convenience; the keyboard path is
+   * Escape, wired above by useEscape. Marked presentational so that is
+   * explicit — an undeclared click handler on a bare div reads as an
+   * interactive element with no keyboard equivalent.
+   *
+   * Dismissing only when the click landed on the overlay *itself* also removes
+   * the need for a stopPropagation handler on the dialog, which was a second
+   * non-interactive element carrying a click listener.
+   */
   return (
-    <div className={share.overlay} onClick={onClose}>
-      <div
-        className={share.dialog}
-        role="dialog"
-        aria-label="New page"
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: 480 }}
-      >
+    <div
+      className={share.overlay}
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className={share.dialog} role="dialog" aria-label="New page" style={{ width: 480 }}>
         <header className={share.header}>
           <h2 className={share.title}>New page</h2>
           <IconButton label="Close" onClick={onClose}>

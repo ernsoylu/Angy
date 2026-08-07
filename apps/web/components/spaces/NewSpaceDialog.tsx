@@ -78,15 +78,25 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
+  /*
+   * Click-outside-to-dismiss is a mouse convenience; the keyboard path is
+   * Escape, wired above by useEscape. Marked presentational so that is
+   * explicit — an undeclared click handler on a bare div reads as an
+   * interactive element with no keyboard equivalent.
+   *
+   * Dismissing only when the click landed on the overlay *itself* also removes
+   * the need for a stopPropagation handler on the dialog, which was a second
+   * non-interactive element carrying a click listener.
+   */
   return (
-    <div className={share.overlay} onClick={onClose}>
-      <div
-        className={share.dialog}
-        role="dialog"
-        aria-label="New space"
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: 560 }}
-      >
+    <div
+      className={share.overlay}
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className={share.dialog} role="dialog" aria-label="New space" style={{ width: 560 }}>
         <header className={share.header}>
           <h2 className={share.title}>New space</h2>
           <IconButton label="Close" onClick={onClose}>
@@ -138,20 +148,18 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
 
         <div className={styles.field}>
           <span className={styles.label}>Visibility</span>
-          {(
-            [
-              {
-                value: "PUBLIC" as const,
-                title: "Public to the workspace",
-                body: "Anyone signed in can read it.",
-              },
-              {
-                value: "PRIVATE" as const,
-                title: "Private",
-                body: "Members only; media is served through signed URLs.",
-              },
-            ]
-          ).map((option) => (
+          {[
+            {
+              value: "PUBLIC" as const,
+              title: "Public to the workspace",
+              body: "Anyone signed in can read it.",
+            },
+            {
+              value: "PRIVATE" as const,
+              title: "Private",
+              body: "Members only; media is served through signed URLs.",
+            },
+          ].map((option) => (
             <button
               key={option.value}
               type="button"
@@ -180,8 +188,8 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
         </label>
 
         <Callout tone="note">
-          You become this space&rsquo;s first admin. Page grants can only widen the baseline,
-          never reduce it.
+          You become this space&rsquo;s first admin. Page grants can only widen the baseline, never
+          reduce it.
         </Callout>
 
         <footer className={share.footer}>

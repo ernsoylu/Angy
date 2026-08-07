@@ -63,14 +63,25 @@ export function ShareDialog({ pageId, onClose }: { pageId: string; onClose: () =
     }
   }
 
+  /*
+   * Click-outside-to-dismiss is a mouse convenience; the keyboard path is
+   * Escape, wired above by useEscape. Marked presentational so that is
+   * explicit — an undeclared click handler on a bare div reads as an
+   * interactive element with no keyboard equivalent.
+   *
+   * Dismissing only when the click landed on the overlay *itself* also removes
+   * the need for a stopPropagation handler on the dialog, which was a second
+   * non-interactive element carrying a click listener.
+   */
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div
-        className={styles.dialog}
-        role="dialog"
-        aria-label="Share"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div
+      className={styles.overlay}
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className={styles.dialog} role="dialog" aria-label="Share">
         <header className={styles.header}>
           <h2 className={styles.title}>Share</h2>
           <IconButton label="Close" onClick={onClose}>
@@ -186,8 +197,8 @@ export function ShareDialog({ pageId, onClose }: { pageId: string; onClose: () =
               ))}
 
             <div className={styles.warning}>
-              Page grants can only widen access. You cannot reduce someone&apos;s space-level
-              access from this page.
+              Page grants can only widen access. You cannot reduce someone&apos;s space-level access
+              from this page.
             </div>
 
             <footer className={styles.footer}>

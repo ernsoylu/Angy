@@ -48,7 +48,12 @@ export function PageActions({
       >
         Move page
       </Button>
-      <Button variant="danger" icon={<Trash2 size={14} />} disabled={busy} onClick={() => void trash()}>
+      <Button
+        variant="danger"
+        icon={<Trash2 size={14} />}
+        disabled={busy}
+        onClick={() => void trash()}
+      >
         Move to trash
       </Button>
       {moveOpen && (

@@ -33,8 +33,9 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
   const needle = query.trim().toLowerCase();
   const visible = needle
     ? items.filter((item) =>
-        [item.title, item.parentTitle, item.spaceName, item.trashedByName]
-          .some((field) => field?.toLowerCase().includes(needle)),
+        [item.title, item.parentTitle, item.spaceName, item.trashedByName].some((field) =>
+          field?.toLowerCase().includes(needle),
+        ),
       )
     : items;
 
@@ -173,7 +174,7 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
                 </span>
               </div>
             );
-            })}
+          })}
         </div>
       )}
     </div>

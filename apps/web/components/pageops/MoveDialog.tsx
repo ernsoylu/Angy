@@ -82,7 +82,8 @@ export function MoveDialog({
   }, []);
 
   const { rows, childCount, currentSpaceId, currentParentId } = useMemo(() => {
-    if (!spaces) return { rows: [] as Row[], childCount: 0, currentSpaceId: "", currentParentId: null };
+    if (!spaces)
+      return { rows: [] as Row[], childCount: 0, currentSpaceId: "", currentParentId: null };
     let childCount = 0;
     let currentSpaceId = "";
     let currentParentId: string | null = null;
@@ -180,13 +181,31 @@ export function MoveDialog({
         if (row.kind === "page") return matches(row);
         return (
           matches(row) ||
-          rows.some((other) => other.kind === "page" && other.spaceId === row.spaceId && matches(other))
+          rows.some(
+            (other) => other.kind === "page" && other.spaceId === row.spaceId && matches(other),
+          )
         );
       });
 
+  /*
+   * Click-outside-to-dismiss is a mouse convenience; the keyboard path is
+   * Escape, wired above by useEscape. Marked presentational so that is
+   * explicit — an undeclared click handler on a bare div reads as an
+   * interactive element with no keyboard equivalent.
+   *
+   * Dismissing only when the click landed on the overlay *itself* also removes
+   * the need for a stopPropagation handler on the dialog, which was a second
+   * non-interactive element carrying a click listener.
+   */
   return (
-    <div className={share.overlay} onClick={onClose}>
-      <div className={share.dialog} role="dialog" aria-label="Move page" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={share.overlay}
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className={share.dialog} role="dialog" aria-label="Move page">
         <header className={share.header}>
           <div>
             <h2 className={share.title}>Move page</h2>
@@ -235,8 +254,8 @@ export function MoveDialog({
         <div className={share.warning}>
           Moving rewrites the page tree for this page and its {childCount} child
           {childCount === 1 ? "" : "ren"}, and re-evaluates their permissions from the new parent.
-          Moving between spaces of different visibility re-issues media URLs. Links to the page
-          keep working.
+          Moving between spaces of different visibility re-issues media URLs. Links to the page keep
+          working.
         </div>
 
         <footer className={share.footer}>

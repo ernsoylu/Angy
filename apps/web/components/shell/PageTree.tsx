@@ -136,8 +136,13 @@ export function PageTree({ tree, activeHref }: { tree: TreeNode[]; activeHref: s
             style={{ paddingLeft: 8 + row.depth * 20 }}
           >
             {isFolder && (
+              /* Presentational: expanding and collapsing already have a
+                 keyboard path on the row itself (→ / ←, handled above), and
+                 the tree is one tab stop by design — a focusable chevron per
+                 row would break the roving tabindex it depends on. */
               <span
                 className={styles.treeChevron}
+                role="presentation"
                 onClick={(event) => {
                   event.preventDefault();
                   toggle(row.node.id, !row.expanded);

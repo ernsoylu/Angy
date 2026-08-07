@@ -117,9 +117,7 @@ export function SpaceSettingsView({ space, members, pageCount }: SpaceSettingsVi
     });
     setBusy(false);
     if (result.ok) {
-      setRoster((prev) =>
-        prev.map((m) => (m.userId === member.userId ? { ...m, permLevel } : m)),
-      );
+      setRoster((prev) => prev.map((m) => (m.userId === member.userId ? { ...m, permLevel } : m)));
     }
   }
 
@@ -208,20 +206,18 @@ export function SpaceSettingsView({ space, members, pageCount }: SpaceSettingsVi
 
         <section className={styles.card}>
           <div className="t-caption">Visibility &amp; access</div>
-          {(
-            [
-              {
-                value: "PUBLIC" as const,
-                title: "Public to the workspace",
-                body: "Anyone signed in can read it. Media is served from immutable CDN URLs.",
-              },
-              {
-                value: "PRIVATE" as const,
-                title: "Private",
-                body: "Members only. Media is served through short-lived signed URLs (ADR 0007).",
-              },
-            ]
-          ).map((option) => (
+          {[
+            {
+              value: "PUBLIC" as const,
+              title: "Public to the workspace",
+              body: "Anyone signed in can read it. Media is served from immutable CDN URLs.",
+            },
+            {
+              value: "PRIVATE" as const,
+              title: "Private",
+              body: "Members only. Media is served through short-lived signed URLs (ADR 0007).",
+            },
+          ].map((option) => (
             <button
               key={option.value}
               type="button"
@@ -253,8 +249,8 @@ export function SpaceSettingsView({ space, members, pageCount }: SpaceSettingsVi
             </Select>
           </label>
           <Callout tone="hardRule">
-            Page grants can only widen this baseline, never reduce it. Changing it clears the
-            cached permissions for all {pageCount} page{pageCount === 1 ? "" : "s"}.
+            Page grants can only widen this baseline, never reduce it. Changing it clears the cached
+            permissions for all {pageCount} page{pageCount === 1 ? "" : "s"}.
           </Callout>
         </section>
       </div>
@@ -330,9 +326,8 @@ export function SpaceSettingsView({ space, members, pageCount }: SpaceSettingsVi
           <span>
             <span className={styles.dangerTitle}>Move this space to the trash</span>
             <span className={styles.dangerBody}>
-              The space and its {pageCount} page{pageCount === 1 ? "" : "s"} become recoverable
-              for 30 days, then are deleted permanently. Search and cached permissions drop
-              immediately.
+              The space and its {pageCount} page{pageCount === 1 ? "" : "s"} become recoverable for
+              30 days, then are deleted permanently. Search and cached permissions drop immediately.
             </span>
           </span>
           <Button
