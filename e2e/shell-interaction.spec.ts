@@ -44,7 +44,14 @@ test.describe("shell interaction", () => {
     const page = await context.newPage();
     await page.goto("/s/eng");
 
-    const row = page.locator("a", { hasText: "Runbooks" }).last();
+    // Target the recent list by role, not by the title of a page that happens
+    // to be in it. Naming a page made the test depend on how many pages other
+    // specs had created: once "Runbooks" fell out of "Recently updated", the
+    // locator silently matched a *sidebar* row instead — which has a fixed
+    // 31px height and does not answer to density at all. The test then failed
+    // for a reason that had nothing to do with the preference it covers.
+    const row = page.getByTestId("recent-list").locator("a").first();
+    await expect(row).toBeVisible();
     const comfortable = (await row.boundingBox())!.height;
 
     await page.getByRole("button", { name: "Account" }).click();
@@ -58,7 +65,7 @@ test.describe("shell interaction", () => {
 
     // …but never applies at the touch breakpoint (frame D).
     await page.setViewportSize({ width: 390, height: 780 });
-    await expect(page.locator("a", { hasText: "Runbooks" }).last()).toHaveCSS(
+    await expect(page.getByTestId("recent-list").locator("a").first()).toHaveCSS(
       "min-height",
       "47px",
     );

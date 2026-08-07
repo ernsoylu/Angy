@@ -72,7 +72,7 @@ export default async function SpaceHomePage({ params }: { params: Promise<{ key:
             }
           />
         ) : (
-          <div className={styles.recentList}>
+          <div className={styles.recentList} data-testid="recent-list">
             {home.recentlyUpdated.map((page) => (
               <Link key={page.id} href={`/s/${key}/${page.id}`} className={styles.recentRow}>
                 <FileText size={15} style={{ color: "var(--text-3)", flexShrink: 0 }} />
