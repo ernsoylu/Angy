@@ -123,13 +123,14 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **Public ≠ internal origins behind a proxy.** `S3_ENDPOINT` is for SDK calls; `S3_PUBLIC_ENDPOINT` is for anything a browser fetches — bare media URLs *and presigning*, since SigV4 signs the Host header. `PUBLIC_API_URL` (not the listen port) forms the OIDC redirect_uri and drives the session cookie's `Secure` flag. Collapsing either pair works on localhost and breaks everywhere else (ADR 0012).
 - **`NEXT_PUBLIC_*` are baked into the web image at build time**, so the `angy-env` Secret cannot change what the browser talks to — pass them to infra/docker/build.sh per deployment target. Server-side code uses `API_INTERNAL_URL`, which *is* runtime env.
 - **Editor plugins registered from React (drag handle) must take referentially stable props** — a new `onNodeChange` identity each render re-registers the ProseMirror plugin, and the reconfigure tears down every other plugin's view (the slash menu silently stops opening).
+- **Page links are named at creation time**, because the node is an atom — its label cannot be edited in place, and letting the parent document write it would give `page.title` a second writer alongside `onStoreDocument`.
 - **Page links (`pageLink`) resolve through `/p/{pageId}`, never `/s/{key}/{id}`** — a space key baked into a link goes stale the moment the page moves, and rewriting every referring Y.Doc needs a backlink index (V2). The cached `title` attribute *does* go stale on rename; that is the accepted cost of keeping the static renderer a pure JSON→HTML function.
 - **The page title is a `title` Y.Text in the page's own Y.Doc** (`TITLE_FIELD`), not a plain column write: `onStoreDocument` copies it into `page.title`, so anything renaming a page must go through the doc (`rename` doc command) or the next store overwrites it. Never persist an empty title — reseed the doc from the row instead.
 
 ## V1 Scope (Ship the Core Editing Experience)
 
 - Spaces + pages + page closure table
-- Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote, page link (`/page` creates a child)
+- Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote, page link (`/page` links an existing page or creates a named child)
 - Yjs + Hocuspocus real-time collab, Y.Doc in S3, compaction worker
 - SSR read path via @tiptap/static-renderer; edit-on-click mount
 - Page-level permissions + Redis bitfield cache + space baseline

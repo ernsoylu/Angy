@@ -4,10 +4,10 @@
 # the build needs DATABASE_URL reachable from the build container (local dev:
 # host.docker.internal via --network host; CI: a service container).
 FROM node:24-slim AS build
-RUN npm install -g pnpm@10.34.5 # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
+RUN npm install -g --ignore-scripts pnpm@10.34.5
 WORKDIR /app
 COPY . .
-RUN pnpm install --frozen-lockfile # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
+RUN pnpm install --frozen-lockfile --ignore-scripts
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm build:packages && pnpm --filter @angy/api build

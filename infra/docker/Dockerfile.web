@@ -1,9 +1,9 @@
 # Build from the repo root: infra/docker/build.sh web
 FROM node:24-slim AS build
-RUN npm install -g pnpm@10.34.5 # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
+RUN npm install -g --ignore-scripts pnpm@10.34.5
 WORKDIR /app
 COPY . .
-RUN pnpm install --frozen-lockfile # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
+RUN pnpm install --frozen-lockfile --ignore-scripts
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 # Next inlines NEXT_PUBLIC_* into the client bundle at build time, so these are

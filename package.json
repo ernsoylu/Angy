@@ -10,7 +10,7 @@
     "build:packages": "pnpm -r --filter \"./packages/*\" build",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "test:e2e": "playwright test",
+    "test:e2e": "node e2e/assert-fresh-server.mjs && playwright test",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "db:migrate": "pnpm --filter @angy/db migrate",
