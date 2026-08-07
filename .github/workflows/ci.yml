@@ -8,20 +8,11 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: angy_dev
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U user -d angy_dev"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
+    # No `services:` block: the compose file below already brings up postgres
+    # on 5432, and a service container would fight it for the port. Using one
+    # source for the whole stack also keeps this job's database identical to
+    # the one e2e and every developer runs against, rather than a second
+    # definition to keep in sync.
     env:
       DATABASE_URL: postgresql://user:password@localhost:5432/angy_dev
     steps:
@@ -32,6 +23,22 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # The integration tests run against a real stack, not testcontainers —
+      # apps/realtime/test says so explicitly, and CLAUDE.md's claim otherwise
+      # is stale. The `services:` postgres above covers Prisma and nothing
+      # else, so redis and minio have to come from the compose file exactly as
+      # they do for e2e.
+      - name: Start backing services
+        run: docker compose -f infra/docker-compose.yml up -d --wait postgres redis meilisearch minio
+
+      # And the config those tests read — JWT_SECRET among it — comes from
+      # .env.local, as on a developer machine. Only the e2e job wrote this
+      # file, so `pnpm test` here could never have passed; typecheck was
+      # failing first and hid it.
+      - name: Configure environment
+        run: cp .env.example .env.local
+
       - run: pnpm --filter @angy/db migrate:deploy
 
       # Build first. `@angy/shared` exposes its types through dist/index.d.ts,
