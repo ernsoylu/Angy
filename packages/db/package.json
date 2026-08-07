@@ -4,7 +4,8 @@
   "private": true,
   "files": [
     "dist",
-    "prisma"
+    "prisma",
+    "with-env.sh"
   ],
   "type": "module",
   "exports": {
@@ -14,12 +15,13 @@
     }
   },
   "scripts": {
-    "build": "prisma generate --sql && tsc -p tsconfig.build.json",
-    "generate": "prisma generate --sql",
-    "migrate": "prisma migrate dev",
+    "build": "./with-env.sh prisma generate --sql && tsc -p tsconfig.build.json",
+    "generate": "./with-env.sh prisma generate --sql",
+    "migrate": "./with-env.sh prisma migrate dev",
     "seed": "node --env-file-if-exists=../../.env.local --import tsx src/seed.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate:deploy": "./with-env.sh prisma migrate deploy"
   },
   "dependencies": {
     "@angy/shared": "workspace:*",

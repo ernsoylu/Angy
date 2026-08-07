@@ -55,7 +55,7 @@ packages/
   db/           # Prisma schema, migrations, client, seeders, TypedSQL for closure-table ops
   shared/       # DTOs, zod schemas, types, constants shared across apps
 
-infra/          # docker-compose, k8s manifests, terraform
+infra/          # docker-compose (dev + homelab prod), k8s manifests, backup script
 docs/           # ADRs, architecture, schema, env, roadmap, runbooks
 ```
 

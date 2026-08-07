@@ -148,7 +148,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 - ~~Revision retention/thinning~~ — **done (2026-08-06)**: GC sweep thins past-retention revisions to one per day (pure policy unit-tested in shared).
 - ~~Media URL re-emission on cross-visibility moves~~ — **done (2026-08-06)**: the worker moves objects between access-class prefixes and realtime rewrites embedded srcs in the live doc; verified in both directions.
-- CDN key-rotation is documented in runbooks/key-rotation.md, but the CDN layer itself is unprovisioned — it lands with Wave G, once a provider is chosen.
+- ~~CDN unprovisioned~~ — **resolved (2026-08-06)**: there is no CDN tier and will not be one. The homelab serves media from a tunnel-exposed MinIO instead (ADR 0007 amendment), which is why `S3_PUBLIC_ENDPOINT` exists. The key-rotation runbook's CDN section applies only if a CDN is ever introduced.
 - ~~Search-token guardrail for oversized grant lists~~ — **already built**: past 200 explicit grants the token is withheld and search proxies through the API (`GRANT_GUARDRAIL`). The gap line was stale. Session-tied TTL stays an accepted deviation: sessions have no refresh interval to bind to.
 - ~~Size-triggered compaction and the repeated-failure alert~~ — **already built**: `onStoreDocument` enqueues compaction the moment a blob crosses `COMPACTION_SIZE_THRESHOLD_BYTES`, and the worker emits `[alert] compaction failed N× consecutively` after three strikes. The gap line was stale.
 - ~~Realtime health endpoint~~ — **already built**: the WS tier answers `GET /health` from its `onRequest` hook. The gap line was stale.
@@ -162,7 +162,7 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 ### Ops / infra
 
-- `infra/terraform/` (named in CLAUDE.md's layout) does not exist.
+- ~~`infra/terraform/` does not exist~~ — **and will not (2026-08-07, G5)**: no cloud account, no CDN, no DNS zone to manage. Terraform would describe a VPS the project does not own. CLAUDE.md's layout no longer names it.
 - ~~e2e suite is local-only~~ — **done (2026-08-06)**: a second CI job brings the compose stack up, boots all four apps from their production builds, and runs Playwright; app logs and traces upload on failure.
 - ~~Runtime images carry the whole workspace~~ — **done (2026-08-06)**: `infra/docker/prune.sh` deploys each app prod-only and regenerates the Prisma client in the pruned tree; ~1.5 GB → 578–602 MB (web 509 MB via Next standalone).
 - ~~No clean-deploy rehearsal~~ — **done (2026-08-06)**: `infra/k8s/rehearse.sh` stands `angy.yaml` up on a throwaway kind cluster with a real `angy-env` Secret and smoke-tests all four workloads plus the SSR read path. It caught two real deploy bugs on the first run: `angy.yaml` had no `imagePullPolicy`, so `:latest` defaulted to `Always` and every pod hit `ErrImagePull`; and `NEXT_PUBLIC_*` are inlined by Next at build time, so the Secret's copies never reached the browser — they are build args on `Dockerfile.web` now.
