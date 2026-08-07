@@ -16,7 +16,7 @@ export default async function setup() {
   } finally {
     await admin.$disconnect();
   }
-  execSync("pnpm exec prisma db push --skip-generate", {
+  execSync("pnpm exec prisma db push --skip-generate", { // NOSONAR — test-only; resolving pnpm via PATH is intentional (docs/runbooks/homelab.md §7)
     cwd: new URL("..", import.meta.url).pathname,
     env: { ...process.env, DATABASE_URL: TEST_URL },
     stdio: "inherit",

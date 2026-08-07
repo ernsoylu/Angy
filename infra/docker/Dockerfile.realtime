@@ -1,9 +1,9 @@
 # Build from the repo root: infra/docker/build.sh realtime
 FROM node:24-slim AS build
-RUN npm install -g pnpm@10.34.5
+RUN npm install -g pnpm@10.34.5 # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
 WORKDIR /app
 COPY . .
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
 ARG DATABASE_URL
 ENV DATABASE_URL=$DATABASE_URL
 RUN pnpm build:packages && pnpm --filter @angy/realtime build

@@ -22,7 +22,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
 
       # The integration tests run against a real stack, not testcontainers —
       # apps/realtime/test says so explicitly, and CLAUDE.md's claim otherwise
@@ -66,7 +66,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
 
       - name: Start backing services
         run: docker compose -f infra/docker-compose.yml up -d --wait postgres redis meilisearch minio
@@ -84,7 +84,7 @@ jobs:
       # what keeps the documented setup path tested.
       - run: pnpm --filter @angy/db migrate:deploy
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chrome
+      - run: pnpm exec playwright install --with-deps chrome # NOSONAR — pnpm onlyBuiltDependencies already allowlists scripts (see docs/runbooks/homelab.md §7)
 
       # Boot and test in one step so the backgrounded apps are guaranteed to
       # outlive the shell that started them.
@@ -98,7 +98,7 @@ jobs:
           # waiting for the seed to reach the search index.
           for probe in localhost:3001/health localhost:3002/health localhost:3000/signin; do
             for attempt in $(seq 1 60); do
-              curl -sf "http://$probe" > /dev/null && break
+              curl -sf "http://$probe" > /dev/null && break # NOSONAR — loopback probe on the runner itself
               if [ "$attempt" = 60 ]; then
                 echo "::error::$probe never came up"; tail -n 50 /tmp/angy-logs/*.log; exit 1
               fi

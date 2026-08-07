@@ -394,6 +394,19 @@ narrower than `--ignore-scripts`, which would also block the six that genuinely
 need them — Prisma's engine download and sharp's binaries — and break the
 build. A scanner flagging the missing flag is not seeing the allowlist.
 
+These carry inline `NOSONAR` markers with a one-line reason, so the next reader
+sees the justification rather than a silenced warning. Note the marker
+suppresses *every* rule on its line, not only the one named — acceptable on
+single-purpose lines, blunt anywhere else.
+
+Three findings in `infra/k8s/rehearse.sh` are deliberately **not** marked
+inline. Those lines end in a shell line-continuation backslash, and appending a
+comment makes the backslash escape a space instead of the newline — the command
+silently truncates and every following argument becomes an orphan. `bash -n`
+still reports valid syntax, because the truncated command *is* valid; it is
+simply a different one. Resolve them in the SonarCloud UI instead of reshaping
+a working script to satisfy a scanner.
+
 Two other scanner findings are accepted rather than fixed:
 
 - `http://` inside `infra/k8s/rehearse.sh` and the CI probes is loopback and

@@ -75,7 +75,7 @@ export function Editor({
   );
 
   const color = useMemo(
-    () => CARET_COLORS[Math.floor(Math.random() * CARET_COLORS.length)]!,
+    () => CARET_COLORS[Math.floor(Math.random() * CARET_COLORS.length)]!, // NOSONAR — cosmetic caret tint, not a secret
     [],
   );
 

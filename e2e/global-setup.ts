@@ -21,7 +21,7 @@ export default async function globalSetup() {
     }
   }
 
-  execSync("pnpm db:seed", { cwd: __dirname + "/..", stdio: "inherit" });
+  execSync("pnpm db:seed", { cwd: __dirname + "/..", stdio: "inherit" }); // NOSONAR — test-only; resolving pnpm via PATH is intentional (docs/runbooks/homelab.md §7)
 
   const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
   await redis.set("session:e2e-mira", "1", "EX", 7200); // Mira Kalvo — Product admin
