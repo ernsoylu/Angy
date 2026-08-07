@@ -32,12 +32,18 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @angy/db exec prisma migrate deploy
-      - run: pnpm db:generate
+      - run: pnpm --filter @angy/db migrate:deploy
+
+      # Build first. `@angy/shared` exposes its types through dist/index.d.ts,
+      # so on a clean checkout `packages/db` cannot resolve them and typecheck
+      # dies with TS2307 — while passing on any developer machine, where dist/
+      # is left over from an earlier build. Every check below wants built
+      # workspace deps, and `pnpm -r build` orders them topologically.
+      - run: pnpm build
+
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm build
 
   e2e:
     runs-on: ubuntu-latest
@@ -63,8 +69,13 @@ jobs:
       - name: Configure environment
         run: cp .env.example .env.local
 
-      - run: pnpm --filter @angy/db exec prisma migrate deploy
-      - run: pnpm db:generate
+      # The package script, not `exec prisma` — it routes through with-env.sh,
+      # which loads the .env.local written above. Calling the CLI directly
+      # skipped that and failed with "Environment variable not found:
+      # DATABASE_URL"; this job has no job-level DATABASE_URL to fall back on,
+      # unlike `checks`. Using the same entry point a developer uses is also
+      # what keeps the documented setup path tested.
+      - run: pnpm --filter @angy/db migrate:deploy
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chrome
 
