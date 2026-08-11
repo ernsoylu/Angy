@@ -102,12 +102,16 @@ What is genuinely open is operational, not architectural:
   only button out of an empty space was wired to nothing), which is a reason to
   keep exercising them.
 
-- **The e2e suite is timing-sensitive under load.** Four consecutive local runs
-  of the same commit gave 39, 37, 38 and 39 passes, failing a *different* test
-  each time; one CI run failed `revocation.spec.ts` and passed on re-run of the
-  identical commit. `retries: 0` is deliberate, so any one flake reds the
-  build — which makes "re-run the same commit" the first diagnostic, before
-  reading the failure as a regression.
+- **e2e flakiness — diagnosed and largely closed.** Four local runs of one
+  commit gave 39, 37, 38 and 39 passes, failing a *different* test each time,
+  and GitHub's e2e failed a commit Forgejo's passed. The cause was not load:
+  the reader is streamed, so a bare `.article-prose` locator transiently
+  matched two nodes (the real one and React's hidden `id="S:…"` template) and
+  died with "resolved to 2 elements" — measured at 2 in 40 navigations. Fixed
+  by `articleBody()` in `e2e/helpers.ts`; 3 of 3 full runs green after.
+  `retries: 0` stays deliberate, so any one flake still reds the build — which
+  keeps "re-run the same commit" the cheapest first diagnostic before reading a
+  failure as a regression.
 
 ## Post-V1 hardening *(2026-08-11)*
 

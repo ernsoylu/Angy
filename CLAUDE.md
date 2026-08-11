@@ -99,7 +99,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 - **Unit (vitest)**: pure functions, zod schemas, block serializers, permission resolution logic. Target >80% on packages/shared and packages/blocks.
 - **Integration (vitest)**: API routes and Hocuspocus persistence hooks against the **real `pnpm docker:up` stack** (Postgres + Redis + MinIO) — not testcontainers, which nothing imports. `apps/realtime/test` needs `.env.local` for `JWT_SECRET`; CI writes one.
-- **E2E (playwright)**: reader SSR render, edit-on-click mount, multi-user collab session, page history restore. Run against pnpm docker:up stack with all four apps booted. The suite is timing-sensitive under load — a lone failure that passes on re-run is a flake, not a regression; confirm before chasing it.
+- **E2E (playwright)**: reader SSR render, edit-on-click mount, multi-user collab session, page history restore. Run against pnpm docker:up stack with all four apps booted. **The reader is streamed, so a locator on rendered content can transiently match twice** — the real node plus React's hidden `id="S:…"` template — and strict mode then fails the spec that happened to sample mid-swap. Go through `articleBody()` in `e2e/helpers.ts`; never write a bare `.article-prose`. A lone failure that passes on re-run of the same commit is a flake, not a regression.
 - **CRDT convergence test**: two browser contexts edit the same page offline, reconnect, assert converged state. Required for any change to packages/blocks or apps/realtime.
 
 ## Critical Gotchas
