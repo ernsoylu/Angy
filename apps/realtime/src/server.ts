@@ -321,7 +321,13 @@ export function buildServer(port = env.port): Server {
         redis.set(hotKey(documentName), Buffer.from(update), "EX", HOT_TTL_SECONDS),
         putObject(ydocS3Key(documentName), update),
       ]);
-      await getPrisma().page.update({
+      // updateMany, not update: `update` throws P2025 when the row is gone, and
+      // Hocuspocus answers a failed store by keeping the document in memory
+      // "to avoid data loss" — so one hard-deleted page pins its doc forever
+      // and re-runs the same failing write on every debounce. A page can
+      // legitimately disappear under an open socket (trash purge, space
+      // purge), and there is nothing to recover for it.
+      const stored = await getPrisma().page.updateMany({
         where: { id: documentName },
         data: {
           ydocS3Key: ydocS3Key(documentName),
@@ -330,6 +336,12 @@ export function buildServer(port = env.port): Server {
           ...(editor && /^\d+$/.test(editor.userId) && { updatedBy: BigInt(editor.userId) }),
         },
       });
+      if (stored.count === 0) {
+        // The S3 blob written above is now an orphan; the object sweep owns it.
+        // Nothing downstream is worth queueing for a page nobody can open.
+        console.warn(`[realtime] store for ${documentName} matched no page row — skipping`);
+        return;
+      }
       // Live-by-default (ADR 0010): readers see this once the projection rebuilds.
       await projections.add(JOB_PROJECTION_REBUILD, { pageId: documentName });
       // Size-triggered compaction (runbook) — deduped while one is pending.

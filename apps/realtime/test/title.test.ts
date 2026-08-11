@@ -15,7 +15,10 @@ import { buildServer } from "../src/server.js";
  * the field, and the store path copying the doc's title back into Postgres.
  */
 
-const PORT = 3981;
+// Distinct from every other test file's port: they only avoid colliding
+// because vitest.config.ts sets fileParallelism: false, which is a setting
+// about processes, not about ports.
+const PORT = 3982;
 const URL = `ws://127.0.0.1:${PORT}`;
 const prisma = getPrisma();
 

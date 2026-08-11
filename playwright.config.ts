@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 /**
@@ -5,6 +7,23 @@ import { defineConfig } from "@playwright/test";
  * `pnpm docker:up` + `pnpm dev` must be running. The global setup RESEEDS the
  * dev database, so anything you were hand-testing will be reset.
  */
+
+/**
+ * Every app loads the root .env.local (docs/env.md); the suite has to read the
+ * same file or it addresses different services than the apps under test.
+ * `global-setup` and `helpers` both fall back to `redis://localhost:6379`, so
+ * without this the sessions they plant land in whatever Redis happens to own
+ * that port while the apps read the one .env.local names — the suite then fails
+ * every test with a redirect to /signin and no hint as to why.
+ *
+ * Same mechanism the db seed already uses (`node --env-file-if-exists`), and it
+ * leaves anything exported in the shell alone, so an override still wins.
+ *
+ * `__dirname`, not `import.meta`: the root package.json has no `"type":
+ * "module"`, so Playwright loads this config as CommonJS.
+ */
+const envFile = join(__dirname, ".env.local");
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
