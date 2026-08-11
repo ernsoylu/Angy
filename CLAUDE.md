@@ -2,7 +2,7 @@
 
 Wiki KMS — company knowledge management system. A Confluence-class, blazing-fast, text-media-oriented wiki: Notion-style block editing, real-time collaboration, page-level permissions, full version history, SSR-fast reads.
 
-> **Status: design blueprint.** No application code exists yet. Commands, paths, and components below describe the target system — treat them as the spec to build, not as existing artifacts.
+> **Status: V1 shipped and deployed.** Phases 0–10 and waves A–G are closed; the stack runs on the homelab behind a Pangolin tunnel (ADR 0012). Commands, paths and components below describe **existing** artifacts — read the code before assuming a section is aspirational. Next work is V2: docs/implementation-plan.md § V2.
 
 ## Tech Stack
 
@@ -98,8 +98,8 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 ## Testing
 
 - **Unit (vitest)**: pure functions, zod schemas, block serializers, permission resolution logic. Target >80% on packages/shared and packages/blocks.
-- **Integration (vitest + testcontainers)**: API routes against a real Postgres + Redis; Hocuspocus persistence hooks against S3 (MinIO container).
-- **E2E (playwright)**: reader SSR render, edit-on-click mount, multi-user collab session, page history restore. Run against pnpm docker:up stack.
+- **Integration (vitest)**: API routes and Hocuspocus persistence hooks against the **real `pnpm docker:up` stack** (Postgres + Redis + MinIO) — not testcontainers, which nothing imports. `apps/realtime/test` needs `.env.local` for `JWT_SECRET`; CI writes one.
+- **E2E (playwright)**: reader SSR render, edit-on-click mount, multi-user collab session, page history restore. Run against pnpm docker:up stack with all four apps booted. The suite is timing-sensitive under load — a lone failure that passes on re-run is a flake, not a regression; confirm before chasing it.
 - **CRDT convergence test**: two browser contexts edit the same page offline, reconnect, assert converged state. Required for any change to packages/blocks or apps/realtime.
 
 ## Critical Gotchas
@@ -176,8 +176,8 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/schema.md — table inventory (DDL TODO)
 - docs/env.md + .env.example — canonical environment variables
 - docs/roadmap.md — V1/V2/V3 sequencing
-- docs/implementation-plan.md — phased V1 build plan mapping frontend.pen screens to workstreams
-- docs/TODO.md — actionable checklist of remaining work (waves, dependencies, decision gates)
+- docs/implementation-plan.md — the V1 build record (phases 0–10, waves A–G) **and § V2, the live plan**
+- docs/TODO.md — what closed and what is still open operationally; next feature work lives in the plan's § V2
 - docs/runbooks/compaction.md — operating the Y.Doc compaction worker
 - docs/runbooks/dev-debugging.md — local debugging recipes
 - docs/runbooks/alerts.md — log-based alert signals ([alert] lines) and responses

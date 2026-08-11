@@ -1,6 +1,6 @@
 # Angy Architecture
 
-> Status: design blueprint — describes the target system. Hard rules and scope guardrails: [../CLAUDE.md](../CLAUDE.md). Decision rationale: [adr/](adr/).
+> Status: **built** — this describes the running V1, not a target. Hard rules and scope guardrails: [../CLAUDE.md](../CLAUDE.md). Decision rationale: [adr/](adr/).
 
 ## The Core Insight: Page as Primitive
 

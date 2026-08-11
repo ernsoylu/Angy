@@ -1,8 +1,12 @@
-# V1 Implementation Plan
+# Implementation Plan
 
-> Sequencing for building Angy V1 from the design blueprint. Derived from `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state; later phases depend only on earlier ones.
+> How Angy got built, and what is built next. Phases 0–10 and waves A–G are the
+> V1 record (complete); [§ V2](#v2) is the live plan. Derived from
+> `frontend.pen` (source of truth for UI), CLAUDE.md (hard rules & scope), the
+> ADRs, and docs/roadmap.md. Each phase ends in a shippable, testable state;
+> later phases depend only on earlier ones.
 
-> **Status (2026-08-06): phases 0–10 are complete** — every exit criterion below is implemented and machine-verified (80 unit/integration tests, 35 Playwright e2e tests, all builds green), plus the post-V1 punch list and burn-down waves A–F (see § Open gaps for what was closed and what remains).
+> **Status: shipped.** Phases 0–10 and the post-V1 burn-down waves A–G are all complete, and the result is deployed (ADR 0012). Every exit criterion below is implemented and machine-verified: 91 unit/integration tests, 39 Playwright e2e tests, lint/typecheck/build green. § Open gaps records what the audit found and how each item closed; **§ V2 is the section with work left in it.**
 
 ## Design inputs
 
@@ -45,7 +49,7 @@ Port the .pen tokens to CSS custom properties on `:root[data-theme]` (light/dark
 
 Prisma schema for V1 tables: `user`, `space`, `page` (with `ydoc_s3_key`, `ydoc_state_vector`, projection columns + timestamps), `page_ancestor` closure table, `page_permission`, `page_revision` (`revision_s3_key`), `attachment`, plus space membership. Naming per conventions (snake_case DB, uuid pages, bigint spaces/users). TypedSQL for closure-table insert/subtree queries. OIDC login (Authentik in compose for dev, ADR 0011) with Redis sessions; sign-in screen (frame 6). Zod DTOs in `packages/shared`; NestJS error shape `{ success:false, error:{ code, message } }`. Seeders for dev spaces/pages/users.
 
-**Exit:** integration tests (testcontainers) cover closure-table ops and auth guard; `pnpm db:migrate && pnpm db:seed` produces a browsable dataset via REST.
+**Exit:** integration tests (vitest against the `pnpm docker:up` stack) cover closure-table ops and auth guard; `pnpm db:migrate && pnpm db:seed` produces a browsable dataset via REST.
 
 ## Phase 3 — Blocks, projections & the read path
 
@@ -169,7 +173,12 @@ Everything the plan, the frames, the ADRs, or the runbooks call for — directly
 
 The first burn-down wave (cross-space move + media re-emission, route-level states + toasts, realtime token refresh) landed 2026-08-06 — struck through above. Waves A–D and F followed the same day: e2e-in-CI, image slimming and the deploy rehearsal on the ops side; editor affordances, tree traversal, density, the mobile tab bar and attachment usage as polish; the per-user models (reading history, stars, Recent/Starred, the Me tab); the collaborative title, and the search surfaces (tags, attachment search). Every design-frame feature and robustness item in this audit is now closed, and so is every wave except G. Deployment is the last chapter — and it is a homelab behind Pangolin tunnels rather than a cloud, which changes what ADR 0007's media story and ADR 0008's sticky-session requirement have to survive. See docs/TODO.md § Wave G.
 
-## V2 sequencing (dependency-ordered, planned 2026-08-06)
+## Post-V1 burn-down sequencing (waves A–G) — ✅ complete 2026-08-07
+
+> Historical. This is the plan that closed § Open gaps above; every wave in it
+> shipped. It is kept because the reasoning about what blocked what is still
+> the best record of why the system is shaped this way — but nothing here is
+> outstanding. For what to build next, see § V2 below.
 
 Every remaining item from § Open gaps, arranged by what actually blocks what.
 Three real chains exist — testing/deploy (A1 → A2 → A3 → G), per-user models
@@ -215,3 +224,106 @@ Critical path with full parallelism: A1 → (B, C, F) → D → E → G, with
 A2 → A3 alongside on the ops side. Accepted deviation carried forward:
 search-token TTL stays a flat 15 minutes (sessions have no refresh
 interval to bind to).
+
+## V2
+
+> The live section. V1 is shipped and deployed; everything below is unbuilt.
+> Product-facing list and its ordering rationale: [roadmap.md](roadmap.md).
+> Scope guardrails: [../CLAUDE.md](../CLAUDE.md) § Deferred to V2+.
+
+V2 has one structural decision at its head and a long tail of independent
+features. The structure comes from a single fact: **four separate V2 items all
+need the same missing thing, a queryable projection of what is *inside* pages.**
+V1 projects a page three ways — `document_json`, `rendered_html`,
+`text_extract` — and none of them can answer "which pages link here", "which
+pages mention me", or "which rows have status=Done". That projection is
+`block_index`, and it is the gate.
+
+### H1 · `block_index` — the projection everything waits on
+
+The one item that is not optional, because backlinks, mentions, the tasks board
+and databases (ADR 0013) are each blocked on it and none of them can be
+prototyped without guessing at its shape.
+
+Build order within the wave:
+
+1. **Schema + worker.** A `block_index` table written by the same projection
+   job that already rebuilds `document_json`/`rendered_html`, so it inherits
+   the existing rebuild trigger, the reconciliation sweep and the idempotency
+   those already have. It must not become a second write path.
+2. **Page links first**, because they are the one consumer already shipping in
+   V1 and already carrying a known defect: `pageLink` caches a `title`
+   attribute that goes stale on rename, accepted in V1 precisely because
+   fixing it needs a backlink index (CLAUDE.md gotcha). Indexing link targets
+   both fixes the stale title and yields the backlink query for free.
+3. **Mentions and tasks** on top of the same rows.
+
+**Hard rule it must not break:** rule 2 forbids a block *relational* table.
+`block_index` is a projection — derived, disposable, rebuildable from the
+Y.Doc, never a source of truth and never written by the editor. If it ever
+becomes the thing an edit writes to, the rule has been broken. Rebuilding it
+from scratch for every page must stay a supported operation.
+
+**Decision gate before starting:** granularity — one row per *block* or one
+row per (page, referenced-entity)? The consumers listed above only ever query
+references, not block bodies; picking block-level granularity because it
+sounds more general would multiply the row count by an order of magnitude for
+no query anyone has. Settle it against the four consumers, not in the abstract.
+
+### H2 · Adoption path (independent of H1, parallelisable)
+
+Nothing here is blocked; these are gated on wanting them.
+
+- **Confluence/Notion importer** — the roadmap calls this the migration path
+  for teams adopting Angy, which makes it the highest-value non-structural
+  item. Import writes a fresh Y.Doc per page, the same one-directional shape
+  ADR 0005 settled for Git; never a round-trip.
+- **Page templates** — cheap next to the rest, and the thing that makes an
+  empty workspace usable. Note TODO.md's warning: there is no production seed
+  by design, so first-run paths are load-bearing and under-exercised.
+- **Git import / Git export** — two one-directional flows (ADR 0005). Import
+  shares its machinery with the importer above; build them adjacent or the
+  Markdown→Y.Doc path gets written twice.
+
+### H3 · Waiting on H1
+
+- **Backlinks + mentions UI**, then **per-user mention notifications and the
+  in-app inbox** — the inbox has no reason to exist before mentions do.
+- **Databases-in-pages** (ADR 0013): a row is a Page, a database is a view over
+  a set of pages plus a property schema. The ADR is explicit that it "should
+  not start before `block_index` exists". The `page_property` schema it
+  describes is new relational data and is *not* a block table — properties are
+  page metadata.
+
+### H4 · On demand only
+
+Each of these is a real V2 item with no dependency and no pull yet. Building
+any of them before something asks for it is speculative:
+
+- **GraphQL API** — roadmap says "when a consumer needs it". There is no second
+  consumer; REST is the whole surface.
+- **SCIM provisioning** — rides Authentik's outbound provider (ADR 0011). E2
+  already refuses unknown-email invites with "SCIM is V2" rather than failing
+  silently, so the seam exists.
+- **Confluence-style macros**, **federated search connectors**, **PDF/Word
+  export**, **per-line authorship**, **extension manager**.
+
+**Comments** sit in V3 in the roadmap but are flagged there as a strong V2
+candidate. They are genuinely independent of `block_index` (a comment anchors
+to a page and a position, not to an indexed block), so they can be pulled
+forward without disturbing H1.
+
+### Operational work, carried from V1
+
+Not features, and not blocked by any of the above — from
+[TODO.md](TODO.md):
+
+- **Backups reach a NAS but not another site**, and snapshots are not PITR.
+  That covers a failed disk, not a failed room.
+- **No deployment secret has ever been rotated**, and several were typed in
+  plaintext during setup. Procedure exists: runbooks/key-rotation.md.
+- **The e2e suite is timing-sensitive under load.** `playwright.config.ts` sets
+  `retries: 0` deliberately, so a single flake reds the build; a green re-run
+  of the identical commit is the evidence that distinguishes flake from
+  regression. Worth revisiting only with a policy for *reporting* flakes —
+  silent retries would hide the signal that motivated `retries: 0`.

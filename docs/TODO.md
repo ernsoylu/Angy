@@ -1,6 +1,6 @@
 # TODO — Remaining Work Tracker
 
-> Actionable checklist distilled from [implementation-plan.md § Open gaps and § V2 sequencing](implementation-plan.md). V1 (phases 0–10) plus waves A–F shipped as of 2026-08-06 — 80 unit/integration + 35 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes.
+> Actionable checklist distilled from [implementation-plan.md](implementation-plan.md) § Open gaps and § Post-V1 burn-down. V1 (phases 0–10) and waves A–G are shipped and deployed — 91 unit/integration + 39 e2e tests green. Check items off here; keep the plan's narrative in sync when a wave completes. What comes next lives in [§ V2](implementation-plan.md#v2), not here.
 
 ## Decision gates (answer before the dependent wave starts)
 
@@ -102,6 +102,38 @@ What is genuinely open is operational, not architectural:
   only button out of an empty space was wired to nothing), which is a reason to
   keep exercising them.
 
-Next feature work is V2, sequenced in implementation-plan.md. The first
-question to settle is `block_index`, because backlinks, stale page-link titles
-and databases (ADR 0013) all wait on it.
+- **The e2e suite is timing-sensitive under load.** Four consecutive local runs
+  of the same commit gave 39, 37, 38 and 39 passes, failing a *different* test
+  each time; one CI run failed `revocation.spec.ts` and passed on re-run of the
+  identical commit. `retries: 0` is deliberate, so any one flake reds the
+  build — which makes "re-run the same commit" the first diagnostic, before
+  reading the failure as a regression.
+
+## Post-V1 hardening *(2026-08-11)*
+
+Closed after a status audit found `main` red for four days:
+
+- [x] **Lint on `main`** — `e2e/assert-fresh-server.mjs` is the repo's only
+  non-TS source file, and `no-undef` fires there because the flat config
+  declares no environment (TS files escape the rule through typescript-eslint's
+  overrides). Node globals now declared for `**/*.{mjs,cjs}`.
+- [x] **`onStoreDocument` pinned documents for deleted pages** — `page.update`
+  throws P2025 when the row is gone, and Hocuspocus answers a failed store by
+  keeping the document in memory "to avoid data loss", replaying the same
+  failing write on every debounce. A page can legitimately vanish under an open
+  socket (trash purge, space purge). `updateMany` + a count check; covered by
+  `apps/realtime/test/store.test.ts`, verified by reintroducing the bug.
+- [x] **The e2e harness addressed a different Redis than the apps** —
+  `global-setup` and `helpers` fall back to `redis://localhost:6379`, while
+  every app reads `REDIS_URL` from the root `.env.local`. When those disagree
+  the planted sessions land in another server and *every* test fails with a
+  redirect to `/signin` and no hint why. `playwright.config.ts` now loads the
+  same file (`process.loadEnvFile`, which leaves shell exports winning).
+- [x] **Two realtime test files bound the same port** — harmless only because
+  `vitest.config.ts` sets `fileParallelism: false`, which is a statement about
+  processes, not ports.
+
+Next feature work is V2, planned in
+[implementation-plan.md § V2](implementation-plan.md#v2). The gate is
+`block_index`, because backlinks, stale page-link titles, mentions, the tasks
+board and databases (ADR 0013) all wait on it.

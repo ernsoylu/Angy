@@ -1,8 +1,8 @@
 # Roadmap
 
-> Deliberately date-free: sequencing is committed, timing is not. **Nothing is built yet** — the repo is a design blueprint. The enforceable scope guardrails for agents ("do not build in V1") live in [CLAUDE.md](../CLAUDE.md); this file is the product-facing view and must stay consistent with it.
+> Deliberately date-free: sequencing is committed, timing is not. **V1 is shipped and deployed**; V2 is the live section. The enforceable scope guardrails for agents ("do not build in V1") live in [CLAUDE.md](../CLAUDE.md); this file is the product-facing view and must stay consistent with it.
 
-## V1 — Ship the Core Editing Experience
+## V1 — Ship the Core Editing Experience ✅ *shipped*
 
 - Spaces + pages + page closure table
 - Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote

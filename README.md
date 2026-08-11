@@ -1,6 +1,6 @@
 # Angy — Wiki Knowledge Management System
 
-> **Status: design blueprint.** Implementation has not started — this README describes the target system. Scope guardrails live in [CLAUDE.md](CLAUDE.md); feature sequencing in [docs/roadmap.md](docs/roadmap.md).
+> **Status: V1 shipped.** Everything under V1 below is built, tested and running on a self-hosted deployment. Scope guardrails live in [CLAUDE.md](CLAUDE.md); feature sequencing in [docs/roadmap.md](docs/roadmap.md); what is next in [docs/implementation-plan.md](docs/implementation-plan.md) § V2.
 
 A **Confluence-class, blazing-fast, text-media-oriented wiki** for company knowledge management. Block-based editing (Notion-style) with real-time collaboration, page-level permissions, full version history, and a <100ms-TTFB SSR read budget.
 
