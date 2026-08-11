@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { pageIdBySlug, sessionContext } from "./helpers";
+import { articleBody, pageIdBySlug, sessionContext } from "./helpers";
 
 test.describe("reader SSR + edit-on-click", () => {
   test("streams worker-rendered HTML with zero editor JS, then mounts the editor behind Edit", async ({
@@ -13,8 +13,8 @@ test.describe("reader SSR + edit-on-click", () => {
     await expect(page.getByRole("heading", { name: "Realtime Sync Architecture" })).toBeVisible();
     // Projection content: callout, code block, and table all render server-side.
     await expect(page.locator(".callout-hardRule")).toBeVisible();
-    await expect(page.locator(".article-prose pre")).toBeVisible();
-    await expect(page.locator(".article-prose table")).toBeVisible();
+    await expect(articleBody(page).locator("pre")).toBeVisible();
+    await expect(articleBody(page).locator("table")).toBeVisible();
     // The read path ships no editor: no ProseMirror mount anywhere.
     await expect(page.locator(".tiptap")).toHaveCount(0);
     // TOC built from injected heading ids.

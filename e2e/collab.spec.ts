@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, pageIdBySlug, sessionContext } from "./helpers";
+import { api, articleBody, pageIdBySlug, sessionContext } from "./helpers";
 
 test.describe("multi-user collaboration", () => {
   test("two editors see each other's edits and presence live", async ({ browser }) => {
@@ -61,7 +61,7 @@ test.describe("multi-user collaboration", () => {
       .poll(
         async () => {
           await reader.goto(`/s/eng/${pageId}`);
-          return reader.locator(".article-prose").innerText();
+          return articleBody(reader).innerText();
         },
         { timeout: 20_000, intervals: [2_000] },
       )

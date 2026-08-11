@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext } from "@playwright/test";
+import type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
 import { Redis } from "ioredis";
 
 /** Sessions planted by global-setup, shared by the whole suite. */
@@ -50,6 +50,30 @@ export async function api<T>(
   const body = (await res.json()) as { success: boolean; data: T; error?: { message: string } };
   if (!body.success) throw new Error(body.error?.message ?? `API ${path} failed`);
   return body.data;
+}
+
+/**
+ * The rendered article body — always use this, never a bare `.article-prose`.
+ *
+ * The reader is streamed (RSC), so for a moment after a navigation the DOM
+ * holds *two* `.article-prose` nodes: the one in place, and a second copy
+ * inside React's hidden streaming template (`<div hidden id="S:…">`) before it
+ * is moved into position. A strict locator that resolves inside that window
+ * dies with "resolved to 2 elements", and the assertion it was about never
+ * runs — so the failure names whichever spec happened to sample mid-swap and
+ * says nothing about the code.
+ *
+ * Measured at 2 in 40 navigations locally, which is why the victim rotated
+ * between runs (authoring, collab, history) and why one CI provider could be
+ * green on the same commit another failed: the window is a race, so the answer
+ * depends on how fast the machine streams.
+ *
+ * `:visible` rather than `.first()`: the template is hidden by definition, so
+ * this narrows to the real article without also swallowing a genuine duplicate
+ * — if the page ever renders two visible bodies, this still fails loudly.
+ */
+export function articleBody(page: Page): Locator {
+  return page.locator(".article-prose:visible");
 }
 
 export async function pageIdBySlug(session: SessionName, slug: string): Promise<string> {

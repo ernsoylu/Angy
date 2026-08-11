@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, sessionContext } from "./helpers";
+import { api, articleBody, sessionContext } from "./helpers";
 
 test.describe("authoring: new page + slash commands", () => {
   test("create a page from the sidebar, build blocks with '/', read it back", async ({
@@ -68,13 +68,13 @@ test.describe("authoring: new page + slash commands", () => {
       .poll(
         async () => {
           await page.reload();
-          return page.locator(".article-prose").innerText();
+          return articleBody(page).innerText();
         },
         { timeout: 20_000, intervals: [2_000] },
       )
       .toContain("Slash-inserted hard rule");
-    await expect(page.locator(".article-prose aside.callout")).toBeVisible();
-    await expect(page.locator(".article-prose img")).toHaveAttribute(
+    await expect(articleBody(page).locator("aside.callout")).toBeVisible();
+    await expect(articleBody(page).locator("img")).toHaveAttribute(
       "src",
       /angy-docs\/media\//,
     );

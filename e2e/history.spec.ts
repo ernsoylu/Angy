@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, pageIdBySlug, sessionContext } from "./helpers";
+import { api, articleBody, pageIdBySlug, sessionContext } from "./helpers";
 
 test.describe("revision history & non-destructive restore (ADR 0006)", () => {
   test("checkpoint → edit → checkpoint → restore produces a forward version", async ({
@@ -69,12 +69,12 @@ test.describe("revision history & non-destructive restore (ADR 0006)", () => {
       .poll(
         async () => {
           await page.goto(`/s/eng/${pageId}`);
-          return page.locator(".article-prose").innerText();
+          return articleBody(page).innerText();
         },
         { timeout: 20_000, intervals: [2_000] },
       )
       .toContain(before);
-    expect(await page.locator(".article-prose").innerText()).not.toContain(after);
+    expect(await articleBody(page).innerText()).not.toContain(after);
 
     await context.close();
   });
