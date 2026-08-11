@@ -40,7 +40,7 @@ let started = null;
 try {
   // execFileSync, not execSync: no shell, so nothing here can be
   // reinterpreted as a command even if the argument list ever grows.
-  const out = execFileSync("ps", ["-eo", "pid,lstart,cmd"], { encoding: "utf8" });
+  const out = execFileSync("ps", ["-eo", "pid,lstart,cmd"], { encoding: "utf8" }); // NOSONAR — test-only; resolving ps via PATH is intentional (docs/runbooks/homelab.md §7)
   for (const line of out.split("\n")) {
     if (!line.includes("next-server")) continue;
     const m = /^\s*\d+\s+(.{24})\s/.exec(line);
