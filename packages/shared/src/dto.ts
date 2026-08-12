@@ -250,6 +250,20 @@ export const movePageSchema = z.object({
 });
 export type MovePageDto = z.infer<typeof movePageSchema>;
 
+/**
+ * A page that links to the one being viewed — the query `block_index` exists
+ * for (V2 H1). `count` is how many links that one page carries, so a document
+ * referring to the same page three times is one backlink, not three.
+ */
+export const backlinkSchema = z.object({
+  id: z.uuid(),
+  spaceId: z.string(),
+  title: z.string(),
+  slug: z.string(),
+  count: z.number().int(),
+});
+export type BacklinkDto = z.infer<typeof backlinkSchema>;
+
 export const trashItemSchema = z.object({
   id: z.uuid(),
   title: z.string(),

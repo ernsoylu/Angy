@@ -245,30 +245,51 @@ The one item that is not optional, because backlinks, mentions, the tasks board
 and databases (ADR 0013) are each blocked on it and none of them can be
 prototyped without guessing at its shape.
 
+**Gate answered *(2026-08-11)*: one row per *actionable node*.** Neither of the
+two shapes the gate named survived contact with all four consumers. Per-block
+was rejected for the reason the gate anticipated — indexing paragraphs nobody
+queries. But per-(page, referenced-entity) was rejected too: deduplicating to
+one row per pair leaves nowhere to put a task's text or done-state, so the
+tasks board would have needed a second table within the same wave. Occurrence
+granularity over actionable nodes only — links, mentions, tasks, macros, never
+prose — is what ADR 0001 already committed to ("actionable blocks only"), and
+rows scale with references rather than with document size.
+
 Build order within the wave:
 
-1. **Schema + worker.** A `block_index` table written by the same projection
-   job that already rebuilds `document_json`/`rendered_html`, so it inherits
-   the existing rebuild trigger, the reconciliation sweep and the idempotency
-   those already have. It must not become a second write path.
-2. **Page links first**, because they are the one consumer already shipping in
-   V1 and already carrying a known defect: `pageLink` caches a `title`
-   attribute that goes stale on rename, accepted in V1 precisely because
-   fixing it needs a backlink index (CLAUDE.md gotcha). Indexing link targets
-   both fixes the stale title and yields the backlink query for free.
-3. **Mentions and tasks** on top of the same rows.
+1. ✅ **Schema + worker** *(2026-08-11)* — `block_index` (page_id, ord, kind,
+   target_page_id, target_user_id, payload), written by `rebuildProjection`
+   and nowhere else, so it inherits that job's rebuild trigger, reconciliation
+   sweep and idempotency instead of growing its own staleness modes. Rows are
+   replaced wholesale per page: there is no incremental state to drift, and a
+   full rebuild converges rather than accumulating.
+2. ✅ **Page links** *(2026-08-11)* — both halves the gate promised. The
+   backlink query is `GET /pages/:id/backlinks`, filtered per referring page by
+   the caller's read access (a backlink discloses a title, so VIEW on the
+   target is not enough). Stale labels are resolved **on the projection**:
+   `resolvePageLinkTitles` substitutes each target's current title before
+   `rendered_html` and `text_extract` are generated, while `document_json` and
+   the Y.Doc keep the label the editor authored. That keeps the static renderer
+   a pure JSON→HTML function with no database lookup on the read path, and
+   keeps `onStoreDocument` the only writer of `page.title`.
+   **Termination is the load-bearing detail:** each row records the label *as
+   rendered*, and a rename only enqueues referrers whose recorded label differs.
+   Refreshing referrers unconditionally would cascade through the link graph
+   and two pages linking to each other would never settle.
+   **Residual:** the *editor* still shows the authored label, because nothing
+   rewrites the referring Y.Docs. Closing that means a `relabel` doc command
+   per referrer on the `rewrite-media` pattern — one Y.Doc load per referring
+   page per rename — which is a cost worth deciding on rather than assuming.
+3. **Mentions and tasks** on top of the same rows — each adds a `RefKind` in
+   @angy/blocks and a matching `block_ref_kind` value. The mapping between them
+   is exhaustive, so a kind that nobody maps is a compile error rather than a
+   node type that silently stops being indexed.
 
 **Hard rule it must not break:** rule 2 forbids a block *relational* table.
 `block_index` is a projection — derived, disposable, rebuildable from the
 Y.Doc, never a source of truth and never written by the editor. If it ever
 becomes the thing an edit writes to, the rule has been broken. Rebuilding it
 from scratch for every page must stay a supported operation.
-
-**Decision gate before starting:** granularity — one row per *block* or one
-row per (page, referenced-entity)? The consumers listed above only ever query
-references, not block bodies; picking block-level granularity because it
-sounds more general would multiply the row count by an order of magnitude for
-no query anyone has. Settle it against the four consumers, not in the abstract.
 
 ### H2 · Adoption path (independent of H1, parallelisable)
 

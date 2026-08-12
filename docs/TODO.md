@@ -138,6 +138,25 @@ Closed after a status audit found `main` red for four days:
   processes, not ports.
 
 Next feature work is V2, planned in
-[implementation-plan.md § V2](implementation-plan.md#v2). The gate is
-`block_index`, because backlinks, stale page-link titles, mentions, the tasks
-board and databases (ADR 0013) all wait on it.
+[implementation-plan.md § V2](implementation-plan.md#v2).
+
+## V2 · H1 — `block_index` *(started 2026-08-11)*
+
+The gate everything else waited on. Granularity settled as **one row per
+actionable node** — see the plan for why neither shape the gate named survived
+all four consumers.
+
+- [x] **Schema + worker** — `block_index` written by `rebuildProjection` and
+  nowhere else, so it inherits the rebuild trigger, the reconcile sweep and the
+  idempotency the other projections already have.
+- [x] **Page links** — `GET /pages/:id/backlinks` (read-filtered per referring
+  page), and stale link labels resolved on the projection so the reader is
+  fresh while the Y.Doc keeps what the editor authored.
+- [ ] **Relabel the referring Y.Docs** — the editor still shows the authored
+  label. Closing it means a `relabel` doc command per referrer on the
+  `rewrite-media` pattern: one Y.Doc load per referring page per rename. Worth
+  a decision, not an assumption.
+- [ ] **Backlinks UI** (H3) — the endpoint has no consumer yet. A hub page
+  could accumulate hundreds of inbound links, so whatever surfaces them owns
+  the limit, and must say it truncated rather than the API doing it silently.
+- [ ] **Mentions and tasks** on the same rows.

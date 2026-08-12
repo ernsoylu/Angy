@@ -64,13 +64,33 @@ async function emitHealthSignals(staleCount: number): Promise<void> {
   }
 }
 
+/**
+ * Rebuild the pages that render a link label a rename just invalidated (V2 H1).
+ *
+ * The job id dedupes only while one is still pending — `removeOnComplete`
+ * clears it on the way out, so a later rename of the same page enqueues again
+ * instead of being silently swallowed. Nothing cascades: a referrer's own
+ * rebuild only returns work if *its* title is what drifted.
+ */
+async function refreshReferrers(pageIds: string[]): Promise<void> {
+  if (pageIds.length === 0) return;
+  console.log(`[worker] refreshing ${pageIds.length} page(s) linking to a renamed page`);
+  await queue.addBulk(
+    pageIds.map((pageId) => ({
+      name: JOB_PROJECTION_REBUILD,
+      data: { pageId },
+      opts: { jobId: `relabel-${pageId}`, removeOnComplete: true, removeOnFail: true },
+    })),
+  );
+}
+
 const worker = new Worker<ProjectionJobData | Record<string, never>>(
   QUEUE_PROJECTIONS,
   async (job) => {
     if (job.name === JOB_PROJECTION_INIT) {
-      await initYdoc((job.data as ProjectionJobData).pageId);
+      await refreshReferrers(await initYdoc((job.data as ProjectionJobData).pageId));
     } else if (job.name === JOB_PROJECTION_REBUILD) {
-      await rebuildProjection((job.data as ProjectionJobData).pageId);
+      await refreshReferrers(await rebuildProjection((job.data as ProjectionJobData).pageId));
     } else if (job.name === JOB_SEARCH_REINDEX) {
       // Tag edits change what search knows, not what the page says — no need
       // to re-render the Y.Doc.
@@ -148,7 +168,7 @@ const maintenanceWorker = new Worker(
         author = page.updatedBy ?? page.createdBy;
       }
       await writeRevisionCheckpoint(data.pageId, author, data.label ?? null);
-      await rebuildProjection(data.pageId);
+      await refreshReferrers(await rebuildProjection(data.pageId));
     } else if (job.name === JOB_COMPACT_PAGE) {
       await compactPage((job.data as CompactPageJobData).pageId);
     } else if (job.name === JOB_THUMBNAIL) {

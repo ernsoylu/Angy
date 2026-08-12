@@ -124,7 +124,8 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **`NEXT_PUBLIC_*` are baked into the web image at build time**, so the `angy-env` Secret cannot change what the browser talks to — pass them to infra/docker/build.sh per deployment target. Server-side code uses `API_INTERNAL_URL`, which *is* runtime env.
 - **Editor plugins registered from React (drag handle) must take referentially stable props** — a new `onNodeChange` identity each render re-registers the ProseMirror plugin, and the reconfigure tears down every other plugin's view (the slash menu silently stops opening).
 - **Page links are named at creation time**, because the node is an atom — its label cannot be edited in place, and letting the parent document write it would give `page.title` a second writer alongside `onStoreDocument`.
-- **Page links (`pageLink`) resolve through `/p/{pageId}`, never `/s/{key}/{id}`** — a space key baked into a link goes stale the moment the page moves, and rewriting every referring Y.Doc needs a backlink index (V2). The cached `title` attribute *does* go stale on rename; that is the accepted cost of keeping the static renderer a pure JSON→HTML function.
+- **Page links (`pageLink`) resolve through `/p/{pageId}`, never `/s/{key}/{id}`** — a space key baked into a link goes stale the moment the page moves, and rewriting every referring Y.Doc needs a backlink index. The cached `title` attribute is resolved **on the projection**, not in the document: `resolvePageLinkTitles` substitutes the target's current title before `rendered_html`/`text_extract` are generated, so the reader is fresh while `document_json` and the Y.Doc keep the authored label — the static renderer stays a pure JSON→HTML function and `onStoreDocument` stays the only writer of `page.title`. The *editor* therefore still shows the authored label.
+- **`block_index` is a projection, never a block table** (hard rule 2) — one row per *actionable* node (links, and later mentions/tasks/macros), written only by `rebuildProjection` and rebuildable from the Y.Doc at any time. Each page-link row records the label **as rendered**, and a rename only re-projects referrers whose recorded label differs: refreshing them unconditionally cascades through the link graph and mutual links never settle.
 - **The page title is a `title` Y.Text in the page's own Y.Doc** (`TITLE_FIELD`), not a plain column write: `onStoreDocument` copies it into `page.title`, so anything renaming a page must go through the doc (`rename` doc command) or the next store overwrites it. Never persist an empty title — reseed the doc from the row instead.
 
 ## V1 Scope (Ship the Core Editing Experience)
@@ -145,7 +146,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 - SCIM provisioning
 - GraphQL API
-- block_index projection table + worker + UI (tasks board, mentions backlinks)
+- block_index — table + worker + the backlink query are **built** (V2 H1); still open are the tasks board, mentions, and the backlinks UI
 - Confluence-style macros (Jira, TOC, decision, meeting notes)
 - Extension manager / runtime block-type registry (XWiki-style plugins)
 - Federated search connectors (Slack, Drive, Jira)

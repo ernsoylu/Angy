@@ -13,6 +13,7 @@ import { SignJWT } from "jose";
 import { env } from "../env";
 import {
   createPage,
+  getBacklinks,
   getBreadcrumb,
   getEffectivePageLevel,
   getEffectiveSpaceLevel,
@@ -27,6 +28,7 @@ import {
   renamePageSchema,
   satisfies,
   type ApiOk,
+  type BacklinkDto,
   type CreateChildPageDto,
   type CreatePageDto,
   type PageDetailDto,
@@ -39,6 +41,7 @@ import {
   PagePermissionGuard,
   RequirePageLevel,
 } from "../permissions/page-permission.guard";
+import { checkPagePermission } from "../permissions/permissions.service";
 import { projectionsQueue } from "../queue";
 import { getRedis } from "../redis";
 import { ZodValidationPipe } from "../zod.pipe";
@@ -91,6 +94,46 @@ export class PagesController {
       createdAt: page.createdAt.toISOString(),
       updatedAt: page.updatedAt.toISOString(),
     });
+  }
+
+  /**
+   * Which pages link here (V2 H1) — served from `block_index`, the projection
+   * the worker rebuilds alongside rendered_html.
+   *
+   * Filtered by the caller's read access, one check per referring page: a
+   * backlink names a page and its title, so returning one the user cannot open
+   * would leak both. VIEW on the target is not enough to see who points at it.
+   *
+   * Unpaginated deliberately for now — inbound links are naturally few, and the
+   * bitmap check is a Redis lookup. If a hub page ever accumulates hundreds,
+   * the UI that surfaces them (H3) is where a limit belongs, so it can say it
+   * truncated rather than the API doing it silently.
+   */
+  @Get(":id/backlinks")
+  @RequirePageLevel("VIEW")
+  async backlinks(
+    @Param("id") id: string,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<BacklinkDto[]>> {
+    const prisma = getPrisma();
+    const page = await prisma.page.findFirst({ where: { id, deletedAt: null } });
+    if (!page) throw new NotFoundException("Page not found");
+
+    const candidates = await getBacklinks(prisma, id);
+    const visible = await Promise.all(
+      candidates.map((link) => checkPagePermission(req.user.id, link.pageId, "VIEW")),
+    );
+    return ok(
+      candidates
+        .filter((_link, i) => visible[i])
+        .map((link) => ({
+          id: link.pageId,
+          spaceId: link.spaceId.toString(),
+          title: link.title,
+          slug: link.slug,
+          count: link.count,
+        })),
+    );
   }
 
   /**

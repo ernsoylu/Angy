@@ -28,6 +28,17 @@ enum SpaceVisibility {
   @@map("space_visibility")
 }
 
+/// What kind of actionable node a `block_index` row projects. Only the kinds
+/// something actually writes belong here — it mirrors `RefKind` in
+/// @angy/blocks exactly, so a drift between them is a compile error rather
+/// than a silently unindexed node type. Mentions, tasks and macros each add a
+/// value when their extractor lands.
+enum BlockRefKind {
+  PAGE_LINK
+
+  @@map("block_ref_kind")
+}
+
 model Space {
   id               BigInt          @id @default(autoincrement())
   key              String          @unique
@@ -62,6 +73,7 @@ model AppUser {
   permissions PagePermission[]
   visits      PageVisit[]
   stars       PageStar[]
+  mentions    BlockIndex[]
 
   @@map("app_user")
 }
@@ -99,17 +111,19 @@ model Page {
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
 
-  space       Space            @relation(fields: [spaceId], references: [id])
-  parent      Page?            @relation("PageTree", fields: [parentId], references: [id])
-  children    Page[]           @relation("PageTree")
-  ancestors   PageAncestor[]   @relation("Descendant")
-  descendants PageAncestor[]   @relation("Ancestor")
-  permissions PagePermission[]
-  revisions   PageRevision[]
-  attachments Attachment[]
-  visits      PageVisit[]
-  stars       PageStar[]
-  tags        PageTag[]
+  space        Space            @relation(fields: [spaceId], references: [id])
+  parent       Page?            @relation("PageTree", fields: [parentId], references: [id])
+  children     Page[]           @relation("PageTree")
+  ancestors    PageAncestor[]   @relation("Descendant")
+  descendants  PageAncestor[]   @relation("Ancestor")
+  permissions  PagePermission[]
+  revisions    PageRevision[]
+  attachments  Attachment[]
+  visits       PageVisit[]
+  stars        PageStar[]
+  tags         PageTag[]
+  refs         BlockIndex[]     @relation("RefSource")
+  referencedBy BlockIndex[]     @relation("RefTargetPage")
 
   @@unique([spaceId, slug])
   @@index([spaceId])
@@ -175,6 +189,37 @@ model PageStar {
   @@id([userId, pageId])
   @@index([userId, starredAt(sort: Desc)])
   @@map("page_star")
+}
+
+/// Projection of the *actionable* nodes inside pages (ADR 0001, V2 H1) — what
+/// a document references, made queryable: backlinks, mentions, tasks, macros.
+///
+/// This is **not** the block table hard rule 2 forbids. It is derived,
+/// disposable and rebuilt from the Y.Doc by the same projection job that
+/// writes document_json/rendered_html; the editor never writes it, nothing
+/// reads it as a source of truth, and dropping the table costs a reprojection.
+/// Granularity is one row per actionable node, never one per block: rows scale
+/// with links and mentions, not with document size.
+model BlockIndex {
+  pageId       String       @map("page_id") @db.Uuid
+  /// Document order of the node within its page. Rows are replaced wholesale
+  /// per page on every rebuild, so this is stable identity, not a cursor.
+  ord          Int
+  kind         BlockRefKind
+  targetPageId String?      @map("target_page_id") @db.Uuid
+  targetUserId BigInt?      @map("target_user_id")
+  /// Per-occurrence body. For a page link: `{ label }`, the title as rendered
+  /// into rendered_html — the stale-title refresh compares against it.
+  payload      Json?
+
+  page       Page     @relation("RefSource", fields: [pageId], references: [id], onDelete: Cascade)
+  targetPage Page?    @relation("RefTargetPage", fields: [targetPageId], references: [id], onDelete: Cascade)
+  targetUser AppUser? @relation(fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, ord])
+  @@index([targetPageId])
+  @@index([targetUserId])
+  @@map("block_index")
 }
 
 /// Closure table over pages only — never blocks (hard rule 2).

@@ -16,7 +16,8 @@
 | `page_star` | Per-user bookmarks behind the sidebar's Starred list | `user_id`, `page_id`, `starred_at`; PK (user_id, page_id) |
 | `tag` | Freeform labels, **workspace-wide**: the name is the identity across every space. Normalised on write (`normalizeTag` in @angy/shared), so the unique index is the real deduplication; admins rename/merge what still drifts | `id` bigint PK, `name` unique, `created_by`, `created_at` |
 | `page_tag` | Tag assignment. Written by anyone with EDIT on the page | `page_id`, `tag_id`, `added_by`, `added_at`; PK (page_id, tag_id), index on tag_id |
+| `block_index` | Projection of the **actionable** nodes inside pages (ADR 0001, V2 H1) — links today, mentions/tasks/macros next. Worker-written alongside rendered_html, never by the editor; not a MATERIALIZED VIEW, and **not** the block table hard rule 2 forbids — it is derived, disposable and rebuildable from the Y.Doc. One row per actionable node, never one per block | `page_id`, `ord` (document order); PK (page_id, ord); `kind` (block_ref_kind), `target_page_id`, `target_user_id`, `payload` jsonb (page links carry `{label}` — the title *as rendered*, which is what the stale-label refresh compares against); indexes on target_page_id (backlinks) and target_user_id (mention inbox) |
 
-Deferred to V2: `block_index` (projection of actionable blocks — tasks, mentions, macros, embeds — worker-UPSERTed; not a Postgres MATERIALIZED VIEW), group/team principals for permissions.
+Deferred to V2: group/team principals for permissions.
 
 Open TODOs for the DDL pass: indexes (page.space_id, page_ancestor.descendant_id, page_revision.page_id+created_at, attachment.sha256), FK/on-delete behavior for trash vs hard-delete, and the revision retention policy (ADR 0006).

@@ -21,6 +21,12 @@ export { Callout, CALLOUT_TONES, type CalloutTone } from "./callout.js";
 export { PageLink } from "./page-link.js";
 export { diffDocuments, diffWords, type DiffBlock, type WordDiffPart } from "./diff.js";
 export { baseExtensions, editorExtensions } from "./extensions.js";
+export {
+  extractRefs,
+  resolvePageLinkTitles,
+  type DocRef,
+  type RefKind,
+} from "./refs.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";
 export { applyDocJson } from "./restore.js";
 export {

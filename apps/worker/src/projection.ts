@@ -2,27 +2,71 @@ import type { JSONContent } from "@tiptap/core";
 import * as Y from "yjs";
 import {
   createYdocFromJson,
+  extractRefs,
   extractText,
   renderDocumentToHtml,
+  resolvePageLinkTitles,
   ydocToJson,
+  type DocRef,
+  type RefKind,
 } from "@angy/blocks";
-import { getPrisma, type Prisma } from "@angy/db";
+import {
+  findStaleReferrers,
+  getPrisma,
+  replaceBlockIndex,
+  type BlockRefInput,
+  type BlockRefKind,
+  type Prisma,
+  type PrismaClient,
+} from "@angy/db";
 import { getObject, putObject } from "./s3.js";
 
 export const ydocKey = (pageId: string) => `ydoc/${pageId}`;
+
+/**
+ * The block schema's ref kinds, mapped onto the database enum. Exhaustive by
+ * construction: a new `RefKind` that nobody maps here is a type error, not a
+ * node type that silently stops being indexed.
+ */
+const REF_KIND: Record<RefKind, BlockRefKind> = { page_link: "PAGE_LINK" };
+
+const toBlockRef = (ref: DocRef): BlockRefInput => ({
+  ord: ref.ord,
+  kind: REF_KIND[ref.kind],
+  targetPageId: ref.targetPageId,
+  targetUserId: ref.targetUserId,
+  payload: ref.payload,
+});
+
+/**
+ * Current titles of the pages a document links to, for label resolution.
+ * Trashed targets are left out so their links keep the label they were
+ * authored with rather than the name of something nobody can open.
+ */
+async function targetTitles(
+  prisma: PrismaClient,
+  refs: readonly DocRef[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(refs.flatMap((ref) => (ref.targetPageId ? [ref.targetPageId] : [])))];
+  if (ids.length === 0) return new Map();
+  const pages = await prisma.page.findMany({
+    where: { id: { in: ids }, deletedAt: null },
+    select: { id: true, title: true },
+  });
+  return new Map(pages.map((page) => [page.id, page.title]));
+}
 
 /**
  * Initialise the Y.Doc for a freshly created page: build it from the page's
  * document_json (or the empty document), persist the update bytes to S3, and
  * record ydoc_s3_key + state vector. Idempotent — skips if a doc exists.
  */
-export async function initYdoc(pageId: string): Promise<void> {
+export async function initYdoc(pageId: string): Promise<string[]> {
   const prisma = getPrisma();
   const page = await prisma.page.findUnique({ where: { id: pageId } });
-  if (!page) return;
+  if (!page) return [];
   if (page.ydocS3Key && (await getObject(page.ydocS3Key))) {
-    await rebuildProjection(pageId);
-    return;
+    return rebuildProjection(pageId);
   }
 
   const ydoc = createYdocFromJson(page.documentJson as JSONContent | null);
@@ -33,24 +77,37 @@ export async function initYdoc(pageId: string): Promise<void> {
     where: { id: pageId },
     data: { ydocS3Key: key, ydocStateVector: Buffer.from(Y.encodeStateVector(ydoc)) },
   });
-  await rebuildProjection(pageId);
+  return rebuildProjection(pageId);
 }
 
 /**
- * Rebuild read projections (document_json, rendered_html, text_extract) for a
- * page. The Y.Doc in S3 is authoritative when present; document_json is the
- * bootstrap fallback for pages that predate their Y.Doc. Idempotent.
+ * Rebuild read projections (document_json, rendered_html, text_extract,
+ * block_index) for a page. The Y.Doc in S3 is authoritative when present;
+ * document_json is the bootstrap fallback for pages that predate their Y.Doc.
+ * Idempotent.
+ *
+ * `block_index` is written here and nowhere else, so it inherits this job's
+ * rebuild trigger, reconciliation sweep and idempotency instead of becoming a
+ * second write path with its own staleness modes.
+ *
+ * Returns the pages whose own projections are now out of date because this one
+ * rebuilt — referrers rendering a link label this page no longer answers to.
+ * They are returned rather than enqueued because the queue belongs to main.ts,
+ * which is also where the reconcile sweep's results are enqueued.
  */
-export async function rebuildProjection(pageId: string): Promise<void> {
+export async function rebuildProjection(pageId: string): Promise<string[]> {
   const prisma = getPrisma();
   const page = await prisma.page.findUnique({ where: { id: pageId } });
   if (!page || page.deletedAt) {
     // Trashed or gone — search must not keep serving it, and its attachments
-    // lose the space_id the read filter scopes them by.
+    // lose the space_id the read filter scopes them by. Its outgoing links stop
+    // counting as backlinks for the same reason: the page renders nowhere.
+    // (A hard delete already took the rows with it, through the FK cascade.)
+    await prisma.blockIndex.deleteMany({ where: { pageId } });
     const { indexAttachmentsForPage, removeFromIndex } = await import("./search.js");
     await removeFromIndex(pageId);
     await indexAttachmentsForPage(pageId);
-    return;
+    return [];
   }
 
   let doc: JSONContent | null = null;
@@ -64,22 +121,34 @@ export async function rebuildProjection(pageId: string): Promise<void> {
     }
   }
   doc ??= page.documentJson as JSONContent | null;
-  if (!doc) return;
+  if (!doc) return [];
+
+  // Page-link labels are resolved for the read-path artifacts only. The Y.Doc
+  // keeps the label the editor authored — resolving into it would give
+  // page.title a second writer alongside onStoreDocument — so document_json
+  // stays a faithful projection of the document, while rendered_html and
+  // text_extract show the target's current name.
+  const resolved = resolvePageLinkTitles(doc, await targetTitles(prisma, extractRefs(doc)));
 
   await prisma.page.update({
     where: { id: pageId },
     data: {
       documentJson: doc as Prisma.InputJsonValue,
-      renderedHtml: renderDocumentToHtml(doc),
-      textExtract: extractText(doc),
+      renderedHtml: renderDocumentToHtml(resolved),
+      textExtract: extractText(resolved),
       projectionUpdatedAt: new Date(),
     },
   });
+  // Indexed from the resolved document, so the recorded label is the one the
+  // reader was served — which is what findStaleReferrers compares against.
+  await replaceBlockIndex(prisma, pageId, extractRefs(resolved).map(toBlockRef));
   // Keep search in lockstep with projections (ADR 0009). Attachments ride
   // along: a move changes their space, a restore brings them back.
   const { indexAttachmentsForPage, indexPage } = await import("./search.js");
   await indexPage(pageId);
   await indexAttachmentsForPage(pageId);
+
+  return findStaleReferrers(prisma, pageId, page.title);
 }
 
 /**

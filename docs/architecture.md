@@ -46,7 +46,7 @@ Postgres (rendered_html, page metadata, permission check via bitmap)
 Stream pre-rendered HTML to browser
 ```
 
-(block_index — the projection of actionable blocks for tasks/mentions/backlinks — is **V2**, alongside its consumers.)
+(block_index — the projection of actionable blocks for tasks/mentions/backlinks — is **V2**. Its first slice ships with page links: the same projection job writes one row per actionable node, which is what makes backlinks queryable and page-link labels resolvable. Tasks and mentions land on the same rows.)
 
 ## Consistency Model
 
