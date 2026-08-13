@@ -5,10 +5,12 @@ export type * from "@prisma/client";
 export {
   findStaleReferrers,
   getBacklinks,
+  getMentions,
   refLabel,
   replaceBlockIndex,
   type Backlink,
   type BlockRefInput,
+  type Mention,
 } from "./block-index.js";
 export { getPrisma } from "./client.js";
 export {

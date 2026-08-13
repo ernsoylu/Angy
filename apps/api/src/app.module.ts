@@ -14,6 +14,7 @@ import { PagePermissionGuard } from "./permissions/page-permission.guard";
 import { SearchController } from "./search/search.controller";
 import { SpaceAdminController } from "./spaces/space-admin.controller";
 import { SpacesController } from "./spaces/spaces.controller";
+import { UsersController } from "./users/users.controller";
 
 @Module({
   controllers: [
@@ -29,6 +30,7 @@ import { SpacesController } from "./spaces/spaces.controller";
     PageOpsController,
     PersonalController,
     TagsController,
+    UsersController,
   ],
   providers: [OidcService, SessionGuard, PagePermissionGuard],
 })

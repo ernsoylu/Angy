@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import {
   findStaleReferrers,
   getBacklinks,
+  getMentions,
   refLabel,
   replaceBlockIndex,
   type BlockRefInput,
@@ -155,5 +156,64 @@ describe("getBacklinks", () => {
   it("is empty for a page nothing links to", async () => {
     const lonely = await newPage("Lonely", "lonely");
     expect(await getBacklinks(prisma, lonely)).toEqual([]);
+  });
+});
+
+describe("getMentions", () => {
+  const mentionOf = (userId: bigint, label: string, ord = 0): BlockRefInput => ({
+    ord,
+    kind: "MENTION",
+    targetPageId: null,
+    targetUserId: userId.toString(),
+    payload: { label },
+  });
+
+  let other: bigint;
+  let mentioning: string;
+
+  beforeAll(async () => {
+    const stranger = await prisma.appUser.create({
+      data: { oidcSubject: "test|refs2", email: "refs2@test.io", displayName: "Stranger" },
+    });
+    other = stranger.id;
+    mentioning = await newPage("Standup Notes", "standup-notes");
+    await replaceBlockIndex(prisma, mentioning, [
+      mentionOf(userId, "Linker"),
+      mentionOf(userId, "Linker", 1),
+    ]);
+  });
+
+  it("finds pages naming the user, collapsing repeats into a count", async () => {
+    const mentions = await getMentions(prisma, userId);
+    const row = mentions.find((m) => m.pageId === mentioning);
+    expect(row?.title).toBe("Standup Notes");
+    expect(row?.count).toBe(2);
+  });
+
+  it("does not leak one user's mentions to another", async () => {
+    expect((await getMentions(prisma, other)).map((m) => m.pageId)).not.toContain(mentioning);
+  });
+
+  it("scopes to a space when asked", async () => {
+    expect((await getMentions(prisma, userId, spaceId)).map((m) => m.pageId)).toContain(mentioning);
+    // A space that exists but holds none of them.
+    const elsewhere = await prisma.space.create({
+      data: { key: "refs-elsewhere", name: "Elsewhere" },
+    });
+    expect(await getMentions(prisma, userId, elsewhere.id)).toEqual([]);
+  });
+
+  it("omits trashed pages", async () => {
+    await prisma.page.update({ where: { id: mentioning }, data: { deletedAt: new Date() } });
+    expect((await getMentions(prisma, userId)).map((m) => m.pageId)).not.toContain(mentioning);
+    await prisma.page.update({ where: { id: mentioning }, data: { deletedAt: null } });
+  });
+
+  it("does not confuse a mention with a link to the same numeric id", async () => {
+    // target_page_id and target_user_id are separate columns; a query keyed on
+    // the wrong one would return page links as mentions.
+    const linker = await newPage("Just A Link", "just-a-link");
+    await replaceBlockIndex(prisma, linker, [linkTo(target, "Architecture")]);
+    expect((await getMentions(prisma, userId)).map((m) => m.pageId)).not.toContain(linker);
   });
 });

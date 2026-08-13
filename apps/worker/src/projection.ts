@@ -5,10 +5,11 @@ import {
   extractRefs,
   extractText,
   renderDocumentToHtml,
-  resolvePageLinkTitles,
+  resolveRefLabels,
   ydocToJson,
   type DocRef,
   type RefKind,
+  type RefLabels,
 } from "@angy/blocks";
 import {
   findStaleReferrers,
@@ -28,7 +29,10 @@ export const ydocKey = (pageId: string) => `ydoc/${pageId}`;
  * construction: a new `RefKind` that nobody maps here is a type error, not a
  * node type that silently stops being indexed.
  */
-const REF_KIND: Record<RefKind, BlockRefKind> = { page_link: "PAGE_LINK" };
+const REF_KIND: Record<RefKind, BlockRefKind> = {
+  page_link: "PAGE_LINK",
+  mention: "MENTION",
+};
 
 /** Work a rebuild created for *other* pages: they name this one by its old title. */
 export interface ReferrerRefresh {
@@ -49,21 +53,37 @@ const toBlockRef = (ref: DocRef): BlockRefInput => ({
 });
 
 /**
- * Current titles of the pages a document links to, for label resolution.
- * Trashed targets are left out so their links keep the label they were
- * authored with rather than the name of something nobody can open.
+ * Current names for whatever a document references — page titles for links,
+ * display names for mentions.
+ *
+ * Trashed pages are left out so their links keep the label they were authored
+ * with rather than the name of something nobody can open. Deactivated users
+ * are *not*: a mention is a record of who was named, and someone who has left
+ * should still be readable as themselves rather than as "someone".
  */
-async function targetTitles(
-  prisma: PrismaClient,
-  refs: readonly DocRef[],
-): Promise<Map<string, string>> {
-  const ids = [...new Set(refs.flatMap((ref) => (ref.targetPageId ? [ref.targetPageId] : [])))];
-  if (ids.length === 0) return new Map();
-  const pages = await prisma.page.findMany({
-    where: { id: { in: ids }, deletedAt: null },
-    select: { id: true, title: true },
-  });
-  return new Map(pages.map((page) => [page.id, page.title]));
+async function refLabels(prisma: PrismaClient, refs: readonly DocRef[]): Promise<RefLabels> {
+  const pageIds = [...new Set(refs.flatMap((r) => (r.targetPageId ? [r.targetPageId] : [])))];
+  const userIds = [...new Set(refs.flatMap((r) => (r.targetUserId ? [r.targetUserId] : [])))];
+
+  const [pages, users] = await Promise.all([
+    pageIds.length === 0
+      ? []
+      : prisma.page.findMany({
+          where: { id: { in: pageIds }, deletedAt: null },
+          select: { id: true, title: true },
+        }),
+    userIds.length === 0
+      ? []
+      : prisma.appUser.findMany({
+          where: { id: { in: userIds.map((id) => BigInt(id)) } },
+          select: { id: true, displayName: true },
+        }),
+  ]);
+
+  return {
+    pages: new Map(pages.map((page) => [page.id, page.title])),
+    users: new Map(users.map((user) => [user.id.toString(), user.displayName])),
+  };
 }
 
 /**
@@ -133,12 +153,12 @@ export async function rebuildProjection(pageId: string): Promise<ReferrerRefresh
   doc ??= page.documentJson as JSONContent | null;
   if (!doc) return null;
 
-  // Page-link labels are resolved for the read-path artifacts only. The Y.Doc
-  // keeps the label the editor authored — resolving into it would give
-  // page.title a second writer alongside onStoreDocument — so document_json
-  // stays a faithful projection of the document, while rendered_html and
-  // text_extract show the target's current name.
-  const resolved = resolvePageLinkTitles(doc, await targetTitles(prisma, extractRefs(doc)));
+  // Cached labels (link titles, mention names) are resolved for the read-path
+  // artifacts only. The Y.Doc keeps what the editor authored — resolving into
+  // it would give page.title a second writer alongside onStoreDocument — so
+  // document_json stays a faithful projection of the document while
+  // rendered_html and text_extract show each target's current name.
+  const resolved = resolveRefLabels(doc, await refLabels(prisma, extractRefs(doc)));
 
   await prisma.page.update({
     where: { id: pageId },

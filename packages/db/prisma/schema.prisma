@@ -35,6 +35,7 @@ enum SpaceVisibility {
 /// value when their extractor lands.
 enum BlockRefKind {
   PAGE_LINK
+  MENTION
 
   @@map("block_ref_kind")
 }

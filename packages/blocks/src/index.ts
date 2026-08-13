@@ -18,27 +18,30 @@ export const V1_BLOCK_TYPES = [
 export type BlockType = (typeof V1_BLOCK_TYPES)[number];
 
 export { Callout, CALLOUT_TONES, type CalloutTone } from "./callout.js";
+export { Mention } from "./mention.js";
 export { PageLink } from "./page-link.js";
 export { diffDocuments, diffWords, type DiffBlock, type WordDiffPart } from "./diff.js";
 export { baseExtensions, editorExtensions } from "./extensions.js";
 export {
   extractRefs,
-  resolvePageLinkTitles,
+  resolveRefLabels,
   type DocRef,
   type RefKind,
+  type RefLabels,
 } from "./refs.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";
 export { applyDocJson } from "./restore.js";
 export {
   applyTextDiff,
   createYdocFromJson,
-  pageLinkTargets,
-  relabelPageLinks,
+  referenceTargets,
+  relabelReferences,
   TITLE_FIELD,
   updateToJson,
   ydocTitle,
   ydocToJson,
   YDOC_FIELD,
+  type ReferenceTargets,
 } from "./ydoc.js";
 export type { JSONContent } from "@tiptap/core";
 

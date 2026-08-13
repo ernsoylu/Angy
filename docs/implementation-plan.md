@@ -290,10 +290,23 @@ Build order within the wave:
    intersecting with its own set — the space-scoped-event shape from ADR 0008.
    The invariant that makes load-time repair free: relabelling a document
    whose labels are already right must produce no Yjs update at all.
-3. **Mentions and tasks** on top of the same rows — each adds a `RefKind` in
-   @angy/blocks and a matching `block_ref_kind` value. The mapping between them
-   is exhaustive, so a kind that nobody maps is a compile error rather than a
-   node type that silently stops being indexed.
+3. ✅ **Mentions** *(2026-08-13)* — the second `RefKind`, and the one that
+   proved the shape generalises: a `mention` node (inline atom), an `@` picker
+   beside the slash palette, `MENTION` rows on `target_user_id`, and a
+   space-scoped Mentions list reusing the Recent/Starred component wholesale.
+
+   Adding it turned the page-link-specific label machinery into a general one
+   (`resolveRefLabels`, `relabelReferences`), because a mention caches a
+   display name for exactly the reason a link caches a title — the static
+   renderer must not query a database — and would otherwise have reintroduced
+   the staleness bug that had just been fixed, in a second place.
+
+   `ord` is one document-order sequence across kinds, not one per kind: it is
+   half the primary key, so per-kind numbering would collide.
+
+4. **Tasks** — the remaining kind. `payload` already exists to carry a task's
+   text and done-state; that is precisely why occurrence granularity was chosen
+   over one row per (page, entity) at the gate.
 
 **Hard rule it must not break:** rule 2 forbids a block *relational* table.
 `block_index` is a projection — derived, disposable, rebuildable from the

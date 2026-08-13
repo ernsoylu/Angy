@@ -53,6 +53,8 @@ export const getRecentPages = (spaceId: string) =>
   apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/recent`);
 export const getStarredPages = (spaceId: string) =>
   apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/starred`);
+export const getMentionedPages = (spaceId: string) =>
+  apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/mentions`);
 export const getSearchToken = () =>
   apiFetch<
     | {

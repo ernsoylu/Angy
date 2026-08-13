@@ -9,7 +9,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { getEffectiveSpaceLevel, getPrisma } from "@angy/db";
+import { getEffectiveSpaceLevel, getMentions, getPrisma } from "@angy/db";
 import { ok, satisfies, type ApiOk, type PageListItemDto } from "@angy/shared";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
 import {
@@ -107,6 +107,43 @@ export class PersonalController {
   ): Promise<ApiOk<PageListItemDto[]>> {
     const rows = await this.listFor(spaceId, req, "starred");
     return ok(rows);
+  }
+
+  /**
+   * Pages in this space that mention the caller, most recently updated first —
+   * the reader-facing half of `block_index`'s `target_user_id` rows (V2 H1).
+   *
+   * Same space-VIEW gate as the lists above, and correct for the same reason:
+   * page grants only widen the space baseline, so anyone who can read the
+   * space can read every page in it. A mention grants nothing on its own.
+   */
+  @Get("spaces/:spaceId/mentions")
+  async mentions(
+    @Param("spaceId") spaceId: string,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<PageListItemDto[]>> {
+    const prisma = getPrisma();
+    const id = BigInt(spaceId);
+    const level = await getEffectiveSpaceLevel(prisma, req.user.id, id);
+    if (!satisfies(level, "VIEW")) {
+      throw new ForbiddenException("You don't have access to this space");
+    }
+
+    const mentions = (await getMentions(prisma, req.user.id, id)).slice(0, LIST_LIMIT);
+    if (mentions.length === 0) return ok([]);
+    const pages = await prisma.page.findMany({
+      where: { id: { in: mentions.map((m) => m.pageId) } },
+      select: PAGE_SELECT,
+    });
+    const byId = new Map(pages.map((page) => [page.id, page]));
+    return ok(
+      await toListItems(
+        mentions.flatMap((mention) => {
+          const page = byId.get(mention.pageId);
+          return page ? [{ page, at: mention.updatedAt }] : [];
+        }),
+      ),
+    );
   }
 
   private async listFor(

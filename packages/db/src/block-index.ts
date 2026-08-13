@@ -95,6 +95,67 @@ export interface Backlink {
   count: number;
 }
 
+export interface Mention {
+  pageId: string;
+  spaceId: bigint;
+  title: string;
+  /** How many times this page mentions the user. */
+  count: number;
+  /** Page last-modified time — what "newest first" means here. */
+  updatedAt: Date;
+}
+
+/**
+ * Pages mentioning a user, newest first — what `target_user_id` is indexed for.
+ *
+ * Grouped by page: being named three times in one document is one thing to
+ * look at, not three. Callers must still filter by read permission; a mention
+ * does not grant access to the page it is in, and listing one the caller
+ * cannot open would disclose its title.
+ *
+ * Scoped to a space when given one, because the surfaces that show this are
+ * space-scoped routes (the same shape Recent and Starred use).
+ */
+export async function getMentions(
+  prisma: PrismaClient,
+  userId: bigint,
+  spaceId?: bigint,
+): Promise<Mention[]> {
+  const rows = await prisma.blockIndex.findMany({
+    where: {
+      targetUserId: userId,
+      kind: "MENTION",
+      page: {
+        deletedAt: null,
+        space: { deletedAt: null },
+        ...(spaceId === undefined ? {} : { spaceId }),
+      },
+    },
+    select: {
+      pageId: true,
+      page: { select: { spaceId: true, title: true, updatedAt: true } },
+    },
+  });
+
+  const grouped = new Map<string, Mention>();
+  for (const row of rows) {
+    const existing = grouped.get(row.pageId);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    grouped.set(row.pageId, {
+      pageId: row.pageId,
+      spaceId: row.page.spaceId,
+      title: row.page.title,
+      count: 1,
+      updatedAt: row.page.updatedAt,
+    });
+  }
+
+  return [...grouped.values()].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+}
+
 /**
  * Which live pages link to this one — the query the index exists for.
  *

@@ -6,8 +6,8 @@ import {
   applyDocJson,
   applyTextDiff,
   createYdocFromJson,
-  pageLinkTargets,
-  relabelPageLinks,
+  referenceTargets,
+  relabelReferences,
   TITLE_FIELD,
   ydocTitle,
   ydocToJson,
@@ -99,29 +99,44 @@ async function bootstrapTitle(document: Y.Doc, pageId: string): Promise<void> {
 }
 
 /**
- * Point this document's page-link labels at their targets' current titles.
+ * Point this document's cached labels — page-link titles and mention names —
+ * at their targets' current values.
  *
- * The label is authored into the node when the link is made and cannot follow
- * a later rename on its own. Readers never see the stale one — the projection
- * resolves labels on the way to rendered_html — but the editor renders from the
- * Y.Doc, so it does. Repairing on load is what makes that self-healing without
- * a fan-out: every document is fixed the moment somebody opens it, and one
- * nobody opens is one nobody sees a stale label in.
+ * The label is authored into the node when the reference is made and cannot
+ * follow a later rename on its own. Readers never see the stale one, because
+ * the projection resolves labels on the way to rendered_html; the editor
+ * renders from the Y.Doc, so it does. Repairing on load is what makes that
+ * self-healing without a fan-out: every document is fixed the moment somebody
+ * opens it, and one nobody opens is one nobody sees a stale label in.
  *
- * Cheap in the common case: no links means one CRDT walk and no query, and a
- * document whose labels are already right produces no Yjs update at all, so it
- * is not re-stored or checkpointed for having been opened.
+ * Cheap in the common case: no references means one CRDT walk and no query,
+ * and a document whose labels are already right produces no Yjs update at all,
+ * so it is not re-stored or checkpointed for having been opened.
  */
-async function repairPageLinkLabels(document: Y.Doc, pageId: string): Promise<void> {
-  const targets = pageLinkTargets(document);
-  if (targets.length === 0) return;
-  const pages = await getPrisma().page.findMany({
-    where: { id: { in: targets }, deletedAt: null },
-    select: { id: true, title: true },
+async function repairReferenceLabels(document: Y.Doc, pageId: string): Promise<void> {
+  const { pageIds, userIds } = referenceTargets(document);
+  if (pageIds.length === 0 && userIds.length === 0) return;
+  const prisma = getPrisma();
+  const [pages, users] = await Promise.all([
+    pageIds.length === 0
+      ? []
+      : prisma.page.findMany({
+          where: { id: { in: pageIds }, deletedAt: null },
+          select: { id: true, title: true },
+        }),
+    userIds.length === 0
+      ? []
+      : prisma.appUser.findMany({
+          where: { id: { in: userIds.map((id) => BigInt(id)) } },
+          select: { id: true, displayName: true },
+        }),
+  ]);
+  const changed = relabelReferences(document, {
+    pages: new Map(pages.map((p) => [p.id, p.title])),
+    users: new Map(users.map((u) => [u.id.toString(), u.displayName])),
   });
-  const changed = relabelPageLinks(document, new Map(pages.map((p) => [p.id, p.title])));
   if (changed > 0) {
-    console.log(`[realtime] relabelled ${changed} page link(s) on load of ${pageId}`);
+    console.log(`[realtime] relabelled ${changed} reference(s) on load of ${pageId}`);
   }
 }
 
@@ -137,16 +152,19 @@ async function repairPageLinkLabels(document: Y.Doc, pageId: string): Promise<vo
  * are repaired on their next load.
  */
 async function relabelOpenDocuments(server: Server, command: RelabelCommand): Promise<void> {
-  const titles = new Map([[command.targetPageId, command.title]]);
+  const names = {
+    pages: new Map([[command.targetPageId, command.title]]),
+    users: new Map<string, string>(),
+  };
   for (const name of [...server.hocuspocus.documents.keys()]) {
     const document = server.hocuspocus.documents.get(name);
-    if (!document || !pageLinkTargets(document).includes(command.targetPageId)) continue;
+    if (!document || !referenceTargets(document).pageIds.includes(command.targetPageId)) continue;
     // Through a direct connection, so the edit stores and broadcasts like any
     // other rather than mutating a shared document behind Hocuspocus's back.
     const connection = await server.hocuspocus.openDirectConnection(name, { name: "relabel" });
     try {
       await connection.transact((doc) => {
-        const changed = relabelPageLinks(doc, titles);
+        const changed = relabelReferences(doc, names);
         if (changed > 0) console.log(`[realtime] relabelled ${changed} link(s) in open ${name}`);
       });
     } finally {
@@ -372,7 +390,7 @@ export function buildServer(port = env.port): Server {
       // Both of these edit the doc *after* the persisted bytes are applied —
       // never instead of them. Rebuilding a document from anything but its own
       // update log forks every connected client (CLAUDE.md gotcha).
-      await repairPageLinkLabels(document, documentName);
+      await repairReferenceLabels(document, documentName);
       return document;
     },
 

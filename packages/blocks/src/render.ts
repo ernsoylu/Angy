@@ -13,7 +13,11 @@ export function extractText(doc: JSONContent): string {
 
   function walk(node: JSONContent): void {
     if (node.type === "text" && node.text) parts.push(node.text);
+    // Atoms carry their text in an attribute rather than a child text node —
+    // a page link's title, a mention's name. Search would otherwise never
+    // match the one word a reader remembers about the page.
     if (typeof node.attrs?.title === "string") parts.push(node.attrs.title);
+    if (typeof node.attrs?.label === "string") parts.push(node.attrs.label);
     for (const child of node.content ?? []) walk(child);
   }
 

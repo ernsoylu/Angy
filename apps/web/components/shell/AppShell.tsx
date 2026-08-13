@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  AtSign,
   Bell,
   Check,
   FileText,
@@ -177,6 +178,16 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
               >
                 <Star size={15} />
                 <span className={styles.treeLabel}>Starred</span>
+              </Link>
+              <Link
+                href={`/s/${space.key}/mentions`}
+                className={cx(
+                  styles.treeRow,
+                  pathname === `/s/${space.key}/mentions` && styles.treeRowActive,
+                )}
+              >
+                <AtSign size={15} />
+                <span className={styles.treeLabel}>Mentions</span>
               </Link>
               <Link
                 href={`/s/${space.key}/attachments`}

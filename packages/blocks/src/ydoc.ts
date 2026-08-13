@@ -65,51 +65,70 @@ function walkElements(node: Y.XmlFragment | Y.XmlElement, visit: (el: Y.XmlEleme
   }
 }
 
-/**
- * Page ids the document links to, read straight off the CRDT.
- *
- * Deliberately not `ydocToJson(...)` then `extractRefs(...)`: this runs on
- * every document load, and materialising the whole ProseMirror tree to answer
- * "are there any links here" costs the entire document to learn, usually, that
- * there are none.
- */
-export function pageLinkTargets(ydoc: Y.Doc): string[] {
-  const ids = new Set<string>();
-  walkElements(ydoc.getXmlFragment(YDOC_FIELD), (el) => {
-    if (el.nodeName !== "pageLink") return;
-    const pageId = el.getAttribute("pageId");
-    if (typeof pageId === "string" && pageId) ids.add(pageId);
-  });
-  return [...ids];
+/** What a document references: page ids for links, user ids for mentions. */
+export interface ReferenceTargets {
+  pageIds: string[];
+  userIds: string[];
 }
 
 /**
- * Point page-link labels in a live document at their targets' current titles.
+ * The things this document references, read straight off the CRDT.
  *
- * The authored label is a cache that goes stale on rename. The *reader* never
- * sees that, because the projection resolves labels on the way to
- * rendered_html — but the editor renders straight from the Y.Doc, so the stale
- * name survives there until the node itself is rewritten. This is that
- * rewrite, applied as an ordinary forward edit so open collaborators converge
- * on it like any other change.
+ * Deliberately not `ydocToJson(...)` then `extractRefs(...)`: this runs on
+ * every document load, and materialising the whole ProseMirror tree to answer
+ * "are there any references here" costs the entire document to learn, usually,
+ * that there are none.
+ */
+export function referenceTargets(ydoc: Y.Doc): ReferenceTargets {
+  const pageIds = new Set<string>();
+  const userIds = new Set<string>();
+  walkElements(ydoc.getXmlFragment(YDOC_FIELD), (el) => {
+    if (el.nodeName === "pageLink") {
+      const pageId = el.getAttribute("pageId");
+      if (typeof pageId === "string" && pageId) pageIds.add(pageId);
+    } else if (el.nodeName === "mention") {
+      const userId = el.getAttribute("userId");
+      if (typeof userId === "string" && userId) userIds.add(userId);
+    }
+  });
+  return { pageIds: [...pageIds], userIds: [...userIds] };
+}
+
+/** Which attribute each reference kind keeps its cached label in. */
+const LABEL_ATTR = { pageLink: "title", mention: "label" } as const;
+
+/**
+ * Point cached labels in a live document at their targets' current names.
+ *
+ * The authored label is a cache that goes stale when the target is renamed.
+ * The *reader* never sees that, because the projection resolves labels on the
+ * way to rendered_html — but the editor renders straight from the Y.Doc, so
+ * the stale name survives there until the node itself is rewritten. This is
+ * that rewrite, applied as an ordinary forward edit so open collaborators
+ * converge on it like any other change.
  *
  * Returns the number of labels changed. Zero means no attribute was touched
  * and therefore no Yjs update was produced — which is what keeps a document
  * that is already correct from being re-stored, re-projected and checkpointed
  * on every load.
  */
-export function relabelPageLinks(ydoc: Y.Doc, titles: ReadonlyMap<string, string>): number {
+export function relabelReferences(
+  ydoc: Y.Doc,
+  names: { pages: ReadonlyMap<string, string>; users: ReadonlyMap<string, string> },
+): number {
   let changed = 0;
   const apply = () => {
     walkElements(ydoc.getXmlFragment(YDOC_FIELD), (el) => {
-      if (el.nodeName !== "pageLink") return;
-      const pageId = el.getAttribute("pageId");
-      if (typeof pageId !== "string") return;
-      const title = titles.get(pageId);
-      // A target that is gone keeps the name it was linked under: a link that
-      // suddenly reads "Untitled" is worse than one naming what it pointed at.
-      if (title === undefined || title === el.getAttribute("title")) return;
-      el.setAttribute("title", title);
+      const kind = el.nodeName === "pageLink" || el.nodeName === "mention" ? el.nodeName : null;
+      if (kind === null) return;
+      const idAttr = kind === "pageLink" ? "pageId" : "userId";
+      const id = el.getAttribute(idAttr);
+      if (typeof id !== "string") return;
+      const name = (kind === "pageLink" ? names.pages : names.users).get(id);
+      // A target that is gone keeps the name it was referenced under: a link
+      // reading "Untitled" is worse than one naming what it pointed at.
+      if (name === undefined || name === el.getAttribute(LABEL_ATTR[kind])) return;
+      el.setAttribute(LABEL_ATTR[kind], name);
       changed++;
     });
   };

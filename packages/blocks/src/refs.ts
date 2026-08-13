@@ -17,8 +17,8 @@ import type { JSONContent } from "@tiptap/core";
  * editor (hard rule 2 forbids a block *relational* table; this is not one).
  */
 
-/** V1 ships `pageLink` alone; `mention`, `task` and macros land on these rows. */
-export type RefKind = "page_link";
+/** `task` and macro kinds land on these same rows as they are built. */
+export type RefKind = "page_link" | "mention";
 
 export interface DocRef {
   /** Document order of the actionable node. Part of the row's identity. */
@@ -26,16 +26,26 @@ export interface DocRef {
   kind: RefKind;
   /** Set for `page_link`; the uuid of the page being linked to. */
   targetPageId: string | null;
-  /** Set for `mention` (V2); the mentioned user's dense bigint id, as a string. */
+  /** Set for `mention`; the mentioned user's dense bigint id, as a string. */
   targetUserId: string | null;
   /**
    * Per-occurrence body — a task's text and done-state, a macro's parameters.
    *
-   * For a page link this carries `{ label }`: the title *as rendered into
-   * `rendered_html`*, not the one authored into the Y.Doc. That distinction is
-   * what makes the stale-title refresh converge — see `resolvePageLinkTitles`.
+   * For a page link or a mention this carries `{ label }`: the text *as
+   * rendered into `rendered_html`*, not the one authored into the Y.Doc. That
+   * distinction is what makes the stale-label refresh converge — see
+   * `resolveRefLabels`.
    */
   payload: Record<string, unknown> | null;
+}
+
+/**
+ * Current names for the things a document references, keyed by id: page titles
+ * for links, display names for mentions.
+ */
+export interface RefLabels {
+  pages: ReadonlyMap<string, string>;
+  users: ReadonlyMap<string, string>;
 }
 
 const isUuid = (value: unknown): value is string =>
@@ -63,25 +73,47 @@ function walk(node: JSONContent, visit: (node: JSONContent) => void): void {
 export function extractRefs(doc: JSONContent): DocRef[] {
   const refs: DocRef[] = [];
   walk(doc, (node) => {
-    if (node.type !== "pageLink") return;
-    const pageId = node.attrs?.pageId;
-    if (!isUuid(pageId)) return;
-    refs.push({
-      ord: refs.length,
-      kind: "page_link",
-      targetPageId: pageId,
-      targetUserId: null,
-      payload: { label: linkLabel(node) },
-    });
+    if (node.type === "pageLink") {
+      const pageId = node.attrs?.pageId;
+      if (!isUuid(pageId)) return;
+      refs.push({
+        ord: refs.length,
+        kind: "page_link",
+        targetPageId: pageId,
+        targetUserId: null,
+        payload: { label: nodeLabel(node) },
+      });
+      return;
+    }
+    if (node.type === "mention") {
+      const userId = node.attrs?.userId;
+      if (!isUserId(userId)) return;
+      refs.push({
+        ord: refs.length,
+        kind: "mention",
+        targetPageId: null,
+        targetUserId: userId,
+        payload: { label: nodeLabel(node) },
+      });
+    }
   });
   return refs;
 }
 
-const linkLabel = (node: JSONContent): string =>
-  (typeof node.attrs?.title === "string" && node.attrs.title.trim()) || "Untitled";
+/** Dense bigint ids arrive as decimal strings; anything else is not an identity. */
+const isUserId = (value: unknown): value is string =>
+  typeof value === "string" && /^\d+$/.test(value);
+
+/** A page link labels itself with `title`, a mention with `label`. */
+const nodeLabel = (node: JSONContent): string => {
+  const raw = node.type === "mention" ? node.attrs?.label : node.attrs?.title;
+  const fallback = node.type === "mention" ? "someone" : "Untitled";
+  return (typeof raw === "string" && raw.trim()) || fallback;
+};
 
 /**
- * Replace each page link's cached `title` with the target's current one.
+ * Replace each reference's cached label with the target's current name — page
+ * titles for links, display names for mentions.
  *
  * V1 accepted stale link labels because fixing them needs a backlink index to
  * know which documents to refresh — that index is this one. The substitution
@@ -89,26 +121,32 @@ const linkLabel = (node: JSONContent): string =>
  * authored attribute stays exactly as the editor wrote it, so nothing gives
  * `page.title` a second writer alongside `onStoreDocument`, and the static
  * renderer stays a pure JSON→HTML function that never queries a database.
+ * (Editors, which render the Y.Doc, are repaired separately by
+ * `relabelReferences`.)
  *
- * A target missing from `titles` (trashed, or gone) keeps its authored label —
- * a link that suddenly reads "Untitled" is worse than one reading the name the
- * page had when it was linked.
+ * A target missing from the maps (trashed, deactivated, gone) keeps its
+ * authored label — a reference that suddenly reads "Untitled" or "someone" is
+ * worse than one naming what it pointed at.
  *
  * Returns the same object when nothing changed, so callers can tell cheaply.
  */
-export function resolvePageLinkTitles(
-  doc: JSONContent,
-  titles: ReadonlyMap<string, string>,
-): JSONContent {
+export function resolveRefLabels(doc: JSONContent, labels: RefLabels): JSONContent {
   let changed = false;
 
   const rewrite = (node: JSONContent): JSONContent => {
     let next = node;
     if (node.type === "pageLink") {
       const pageId = node.attrs?.pageId;
-      const fresh = isUuid(pageId) ? titles.get(pageId) : undefined;
+      const fresh = isUuid(pageId) ? labels.pages.get(pageId) : undefined;
       if (fresh !== undefined && fresh !== node.attrs?.title) {
         next = { ...node, attrs: { ...node.attrs, title: fresh } };
+        changed = true;
+      }
+    } else if (node.type === "mention") {
+      const userId = node.attrs?.userId;
+      const fresh = isUserId(userId) ? labels.users.get(userId) : undefined;
+      if (fresh !== undefined && fresh !== node.attrs?.label) {
+        next = { ...node, attrs: { ...node.attrs, label: fresh } };
         changed = true;
       }
     }

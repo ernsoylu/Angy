@@ -14,6 +14,7 @@ import { CollaborativeTitle } from "./CollaborativeTitle";
 import { TableToolbar } from "./TableToolbar";
 import { IMAGE_REQUEST_EVENT, PAGE_REQUEST_EVENT } from "./slash-items";
 import { PageLinkDialog } from "../pageops/PageLinkDialog";
+import { MentionCommand } from "./MentionMenu";
 import { SlashCommand } from "./SlashMenu";
 import styles from "./editor.module.css";
 
@@ -85,6 +86,7 @@ export function Editor({
     extensions: [
       ...editorExtensions(),
       SlashCommand,
+      MentionCommand,
       Collaboration.configure({ document: provider.document }),
       CollaborationCaret.configure({ provider, user: { name: user.name, color } }),
     ],

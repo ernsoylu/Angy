@@ -3,6 +3,7 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { Image } from "@tiptap/extension-image";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { Callout } from "./callout.js";
+import { Mention } from "./mention.js";
 import { PageLink } from "./page-link.js";
 
 /**
@@ -25,6 +26,7 @@ function makeExtensions(options: { undoRedo: boolean }): Extensions {
     TableCell,
     Callout,
     PageLink,
+    Mention,
   ];
 }
 

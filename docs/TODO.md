@@ -168,4 +168,15 @@ all four consumers.
   *after* the read filter so the overflow never includes pages the reader
   cannot open. `filterReadablePages` resolves the whole candidate set in one
   query — a round trip per candidate is what makes a list surface slow.
-- [ ] **Mentions and tasks** on the same rows.
+- [x] **Mentions** *(2026-08-13)* — a `mention` node (inline atom), an `@`
+  picker beside the slash palette, `MENTION` rows keyed on `target_user_id`,
+  and a space-scoped Mentions list reusing the Recent/Starred component. The
+  cached display name is repaired by the same two paths page-link titles are,
+  because a second cached label would otherwise reintroduce the staleness bug
+  that had just been fixed.
+- [ ] **Tasks** on the same rows — the remaining `RefKind`. `payload` already
+  exists to hold a task's text and done-state; that is why occurrence
+  granularity was chosen over one row per (page, entity).
+- [ ] **Workspace-wide mention inbox + notifications** — the roadmap's item.
+  The space-scoped list is deliberately not it: an inbox needs notifications
+  behind it to be worth opening.

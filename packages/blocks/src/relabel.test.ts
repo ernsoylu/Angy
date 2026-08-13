@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import type { JSONContent } from "@tiptap/core";
 import { extractRefs } from "./refs.js";
-import { createYdocFromJson, pageLinkTargets, relabelPageLinks, ydocToJson } from "./ydoc.js";
+import {
+  createYdocFromJson,
+  referenceTargets,
+  relabelReferences,
+  ydocToJson,
+} from "./ydoc.js";
 
 /**
  * Relabelling links inside a live Y.Doc — the editor-side half of the
@@ -26,10 +31,10 @@ const docWith = (...content: JSONContent[]): JSONContent => ({
 const labels = (ydoc: Y.Doc) =>
   extractRefs(ydocToJson(ydoc)).map((ref) => ref.payload?.label);
 
-describe("pageLinkTargets", () => {
+describe("referenceTargets", () => {
   it("finds every distinct target without materialising the document", () => {
     const ydoc = createYdocFromJson(docWith(link(ALPHA, "A"), link(BETA, "B"), link(ALPHA, "A")));
-    expect(pageLinkTargets(ydoc).sort()).toEqual([ALPHA, BETA].sort());
+    expect(referenceTargets(ydoc).pageIds.sort()).toEqual([ALPHA, BETA].sort());
     ydoc.destroy();
   });
 
@@ -37,21 +42,35 @@ describe("pageLinkTargets", () => {
     const ydoc = createYdocFromJson(
       docWith({ type: "callout", attrs: { tone: "info" }, content: [link(BETA, "Runbook")] }),
     );
-    expect(pageLinkTargets(ydoc)).toEqual([BETA]);
+    expect(referenceTargets(ydoc).pageIds).toEqual([BETA]);
     ydoc.destroy();
   });
 
   it("is empty for a document with no links", () => {
     const ydoc = createYdocFromJson(docWith());
-    expect(pageLinkTargets(ydoc)).toEqual([]);
+    expect(referenceTargets(ydoc).pageIds).toEqual([]);
+    ydoc.destroy();
+  });
+
+  it("separates mentioned users from linked pages", () => {
+    const ydoc = createYdocFromJson(
+      docWith(link(ALPHA, "Architecture"), {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "ask " },
+          { type: "mention", attrs: { userId: "7", label: "Ada" } },
+        ],
+      }),
+    );
+    expect(referenceTargets(ydoc)).toEqual({ pageIds: [ALPHA], userIds: ["7"] });
     ydoc.destroy();
   });
 });
 
-describe("relabelPageLinks", () => {
+describe("relabelReferences", () => {
   it("rewrites the label to the target's current title", () => {
     const ydoc = createYdocFromJson(docWith(link(ALPHA, "Old name")));
-    expect(relabelPageLinks(ydoc, new Map([[ALPHA, "New name"]]))).toBe(1);
+    expect(relabelReferences(ydoc, { pages: new Map([[ALPHA, "New name"]]), users: new Map() })).toBe(1);
     expect(labels(ydoc)).toEqual(["New name"]);
     ydoc.destroy();
   });
@@ -64,14 +83,14 @@ describe("relabelPageLinks", () => {
         content: [link(ALPHA, "Old")],
       }),
     );
-    expect(relabelPageLinks(ydoc, new Map([[ALPHA, "Fresh"]]))).toBe(2);
+    expect(relabelReferences(ydoc, { pages: new Map([[ALPHA, "Fresh"]]), users: new Map() })).toBe(2);
     expect(labels(ydoc)).toEqual(["Fresh", "Fresh"]);
     ydoc.destroy();
   });
 
   it("leaves links to other pages alone", () => {
     const ydoc = createYdocFromJson(docWith(link(ALPHA, "Alpha"), link(BETA, "Beta")));
-    relabelPageLinks(ydoc, new Map([[ALPHA, "Alpha Renamed"]]));
+    relabelReferences(ydoc, { pages: new Map([[ALPHA, "Alpha Renamed"]]), users: new Map() });
     expect(labels(ydoc)).toEqual(["Alpha Renamed", "Beta"]);
     ydoc.destroy();
   });
@@ -80,7 +99,7 @@ describe("relabelPageLinks", () => {
     // A trashed or deleted target: a link reading its last known name beats one
     // reading "Untitled".
     const ydoc = createYdocFromJson(docWith(link(ALPHA, "Deleted page")));
-    expect(relabelPageLinks(ydoc, new Map())).toBe(0);
+    expect(relabelReferences(ydoc, { pages: new Map(), users: new Map() })).toBe(0);
     expect(labels(ydoc)).toEqual(["Deleted page"]);
     ydoc.destroy();
   });
@@ -94,7 +113,7 @@ describe("relabelPageLinks", () => {
 
     let updates = 0;
     ydoc.on("update", () => updates++);
-    expect(relabelPageLinks(ydoc, new Map([[ALPHA, "Architecture"]]))).toBe(0);
+    expect(relabelReferences(ydoc, { pages: new Map([[ALPHA, "Architecture"]]), users: new Map() })).toBe(0);
 
     expect(updates).toBe(0);
     expect(Y.encodeStateVector(ydoc)).toEqual(before);
@@ -105,9 +124,42 @@ describe("relabelPageLinks", () => {
     const ydoc = createYdocFromJson(docWith(link(ALPHA, "Old"), link(ALPHA, "Old")));
     let updates = 0;
     ydoc.on("update", () => updates++);
-    relabelPageLinks(ydoc, new Map([[ALPHA, "New"]]));
+    relabelReferences(ydoc, { pages: new Map([[ALPHA, "New"]]), users: new Map() });
     // Peers see a single relabel rather than the document changing twice.
     expect(updates).toBe(1);
+    ydoc.destroy();
+  });
+
+  it("relabels mentions the same way, from the users map", () => {
+    const ydoc = createYdocFromJson(
+      docWith({
+        type: "paragraph",
+        content: [{ type: "mention", attrs: { userId: "7", label: "A. Lovelace" } }],
+      }),
+    );
+    expect(relabelReferences(ydoc, { pages: new Map(), users: new Map([["7", "Ada Lovelace"]]) }))
+      .toBe(1);
+    expect(labels(ydoc)).toEqual(["Ada Lovelace"]);
+    ydoc.destroy();
+  });
+
+  it("reads each kind's label from its own map", () => {
+    const ydoc = createYdocFromJson(
+      docWith(link(ALPHA, "Architecture"), {
+        type: "paragraph",
+        content: [{ type: "mention", attrs: { userId: "7", label: "Ada" } }],
+      }),
+    );
+    // "7" is present in *both* maps: only the node kind decides which one is
+    // consulted, so crossing them would label the mention "WRONG".
+    relabelReferences(ydoc, {
+      pages: new Map([
+        [ALPHA, "Renamed Page"],
+        ["7", "WRONG"],
+      ]),
+      users: new Map([["7", "Ada Lovelace"]]),
+    });
+    expect(labels(ydoc)).toEqual(["Renamed Page", "Ada Lovelace"]);
     ydoc.destroy();
   });
 
@@ -119,7 +171,7 @@ describe("relabelPageLinks", () => {
     const relabelUpdate = (() => {
       let captured: Uint8Array | null = null;
       server.once("update", (u: Uint8Array) => (captured = u));
-      relabelPageLinks(server, new Map([[ALPHA, "New"]]));
+      relabelReferences(server, { pages: new Map([[ALPHA, "New"]]), users: new Map() });
       return captured!;
     })();
 
