@@ -264,6 +264,22 @@ export const backlinkSchema = z.object({
 });
 export type BacklinkDto = z.infer<typeof backlinkSchema>;
 
+/**
+ * A to-do from somewhere in the space (V2 H1) — the one `block_index` consumer
+ * that reads a row's body rather than what it points at.
+ */
+export const taskSchema = z.object({
+  pageId: z.uuid(),
+  pageTitle: z.string(),
+  /** Document order within its page; a board reads in the page's own order. */
+  ord: z.number().int(),
+  text: z.string(),
+  done: z.boolean(),
+  /** Display name of the first person named in the task, if any. */
+  assigneeName: z.string().nullable(),
+});
+export type TaskDto = z.infer<typeof taskSchema>;
+
 export const trashItemSchema = z.object({
   id: z.uuid(),
   title: z.string(),

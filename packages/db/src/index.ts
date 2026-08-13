@@ -6,11 +6,14 @@ export {
   findStaleReferrers,
   getBacklinks,
   getMentions,
+  getTasks,
   refLabel,
   replaceBlockIndex,
+  taskDone,
   type Backlink,
   type BlockRefInput,
   type Mention,
+  type Task,
 } from "./block-index.js";
 export { getPrisma } from "./client.js";
 export {

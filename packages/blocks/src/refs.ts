@@ -17,8 +17,8 @@ import type { JSONContent } from "@tiptap/core";
  * editor (hard rule 2 forbids a block *relational* table; this is not one).
  */
 
-/** `task` and macro kinds land on these same rows as they are built. */
-export type RefKind = "page_link" | "mention";
+/** Macro kinds land on these same rows as they are built. */
+export type RefKind = "page_link" | "mention" | "task";
 
 export interface DocRef {
   /** Document order of the actionable node. Part of the row's identity. */
@@ -95,9 +95,59 @@ export function extractRefs(doc: JSONContent): DocRef[] {
         targetUserId: userId,
         payload: { label: nodeLabel(node) },
       });
+      return;
+    }
+    if (node.type === "taskItem") {
+      refs.push({
+        ord: refs.length,
+        kind: "task",
+        targetPageId: null,
+        // The first person named in the task is its assignee, which is what
+        // makes "my tasks" an indexed lookup rather than a scan. Everyone else
+        // named still gets their own mention row, so nobody is dropped.
+        targetUserId: firstMentionedUser(node),
+        payload: { label: taskText(node), done: node.attrs?.checked === true },
+      });
     }
   });
   return refs;
+}
+
+/**
+ * A task's own text, excluding any nested sub-tasks.
+ *
+ * Without that exclusion a parent would carry every descendant's text as its
+ * own, and a board would show the same words on several rows.
+ */
+function taskText(node: JSONContent): string {
+  const parts: string[] = [];
+  const collect = (current: JSONContent): void => {
+    if (current !== node && current.type === "taskList") return;
+    if (current.type === "text" && current.text) parts.push(current.text);
+    if (current !== node && current.type === "mention") {
+      parts.push(`@${nodeLabel(current)}`);
+      return;
+    }
+    for (const child of current.content ?? []) collect(child);
+  };
+  collect(node);
+  return parts.join("").replace(/\s+/g, " ").trim();
+}
+
+/** The first mention inside a task, ignoring nested sub-tasks. */
+function firstMentionedUser(node: JSONContent): string | null {
+  let found: string | null = null;
+  const search = (current: JSONContent): void => {
+    if (found !== null) return;
+    if (current !== node && current.type === "taskList") return;
+    if (current.type === "mention" && isUserId(current.attrs?.userId)) {
+      found = current.attrs.userId as string;
+      return;
+    }
+    for (const child of current.content ?? []) search(child);
+  };
+  search(node);
+  return found;
 }
 
 /** Dense bigint ids arrive as decimal strings; anything else is not an identity. */

@@ -304,9 +304,22 @@ Build order within the wave:
    `ord` is one document-order sequence across kinds, not one per kind: it is
    half the primary key, so per-kind numbering would collide.
 
-4. **Tasks** — the remaining kind. `payload` already exists to carry a task's
-   text and done-state; that is precisely why occurrence granularity was chosen
-   over one row per (page, entity) at the gate.
+4. ✅ **Tasks** *(2026-08-13)* — the kind that retroactively justifies the
+   gate's answer. A to-do is the one consumer that reads a row's *body* rather
+   than what it points at, so under the rejected (page, entity) shape two
+   to-dos on a page would have been one row with nowhere to put either text or
+   done-state. `payload` carries `{label, done}`; the board is space-scoped and
+   read-only, because a checkbox there would have to write back into the Y.Doc
+   and making the projection an edit target is what hard rule 2 forbids.
+
+   Assignment reuses `target_user_id` rather than adding a column: the first
+   person named inside a task is its assignee, so "assigned to me" is an
+   indexed lookup. Everyone else named still gets their own MENTION row, so
+   nothing is lost — and `kind` is what keeps the two queries apart, since both
+   populate the same column.
+
+**H1 is complete**: three kinds indexed, four consumers built. What remains in
+V2 is the adoption path (H2) and the workspace-wide mention inbox (H3).
 
 **Hard rule it must not break:** rule 2 forbids a block *relational* table.
 `block_index` is a projection — derived, disposable, rebuildable from the

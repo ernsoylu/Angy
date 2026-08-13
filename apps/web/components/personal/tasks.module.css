@@ -1,0 +1,98 @@
+/* Tasks board (V2 H1). No frontend.pen frame specifies it, so the metrics come
+   from the sibling list surfaces (Recent/Starred) and the design system's
+   segmented-control treatment. */
+
+.filters {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 20px;
+}
+
+.filter {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.filter:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.filterActive {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.group {
+  margin-bottom: 22px;
+}
+
+.groupTitle {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.groupTitle:hover {
+  color: var(--text);
+}
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row-h, 36px);
+  padding: 0 8px;
+  margin: 0 -8px;
+  border-radius: var(--r-btn);
+  color: var(--text);
+  font-size: var(--row-font, 13.5px);
+}
+
+.task:hover {
+  background: var(--surface-hover);
+}
+
+.box {
+  flex: none;
+  color: var(--text-3);
+}
+
+.boxDone {
+  flex: none;
+  color: var(--sage);
+}
+
+/* The text takes the room and truncates last — it is the row's identity. */
+.text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.textDone {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+}

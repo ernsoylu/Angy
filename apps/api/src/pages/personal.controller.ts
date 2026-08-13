@@ -6,11 +6,18 @@ import {
   NotFoundException,
   Param,
   Put,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { getEffectiveSpaceLevel, getMentions, getPrisma } from "@angy/db";
-import { ok, satisfies, type ApiOk, type PageListItemDto } from "@angy/shared";
+import { getEffectiveSpaceLevel, getMentions, getPrisma, getTasks } from "@angy/db";
+import {
+  ok,
+  satisfies,
+  type ApiOk,
+  type PageListItemDto,
+  type TaskDto,
+} from "@angy/shared";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
 import {
   PagePermissionGuard,
@@ -18,6 +25,8 @@ import {
 } from "../permissions/page-permission.guard";
 
 const LIST_LIMIT = 20;
+/** A board is for reading, not for paging through a backlog. */
+const TASK_LIMIT = 100;
 
 type PageRow = {
   id: string;
@@ -143,6 +152,56 @@ export class PersonalController {
           return page ? [{ page, at: mention.updatedAt }] : [];
         }),
       ),
+    );
+  }
+
+  /**
+   * Open to-dos across the space — the tasks board (V2 H1).
+   *
+   * `mine=1` narrows to tasks naming the caller, which is an indexed lookup
+   * because the extractor puts the first person named in a task into the same
+   * `target_user_id` column mentions use.
+   *
+   * Space VIEW is the gate, as with every list here: page grants only widen
+   * the baseline, so anyone who can read the space can read all of it.
+   */
+  @Get("spaces/:spaceId/tasks")
+  async tasks(
+    @Param("spaceId") spaceId: string,
+    @Query("mine") mine: string | undefined,
+    @Query("all") all: string | undefined,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<TaskDto[]>> {
+    const prisma = getPrisma();
+    const id = BigInt(spaceId);
+    const level = await getEffectiveSpaceLevel(prisma, req.user.id, id);
+    if (!satisfies(level, "VIEW")) {
+      throw new ForbiddenException("You don't have access to this space");
+    }
+
+    const tasks = (
+      await getTasks(prisma, id, {
+        openOnly: all !== "1",
+        ...(mine === "1" ? { assigneeId: req.user.id } : {}),
+      })
+    ).slice(0, TASK_LIMIT);
+
+    const assignees = [...new Set(tasks.flatMap((t) => (t.assigneeId ? [t.assigneeId] : [])))];
+    const users =
+      assignees.length === 0
+        ? []
+        : await prisma.appUser.findMany({ where: { id: { in: assignees } } });
+    const nameOf = new Map(users.map((u) => [u.id.toString(), u.displayName]));
+
+    return ok(
+      tasks.map((task) => ({
+        pageId: task.pageId,
+        pageTitle: task.pageTitle,
+        ord: task.ord,
+        text: task.text,
+        done: task.done,
+        assigneeName: task.assigneeId ? (nameOf.get(task.assigneeId.toString()) ?? null) : null,
+      })),
     );
   }
 

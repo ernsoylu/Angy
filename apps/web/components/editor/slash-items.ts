@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
   Info,
   List,
+  ListChecks,
   ListOrdered,
   Minus,
   FileText,
@@ -93,6 +94,14 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: "numbered ordered list ol",
     command: (editor, range) =>
       editor.chain().focus().deleteRange(range).toggleList("orderedList", "listItem").run(),
+  },
+  {
+    title: "To-do list",
+    description: "Checkboxes the tasks board can find",
+    icon: ListChecks,
+    keywords: "todo task checkbox checklist action item",
+    command: (editor, range) =>
+      editor.chain().focus().deleteRange(range).toggleList("taskList", "taskItem").run(),
   },
   {
     title: "Code block",

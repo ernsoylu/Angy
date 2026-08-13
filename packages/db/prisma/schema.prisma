@@ -36,6 +36,7 @@ enum SpaceVisibility {
 enum BlockRefKind {
   PAGE_LINK
   MENTION
+  TASK
 
   @@map("block_ref_kind")
 }

@@ -126,14 +126,14 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **Page links are named at creation time**, because the node is an atom — its label cannot be edited in place, and letting the parent document write it would give `page.title` a second writer alongside `onStoreDocument`.
 - **Page links (`pageLink`) resolve through `/p/{pageId}`, never `/s/{key}/{id}`** — a space key baked into a link goes stale the moment the page moves. The cached `title` attribute is repaired in **two** places, because the reader and the editor render from different sources. Readers: `resolvePageLinkTitles` substitutes the target's current title before `rendered_html`/`text_extract` are generated, so the static renderer stays a pure JSON→HTML function and `document_json` keeps the authored label. Editors render the Y.Doc, so the node itself is rewritten — `relabelPageLinks` on `onLoadDocument` (self-healing, and the only thing that fixes links authored before the rename), plus a `relabel` doc command for documents already open. Neither writes `page.title`; `onStoreDocument` stays its only writer.
 - **A rename must never fan out over the link graph.** The `relabel` command names the renamed *page*, and realtime intersects it with its open documents — same shape as space-scoped permission events, for the same reason: a hub page is linked from thousands of documents but only a handful are open. Loading each referrer to rewrite an attribute would turn one rename into a storm of S3 reads, revision checkpoints and projection rebuilds. Closed documents need nothing: their readers are already correct, and the doc is repaired on next load. `relabelPageLinks` returning 0 must produce **no** Yjs update, or merely opening a page re-stores and checkpoints it.
-- **`block_index` is a projection, never a block table** (hard rule 2) — one row per *actionable* node (page links and mentions today; tasks/macros next), written only by `rebuildProjection` and rebuildable from the Y.Doc at any time. Each row records the label **as rendered**, and a rename only re-projects referrers whose recorded label differs: refreshing them unconditionally cascades through the link graph and mutual links never settle. `ord` is a single document-order sequence across kinds — it is half the primary key, so per-kind numbering would collide.
+- **`block_index` is a projection, never a block table** (hard rule 2) — one row per *actionable* node (page links, mentions, tasks; macros next), written only by `rebuildProjection` and rebuildable from the Y.Doc at any time. Each row records the label **as rendered**, and a rename only re-projects referrers whose recorded label differs: refreshing them unconditionally cascades through the link graph and mutual links never settle. `ord` is a single document-order sequence across kinds — it is half the primary key, so per-kind numbering would collide.
 - **Two `@tiptap/suggestion` plugins need distinct `pluginKey`s.** Every instance defaults to the same key and ProseMirror refuses two keyed plugins sharing one, which throws during editor construction — so adding a second menu (`@` beside `/`) takes the *whole editor* down, not just the new menu. The symptom is that `.tiptap[contenteditable]` never mounts.
 - **The page title is a `title` Y.Text in the page's own Y.Doc** (`TITLE_FIELD`), not a plain column write: `onStoreDocument` copies it into `page.title`, so anything renaming a page must go through the doc (`rename` doc command) or the next store overwrites it. Never persist an empty title — reseed the doc from the row instead.
 
 ## V1 Scope (Ship the Core Editing Experience)
 
 - Spaces + pages + page closure table
-- Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote, page link (`/page` links an existing page or creates a named child)
+- Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote, page link (`/page` links an existing page or creates a named child). V2 adds `@` mentions and `/todo` task lists.
 - Yjs + Hocuspocus real-time collab, Y.Doc in S3, compaction worker
 - SSR read path via @tiptap/static-renderer; edit-on-click mount
 - Page-level permissions + Redis bitfield cache + space baseline
@@ -148,7 +148,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 - SCIM provisioning
 - GraphQL API
-- block_index — table, worker, backlinks (query + UI) and **`@` mentions** are built (V2 H1); still open is the tasks board, plus the workspace-wide mention inbox and notifications
+- block_index — **H1 is complete** (V2): table, worker, backlinks, `@` mentions and the tasks board. Still open: the workspace-wide mention inbox and notifications
 - Confluence-style macros (Jira, TOC, decision, meeting notes)
 - Extension manager / runtime block-type registry (XWiki-style plugins)
 - Federated search connectors (Slack, Drive, Jira)

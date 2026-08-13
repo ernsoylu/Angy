@@ -10,6 +10,7 @@ import type {
   SpaceDto,
   SpaceHomeDto,
   SpaceMemberDto,
+  TaskDto,
   TrashItemDto,
   UserDto,
 } from "@angy/shared";
@@ -55,6 +56,8 @@ export const getStarredPages = (spaceId: string) =>
   apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/starred`);
 export const getMentionedPages = (spaceId: string) =>
   apiFetch<PageListItemDto[]>(`/spaces/${spaceId}/mentions`);
+export const getSpaceTasks = (spaceId: string) =>
+  apiFetch<TaskDto[]>(`/spaces/${spaceId}/tasks`);
 export const getSearchToken = () =>
   apiFetch<
     | {

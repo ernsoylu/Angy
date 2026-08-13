@@ -116,6 +116,132 @@ describe("extractRefs", () => {
     ]);
   });
 
+  it("carries a task's text and done-state in the payload", () => {
+    // The rejected (page, entity) shape had nowhere to put either of these,
+    // which is why granularity is per actionable node.
+    const refs = extractRefs(
+      doc({
+        type: "taskList",
+        content: [
+          {
+            type: "taskItem",
+            attrs: { checked: false },
+            content: [{ type: "paragraph", content: [{ type: "text", text: "Ship the thing" }] }],
+          },
+          {
+            type: "taskItem",
+            attrs: { checked: true },
+            content: [{ type: "paragraph", content: [{ type: "text", text: "Write the ADR" }] }],
+          },
+        ],
+      }),
+    );
+
+    expect(refs.map((r) => r.payload)).toEqual([
+      { label: "Ship the thing", done: false },
+      { label: "Write the ADR", done: true },
+    ]);
+    expect(refs.every((r) => r.kind === "task")).toBe(true);
+  });
+
+  it("assigns a task to the first person named in it", () => {
+    const refs = extractRefs(
+      doc({
+        type: "taskList",
+        content: [
+          {
+            type: "taskItem",
+            attrs: { checked: false },
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  { type: "text", text: "Review " },
+                  { type: "mention", attrs: { userId: "4", label: "Ada" } },
+                  { type: "text", text: " and " },
+                  { type: "mention", attrs: { userId: "5", label: "Eren" } },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const task = refs.find((r) => r.kind === "task");
+    expect(task?.targetUserId).toBe("4");
+    expect(task?.payload?.label).toBe("Review @Ada and @Eren");
+    // Everyone named still gets their own row, so nobody is dropped.
+    expect(refs.filter((r) => r.kind === "mention").map((r) => r.targetUserId)).toEqual(["4", "5"]);
+  });
+
+  it("does not fold a sub-task's text into its parent", () => {
+    const refs = extractRefs(
+      doc({
+        type: "taskList",
+        content: [
+          {
+            type: "taskItem",
+            attrs: { checked: false },
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "Parent" }] },
+              {
+                type: "taskList",
+                content: [
+                  {
+                    type: "taskItem",
+                    attrs: { checked: false },
+                    content: [
+                      { type: "paragraph", content: [{ type: "text", text: "Child" }] },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(refs.map((r) => r.payload?.label)).toEqual(["Parent", "Child"]);
+  });
+
+  it("does not inherit a sub-task's assignee", () => {
+    const refs = extractRefs(
+      doc({
+        type: "taskList",
+        content: [
+          {
+            type: "taskItem",
+            attrs: { checked: false },
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "Parent" }] },
+              {
+                type: "taskList",
+                content: [
+                  {
+                    type: "taskItem",
+                    attrs: { checked: false },
+                    content: [
+                      {
+                        type: "paragraph",
+                        content: [{ type: "mention", attrs: { userId: "4", label: "Ada" } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const tasks = refs.filter((r) => r.kind === "task");
+    expect(tasks[0]?.targetUserId).toBeNull();
+    expect(tasks[1]?.targetUserId).toBe("4");
+  });
+
   it("skips a mention with no usable user id", () => {
     const refs = extractRefs(
       doc({

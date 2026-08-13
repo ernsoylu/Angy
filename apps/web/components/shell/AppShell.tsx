@@ -11,6 +11,7 @@ import {
   FileText,
   Home,
   History,
+  ListChecks,
   Menu,
   Paperclip,
   Pencil,
@@ -188,6 +189,16 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
               >
                 <AtSign size={15} />
                 <span className={styles.treeLabel}>Mentions</span>
+              </Link>
+              <Link
+                href={`/s/${space.key}/tasks`}
+                className={cx(
+                  styles.treeRow,
+                  pathname === `/s/${space.key}/tasks` && styles.treeRowActive,
+                )}
+              >
+                <ListChecks size={15} />
+                <span className={styles.treeLabel}>Tasks</span>
               </Link>
               <Link
                 href={`/s/${space.key}/attachments`}

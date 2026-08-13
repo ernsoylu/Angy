@@ -4,6 +4,7 @@ import {
   findStaleReferrers,
   getBacklinks,
   getMentions,
+  getTasks,
   refLabel,
   replaceBlockIndex,
   type BlockRefInput,
@@ -209,11 +210,93 @@ describe("getMentions", () => {
     await prisma.page.update({ where: { id: mentioning }, data: { deletedAt: null } });
   });
 
+  it("does not return tasks assigned to the user as mentions", async () => {
+    // A task carries its assignee in target_user_id too; only `kind` separates
+    // them, so a mentions query keyed on the column alone would return to-dos.
+    const board = await newPage("Has Tasks", "has-tasks");
+    await replaceBlockIndex(prisma, board, [
+      { ord: 0, kind: "TASK", targetPageId: null, targetUserId: userId.toString(), payload: { label: "Do it", done: false } },
+    ]);
+    expect((await getMentions(prisma, userId)).map((m) => m.pageId)).not.toContain(board);
+  });
+
   it("does not confuse a mention with a link to the same numeric id", async () => {
     // target_page_id and target_user_id are separate columns; a query keyed on
     // the wrong one would return page links as mentions.
     const linker = await newPage("Just A Link", "just-a-link");
     await replaceBlockIndex(prisma, linker, [linkTo(target, "Architecture")]);
     expect((await getMentions(prisma, userId)).map((m) => m.pageId)).not.toContain(linker);
+  });
+});
+
+describe("getTasks", () => {
+  const task = (
+    ord: number,
+    text: string,
+    done: boolean,
+    assignee?: bigint,
+  ): BlockRefInput => ({
+    ord,
+    kind: "TASK",
+    targetPageId: null,
+    targetUserId: assignee ? assignee.toString() : null,
+    payload: { label: text, done },
+  });
+
+  let board: string;
+
+  beforeAll(async () => {
+    board = await newPage("Sprint Board", "sprint-board");
+    await replaceBlockIndex(prisma, board, [
+      task(0, "Open one", false),
+      task(1, "Done one", true),
+      task(2, "Mine", false, userId),
+    ]);
+  });
+
+  it("returns open tasks only by default", async () => {
+    const tasks = await getTasks(prisma, spaceId, { openOnly: true });
+    const texts = tasks.filter((t) => t.pageId === board).map((t) => t.text);
+    expect(texts).toEqual(["Open one", "Mine"]);
+  });
+
+  it("includes finished ones when asked", async () => {
+    const tasks = await getTasks(prisma, spaceId);
+    expect(tasks.filter((t) => t.pageId === board).map((t) => t.text)).toContain("Done one");
+  });
+
+  it("keeps each page's tasks in document order", async () => {
+    const tasks = (await getTasks(prisma, spaceId)).filter((t) => t.pageId === board);
+    expect(tasks.map((t) => t.ord)).toEqual([0, 1, 2]);
+  });
+
+  it("narrows to one assignee", async () => {
+    const mine = await getTasks(prisma, spaceId, { assigneeId: userId });
+    // Scoped to this board: earlier specs leave their own assigned tasks in
+    // the shared space, and this assertion is about the filter, not the space.
+    expect(mine.filter((t) => t.pageId === board).map((t) => t.text)).toEqual(["Mine"]);
+    expect(mine.every((t) => t.assigneeId === userId)).toBe(true);
+    // The unassigned ones on the same page are excluded.
+    expect(mine.map((t) => t.text)).not.toContain("Open one");
+  });
+
+  it("carries the page it came from, so a board can link back", async () => {
+    const tasks = (await getTasks(prisma, spaceId)).filter((t) => t.pageId === board);
+    expect(tasks[0]?.pageTitle).toBe("Sprint Board");
+  });
+
+  it("omits trashed pages", async () => {
+    await prisma.page.update({ where: { id: board }, data: { deletedAt: new Date() } });
+    expect((await getTasks(prisma, spaceId)).map((t) => t.pageId)).not.toContain(board);
+    await prisma.page.update({ where: { id: board }, data: { deletedAt: null } });
+  });
+
+  it("does not return links or mentions as tasks", async () => {
+    const mixed = await newPage("Mixed", "mixed");
+    await replaceBlockIndex(prisma, mixed, [
+      linkTo(target, "Architecture"),
+      { ord: 1, kind: "MENTION", targetPageId: null, targetUserId: userId.toString(), payload: { label: "Linker" } },
+    ]);
+    expect((await getTasks(prisma, spaceId)).map((t) => t.pageId)).not.toContain(mixed);
   });
 });

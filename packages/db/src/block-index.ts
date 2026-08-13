@@ -156,6 +156,78 @@ export async function getMentions(
   return [...grouped.values()].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
+export interface Task {
+  pageId: string;
+  pageTitle: string;
+  spaceId: bigint;
+  /** Document order within its page, so a board reads like the page does. */
+  ord: number;
+  text: string;
+  done: boolean;
+  /** First person named in the task, if any. */
+  assigneeId: bigint | null;
+}
+
+/**
+ * Tasks across a space — the board's query.
+ *
+ * This is the one consumer that reads a `payload` rather than a target, and
+ * the reason `block_index` is one row per actionable *node*: collapsing to one
+ * row per (page, entity) would have left two tasks on a page indistinguishable
+ * and their text nowhere to live.
+ *
+ * `openOnly` filters in SQL rather than in the caller because a page of
+ * finished work is the common case in a wiki — a board that fetched every
+ * checkbox ever ticked to display none of them would scale with history
+ * instead of with what is left to do.
+ */
+export async function getTasks(
+  prisma: PrismaClient,
+  spaceId: bigint,
+  options: { openOnly?: boolean; assigneeId?: bigint } = {},
+): Promise<Task[]> {
+  const rows = await prisma.blockIndex.findMany({
+    where: {
+      kind: "TASK",
+      page: { spaceId, deletedAt: null, space: { deletedAt: null } },
+      ...(options.assigneeId === undefined ? {} : { targetUserId: options.assigneeId }),
+      ...(options.openOnly ? { payload: { path: ["done"], equals: false } } : {}),
+    },
+    orderBy: [{ pageId: "asc" }, { ord: "asc" }],
+    select: {
+      pageId: true,
+      ord: true,
+      payload: true,
+      targetUserId: true,
+      page: { select: { title: true, spaceId: true, updatedAt: true } },
+    },
+  });
+
+  return rows
+    .map((row) => ({
+      pageId: row.pageId,
+      pageTitle: row.page.title,
+      spaceId: row.page.spaceId,
+      ord: row.ord,
+      text: refLabel(row.payload) ?? "",
+      done: taskDone(row.payload),
+      assigneeId: row.targetUserId,
+      updatedAt: row.page.updatedAt,
+    }))
+    // Most recently touched page first, but each page's tasks in document
+    // order — a board that scrambled them would not match the page it came from.
+    .sort((a, b) =>
+      a.pageId === b.pageId ? a.ord - b.ord : b.updatedAt.getTime() - a.updatedAt.getTime(),
+    )
+    .map(({ updatedAt: _updatedAt, ...task }) => task);
+}
+
+/** Whether a task row is ticked. Absent means not done — never "unknown". */
+export function taskDone(payload: Prisma.JsonValue | null): boolean {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) return false;
+  return (payload as Record<string, unknown>).done === true;
+}
+
 /**
  * Which live pages link to this one — the query the index exists for.
  *

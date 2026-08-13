@@ -32,6 +32,7 @@ export const ydocKey = (pageId: string) => `ydoc/${pageId}`;
 const REF_KIND: Record<RefKind, BlockRefKind> = {
   page_link: "PAGE_LINK",
   mention: "MENTION",
+  task: "TASK",
 };
 
 /** Work a rebuild created for *other* pages: they name this one by its old title. */

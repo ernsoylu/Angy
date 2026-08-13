@@ -174,9 +174,16 @@ all four consumers.
   cached display name is repaired by the same two paths page-link titles are,
   because a second cached label would otherwise reintroduce the staleness bug
   that had just been fixed.
-- [ ] **Tasks** on the same rows — the remaining `RefKind`. `payload` already
-  exists to hold a task's text and done-state; that is why occurrence
-  granularity was chosen over one row per (page, entity).
+- [x] **Tasks** *(2026-08-13)* — `/todo` checklists, `TASK` rows carrying
+  `{label, done}`, and a space-scoped board grouped by page. The board is
+  read-only on purpose: a checkbox there would have to write back into the
+  page's Y.Doc, and making the projection the thing an edit writes to is
+  exactly what hard rule 2 forbids. Assignment rides the mention already in the
+  task — the first person named goes into `target_user_id`, so "assigned to me"
+  is an indexed lookup rather than a scan, and everyone else named still gets
+  their own mention row.
+
+**H1 is complete.** All three kinds are indexed and all four consumers built.
 - [ ] **Workspace-wide mention inbox + notifications** — the roadmap's item.
   The space-scoped list is deliberately not it: an inbox needs notifications
   behind it to be worth opening.

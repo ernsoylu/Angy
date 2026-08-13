@@ -312,6 +312,34 @@ button {
   background: var(--elevated);
 }
 
+/* To-do lists. The checkbox on the read path is inert by construction —
+   rendered_html is a projection, so a tick there would write nowhere. */
+.article-prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.article-prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.article-prose ul[data-type="taskList"] li > label {
+  flex: none;
+  margin-top: 3px;
+  user-select: none;
+}
+
+.article-prose ul[data-type="taskList"] li > div {
+  min-width: 0;
+}
+
+.article-prose ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
 /* A mention is inline, unlike the page-link card: it stands in for a word in a
    sentence, so it takes the accent chip treatment the tag pills use rather than
    breaking the line. */

@@ -1,6 +1,7 @@
 import type { Extensions } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Image } from "@tiptap/extension-image";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { Callout } from "./callout.js";
 import { Mention } from "./mention.js";
@@ -27,6 +28,11 @@ function makeExtensions(options: { undoRedo: boolean }): Extensions {
     Callout,
     PageLink,
     Mention,
+    TaskList,
+    // Nested to-dos, so a checklist can have sub-items like every other list.
+    // The checkbox is inert on the read path: rendered_html is a projection,
+    // and letting a reader tick a box there would write nowhere.
+    TaskItem.configure({ nested: true }),
   ];
 }
 
