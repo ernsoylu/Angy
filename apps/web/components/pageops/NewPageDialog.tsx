@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FilePlus2, X } from "lucide-react";
+import type { PageTemplateDto } from "@angy/shared";
 import type { TreeNode } from "../../lib/tree";
 import { useEscape } from "../../lib/useEscape";
 import { Button } from "../ui/Button";
@@ -28,9 +29,31 @@ export function NewPageDialog({
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [parentId, setParentId] = useState<string>("");
+  const [templateId, setTemplateId] = useState<string>("");
+  const [templates, setTemplates] = useState<PageTemplateDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEscape(onClose);
+
+  // Templates are optional scaffolding, so a failed lookup leaves the dialog
+  // fully usable rather than blocking page creation on them.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_URL}/spaces/${spaceId}/templates`, {
+          credentials: "include",
+        });
+        const body = await res.json();
+        if (!cancelled && body.success) setTemplates(body.data as PageTemplateDto[]);
+      } catch {
+        /* no templates offered */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceId]);
 
   // Flatten the tree for the parent picker, depth-indented.
   const options: { id: string; label: string }[] = [];
@@ -54,6 +77,7 @@ export function NewPageDialog({
           spaceId,
           title: title.trim(),
           parentId: parentId || null,
+          templateId: templateId || null,
         }),
       });
       const body = await res.json();
@@ -114,6 +138,20 @@ export function NewPageDialog({
             </option>
           ))}
         </Select>
+
+        {templates.length > 0 && (
+          <>
+            <div className="t-caption">Template</div>
+            <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+              <option value="">Blank page</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Select>
+          </>
+        )}
 
         <footer className={share.footer}>
           <span className={share.footerNote}>Opens straight in the editor.</span>

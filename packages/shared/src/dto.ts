@@ -123,6 +123,8 @@ export const createPageSchema = z.object({
   spaceId: z.string().regex(/^\d+$/, "spaceId is a numeric string"),
   parentId: z.uuid().nullish(),
   title: z.string().min(1).max(200),
+  /** Start from a template's body instead of an empty document (V2 H2). */
+  templateId: z.string().regex(/^\d+$/, "templateId is a numeric string").nullish(),
 });
 export type CreatePageDto = z.infer<typeof createPageSchema>;
 
@@ -263,6 +265,23 @@ export const backlinkSchema = z.object({
   count: z.number().int(),
 });
 export type BacklinkDto = z.infer<typeof backlinkSchema>;
+
+/** A reusable page skeleton (V2 H2), scoped to the space that owns it. */
+export const pageTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  createdByName: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type PageTemplateDto = z.infer<typeof pageTemplateSchema>;
+
+/** Save the current page's body as a template. */
+export const saveTemplateSchema = z.object({
+  name: z.string().min(1).max(80),
+  description: z.string().max(200).optional(),
+});
+export type SaveTemplateDto = z.infer<typeof saveTemplateSchema>;
 
 /**
  * A to-do from somewhere in the space (V2 H1) — the one `block_index` consumer

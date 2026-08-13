@@ -55,8 +55,9 @@ model Space {
   deletedAt        DateTime?       @map("deleted_at")
   deletedBy        BigInt?         @map("deleted_by")
 
-  members SpaceMember[]
-  pages   Page[]
+  members   SpaceMember[]
+  pages     Page[]
+  templates PageTemplate[]
 
   @@map("space")
 }
@@ -222,6 +223,36 @@ model BlockIndex {
   @@index([targetPageId])
   @@index([targetUserId])
   @@map("block_index")
+}
+
+/// A reusable page skeleton (V2 H2) — a snapshot of a page's `document_json`,
+/// applied by copying it into a new page's initial document.
+///
+/// Deliberately **not** a Page carrying an `is_template` flag. That would have
+/// come with editing, history and permissions for free, but a template that is
+/// a page has to be excluded from the tree, search, backlinks, trash, Recent,
+/// Starred and every future listing — and missing one leaks a template into a
+/// surface where it reads as real content. A separate table cannot leak.
+///
+/// The cost of that choice is that a template is edited by re-saving a page
+/// over it, not by opening the template itself.
+model PageTemplate {
+  id           BigInt   @id @default(autoincrement())
+  spaceId      BigInt   @map("space_id")
+  name         String
+  description  String?
+  /// The page body this template stamps out. Applied through the same
+  /// `createPage(documentJson)` → `initYdoc` path a normal page takes, so
+  /// templates add no second way for a document to come into existence.
+  documentJson Json     @map("document_json")
+  createdBy    BigInt   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, name])
+  @@index([spaceId])
+  @@map("page_template")
 }
 
 /// Closure table over pages only — never blocks (hard rule 2).

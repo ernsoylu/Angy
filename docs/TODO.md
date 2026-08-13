@@ -184,6 +184,21 @@ all four consumers.
   their own mention row.
 
 **H1 is complete.** All three kinds are indexed and all four consumers built.
+
+## V2 · H2 — Adoption path
+
+- [x] **Page templates** *(2026-08-14)* — a `page_template` table holding a
+  snapshot of a page's `document_json`, applied through the existing
+  `createPage(documentJson)` → `initYdoc` path so a templated page and a blank
+  one come into existence identically. Save-as-template from the page rail,
+  a picker in the New page dialog, ADMIN to delete. **Not** a Page with an
+  `is_template` flag: that would have to be excluded from the tree, search,
+  backlinks, trash, Recent, Starred and every future listing, and missing one
+  leaks a template into a surface where it reads as real content.
+- [ ] **Confluence/Notion importer** — the roadmap's highest-value
+  non-structural item, and a multi-session one. Build it adjacent to Git import
+  (ADR 0005) or the Markdown→Y.Doc path gets written twice.
+- [ ] **Git import / Git export** — two one-directional flows.
 - [ ] **Workspace-wide mention inbox + notifications** — the roadmap's item.
   The space-scoped list is deliberately not it: an inbox needs notifications
   behind it to be worth opening.

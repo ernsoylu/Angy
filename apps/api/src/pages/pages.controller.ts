@@ -42,6 +42,7 @@ import {
   RequirePageLevel,
 } from "../permissions/page-permission.guard";
 import { checkPagePermission } from "../permissions/permissions.service";
+import { templateBody } from "./templates.controller";
 import { projectionsQueue } from "../queue";
 import { getRedis } from "../redis";
 import { ZodValidationPipe } from "../zod.pipe";
@@ -220,6 +221,10 @@ export class PagesController {
       title: body.title,
       slug,
       createdBy: req.user.id,
+      // A template only seeds the *initial* document. The Y.Doc is still built
+      // by the worker from document_json, so a templated page and an empty one
+      // come into existence the same way (V2 H2).
+      documentJson: await templateBody(spaceId, body.templateId),
     });
     // The worker owns Y.Doc creation: builds the fresh doc, persists it to S3,
     // and generates the first projections (docs/implementation-plan.md § 3).

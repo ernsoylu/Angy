@@ -9,6 +9,7 @@ import { PagePermissionsController } from "./pages/page-permissions.controller";
 import { PagesController } from "./pages/pages.controller";
 import { PersonalController } from "./pages/personal.controller";
 import { TagsController } from "./pages/tags.controller";
+import { TemplatesController } from "./pages/templates.controller";
 import { RevisionsController } from "./pages/revisions.controller";
 import { PagePermissionGuard } from "./permissions/page-permission.guard";
 import { SearchController } from "./search/search.controller";
@@ -30,6 +31,7 @@ import { UsersController } from "./users/users.controller";
     PageOpsController,
     PersonalController,
     TagsController,
+    TemplatesController,
     UsersController,
   ],
   providers: [OidcService, SessionGuard, PagePermissionGuard],

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FolderInput, Trash2 } from "lucide-react";
+import { FileStack, FolderInput, Trash2 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { MoveDialog } from "./MoveDialog";
+import { SaveTemplateDialog } from "./SaveTemplateDialog";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -19,6 +20,7 @@ export function PageActions({
 }) {
   const router = useRouter();
   const [moveOpen, setMoveOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function trash() {
@@ -49,6 +51,13 @@ export function PageActions({
         Move page
       </Button>
       <Button
+        variant="secondary"
+        icon={<FileStack size={14} />}
+        onClick={() => setTemplateOpen(true)}
+      >
+        Save as template
+      </Button>
+      <Button
         variant="danger"
         icon={<Trash2 size={14} />}
         disabled={busy}
@@ -56,6 +65,13 @@ export function PageActions({
       >
         Move to trash
       </Button>
+      {templateOpen && (
+        <SaveTemplateDialog
+          pageId={pageId}
+          pageTitle={pageTitle}
+          onClose={() => setTemplateOpen(false)}
+        />
+      )}
       {moveOpen && (
         <MoveDialog
           pageId={pageId}

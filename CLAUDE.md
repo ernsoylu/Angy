@@ -153,8 +153,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - Extension manager / runtime block-type registry (XWiki-style plugins)
 - Federated search connectors (Slack, Drive, Jira)
 - Git import / Git export (one-directional flows — ADR 0005)
-- Confluence/Notion importer
-- Page templates
+- Confluence/Notion importer (page templates: **built**, V2 H2)
 - Notion-style databases-in-pages — **a row is a Page, not a block** (ADR 0013); needs `block_index` first
 - PDF / Word export via headless Puppeteer queue
 - Per-line authorship / blame view
