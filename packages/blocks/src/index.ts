@@ -32,6 +32,8 @@ export { applyDocJson } from "./restore.js";
 export {
   applyTextDiff,
   createYdocFromJson,
+  pageLinkTargets,
+  relabelPageLinks,
   TITLE_FIELD,
   updateToJson,
   ydocTitle,

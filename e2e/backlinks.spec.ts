@@ -77,6 +77,15 @@ test.describe("backlinks", () => {
       });
     }).toPass({ timeout: 60_000 });
 
+    // ...and the *editor* too, which renders from the Y.Doc and so cannot be
+    // fixed by the projection. Reopening it is the load-time repair path: the
+    // node itself is rewritten, which is what every link authored before a
+    // rename needs — including every one V1 left behind.
+    await page.goto(`/s/eng/${source.id}/edit`);
+    await expect(page.locator(".tiptap[contenteditable] a[data-page-link]")).toHaveText(renamed, {
+      timeout: 20_000,
+    });
+
     // `eng` is shared and its "Recently updated" list is a fixed length, so
     // every page left behind pushes an older one out of a list another spec
     // asserts against.

@@ -152,10 +152,16 @@ all four consumers.
 - [x] **Page links** — `GET /pages/:id/backlinks` (read-filtered per referring
   page), and stale link labels resolved on the projection so the reader is
   fresh while the Y.Doc keeps what the editor authored.
-- [ ] **Relabel the referring Y.Docs** — the editor still shows the authored
-  label. Closing it means a `relabel` doc command per referrer on the
-  `rewrite-media` pattern: one Y.Doc load per referring page per rename. Worth
-  a decision, not an assumption.
+- [x] **Relabel the referring Y.Docs** *(2026-08-13)* — done, but **not** as
+  "a `relabel` command per referrer" as sketched. Driven off `findStaleReferrers`
+  that design only ever fires for *future* renames: every link that already
+  exists has a correct projection and a stale Y.Doc, so it would have left the
+  entire V1 backlog untouched. And per-referrer fan-out costs one Y.Doc load,
+  revision checkpoint and projection rebuild per referring page per rename.
+  Instead: `onLoadDocument` repairs labels as documents open — self-healing,
+  covers the backlog, costs one CRDT walk and no query when a doc has no links
+  — and one `relabel` command naming the renamed *page* lets realtime fix the
+  documents that are open right now. The two together leave no case uncovered.
 - [x] **Backlinks UI** *(2026-08-13)* — a "Linked from" rail group on the
   reader, server-rendered with the rest of the rail so no JS enters the read
   path. It owns the limit, as planned: 8 rows and then "and N more", counted

@@ -1,6 +1,7 @@
 import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import {
+  DOC_COMMAND_CHANNEL,
   JOB_ATTACHMENT_REINDEX,
   JOB_COMPACT_PAGE,
   JOB_GC_PAGE,
@@ -18,16 +19,24 @@ import {
   type GcPageJobData,
   type MediaReemitJobData,
   type ProjectionJobData,
+  type RelabelCommand,
   type RevisionCheckpointJobData,
   type SearchReindexJobData,
   type SpaceReindexJobData,
   type ThumbnailJobData,
 } from "@angy/shared";
 import { env } from "./env.js";
-import { findStalePageIds, initYdoc, rebuildProjection } from "./projection.js";
+import {
+  findStalePageIds,
+  initYdoc,
+  rebuildProjection,
+  type ReferrerRefresh,
+} from "./projection.js";
 import { compactPage, findCompactionCandidates, writeRevisionCheckpoint } from "./revisions.js";
 
 const connection = new Redis(env.redisUrl, { maxRetriesPerRequest: null });
+/** Separate from the BullMQ connection: publishing shares nothing with queueing. */
+const docCommands = new Redis(env.redisUrl, { maxRetriesPerRequest: 2 });
 
 const RECONCILE_JOB = "reconcile";
 const RECONCILE_EVERY_MS = 5 * 60 * 1000;
@@ -65,23 +74,39 @@ async function emitHealthSignals(staleCount: number): Promise<void> {
 }
 
 /**
- * Rebuild the pages that render a link label a rename just invalidated (V2 H1).
+ * Catch up everything showing a link label a rename just invalidated (V2 H1).
  *
- * The job id dedupes only while one is still pending — `removeOnComplete`
- * clears it on the way out, so a later rename of the same page enqueues again
- * instead of being silently swallowed. Nothing cascades: a referrer's own
- * rebuild only returns work if *its* title is what drifted.
+ * Two audiences, two mechanisms. **Readers** are served `rendered_html`, so
+ * their referring pages are re-projected — the job id dedupes only while one is
+ * still pending, `removeOnComplete` clearing it so a later rename enqueues
+ * again instead of being silently swallowed. **Live editors** render from the
+ * Y.Doc, which the projection never touches, so realtime is told the page was
+ * renamed and rewrites the label in whichever documents are open.
+ *
+ * The command names the target, not the referrers: realtime intersects it with
+ * its open set, so a hub page's rename costs one message instead of one Y.Doc
+ * load per referring document. Documents that are closed are repaired when
+ * they are next loaded.
+ *
+ * Nothing cascades: a referrer's own rebuild only returns work if *its* title
+ * is what drifted.
  */
-async function refreshReferrers(pageIds: string[]): Promise<void> {
-  if (pageIds.length === 0) return;
-  console.log(`[worker] refreshing ${pageIds.length} page(s) linking to a renamed page`);
+async function refreshReferrers(refresh: ReferrerRefresh | null): Promise<void> {
+  if (!refresh || refresh.pageIds.length === 0) return;
+  console.log(`[worker] refreshing ${refresh.pageIds.length} page(s) linking to a renamed page`);
   await queue.addBulk(
-    pageIds.map((pageId) => ({
+    refresh.pageIds.map((pageId) => ({
       name: JOB_PROJECTION_REBUILD,
       data: { pageId },
       opts: { jobId: `relabel-${pageId}`, removeOnComplete: true, removeOnFail: true },
     })),
   );
+  const command: RelabelCommand = {
+    type: "relabel",
+    targetPageId: refresh.targetPageId,
+    title: refresh.title,
+  };
+  await docCommands.publish(DOC_COMMAND_CHANNEL, JSON.stringify(command));
 }
 
 const worker = new Worker<ProjectionJobData | Record<string, never>>(

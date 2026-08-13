@@ -6,6 +6,8 @@ import {
   applyDocJson,
   applyTextDiff,
   createYdocFromJson,
+  pageLinkTargets,
+  relabelPageLinks,
   TITLE_FIELD,
   ydocTitle,
   ydocToJson,
@@ -22,6 +24,7 @@ import {
   REVOKED_CLOSE_REASON,
   satisfies,
   type DocCommand,
+  type RelabelCommand,
   type RenameCommand,
   type RewriteMediaCommand,
 } from "@angy/shared";
@@ -93,6 +96,63 @@ async function bootstrapTitle(document: Y.Doc, pageId: string): Promise<void> {
     select: { title: true },
   });
   if (page?.title) document.getText(TITLE_FIELD).insert(0, page.title);
+}
+
+/**
+ * Point this document's page-link labels at their targets' current titles.
+ *
+ * The label is authored into the node when the link is made and cannot follow
+ * a later rename on its own. Readers never see the stale one — the projection
+ * resolves labels on the way to rendered_html — but the editor renders from the
+ * Y.Doc, so it does. Repairing on load is what makes that self-healing without
+ * a fan-out: every document is fixed the moment somebody opens it, and one
+ * nobody opens is one nobody sees a stale label in.
+ *
+ * Cheap in the common case: no links means one CRDT walk and no query, and a
+ * document whose labels are already right produces no Yjs update at all, so it
+ * is not re-stored or checkpointed for having been opened.
+ */
+async function repairPageLinkLabels(document: Y.Doc, pageId: string): Promise<void> {
+  const targets = pageLinkTargets(document);
+  if (targets.length === 0) return;
+  const pages = await getPrisma().page.findMany({
+    where: { id: { in: targets }, deletedAt: null },
+    select: { id: true, title: true },
+  });
+  const changed = relabelPageLinks(document, new Map(pages.map((p) => [p.id, p.title])));
+  if (changed > 0) {
+    console.log(`[realtime] relabelled ${changed} page link(s) on load of ${pageId}`);
+  }
+}
+
+/**
+ * A page was renamed: fix the label in every *open* document linking to it, so
+ * people editing right now see the new name without reopening.
+ *
+ * Resolved against the open set rather than against a list of referrers, the
+ * same way space-scoped permission events are (ADR 0008). A hub page can be
+ * linked from thousands of documents; loading each one to rewrite an attribute
+ * would turn a rename into a storm of S3 reads, revision checkpoints and
+ * projection rebuilds. Closed documents cost nothing and lose nothing — they
+ * are repaired on their next load.
+ */
+async function relabelOpenDocuments(server: Server, command: RelabelCommand): Promise<void> {
+  const titles = new Map([[command.targetPageId, command.title]]);
+  for (const name of [...server.hocuspocus.documents.keys()]) {
+    const document = server.hocuspocus.documents.get(name);
+    if (!document || !pageLinkTargets(document).includes(command.targetPageId)) continue;
+    // Through a direct connection, so the edit stores and broadcasts like any
+    // other rather than mutating a shared document behind Hocuspocus's back.
+    const connection = await server.hocuspocus.openDirectConnection(name, { name: "relabel" });
+    try {
+      await connection.transact((doc) => {
+        const changed = relabelPageLinks(doc, titles);
+        if (changed > 0) console.log(`[realtime] relabelled ${changed} link(s) in open ${name}`);
+      });
+    } finally {
+      await connection.disconnect();
+    }
+  }
 }
 
 /**
@@ -232,6 +292,10 @@ function subscribeToDocCommands(
         await renameDocument(server, command);
         return;
       }
+      if (command.type === "relabel") {
+        await relabelOpenDocuments(server, command);
+        return;
+      }
       if (command.type !== "restore") return;
       const revision = await getPrisma().pageRevision.findUnique({
         where: { pageId_version: { pageId: command.pageId, version: command.version } },
@@ -305,6 +369,10 @@ export function buildServer(port = env.port): Server {
       const bytes = await loadPersistedUpdate(redis, documentName);
       Y.applyUpdate(document, bytes);
       await bootstrapTitle(document, documentName);
+      // Both of these edit the doc *after* the persisted bytes are applied —
+      // never instead of them. Rebuilding a document from anything but its own
+      // update log forks every connected client (CLAUDE.md gotcha).
+      await repairPageLinkLabels(document, documentName);
       return document;
     },
 

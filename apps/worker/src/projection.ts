@@ -30,6 +30,16 @@ export const ydocKey = (pageId: string) => `ydoc/${pageId}`;
  */
 const REF_KIND: Record<RefKind, BlockRefKind> = { page_link: "PAGE_LINK" };
 
+/** Work a rebuild created for *other* pages: they name this one by its old title. */
+export interface ReferrerRefresh {
+  /** The page just projected — the link target whose title moved on. */
+  targetPageId: string;
+  /** The title referrers should be showing. */
+  title: string;
+  /** Live pages currently rendering something else. */
+  pageIds: string[];
+}
+
 const toBlockRef = (ref: DocRef): BlockRefInput => ({
   ord: ref.ord,
   kind: REF_KIND[ref.kind],
@@ -61,10 +71,10 @@ async function targetTitles(
  * document_json (or the empty document), persist the update bytes to S3, and
  * record ydoc_s3_key + state vector. Idempotent — skips if a doc exists.
  */
-export async function initYdoc(pageId: string): Promise<string[]> {
+export async function initYdoc(pageId: string): Promise<ReferrerRefresh | null> {
   const prisma = getPrisma();
   const page = await prisma.page.findUnique({ where: { id: pageId } });
-  if (!page) return [];
+  if (!page) return null;
   if (page.ydocS3Key && (await getObject(page.ydocS3Key))) {
     return rebuildProjection(pageId);
   }
@@ -95,7 +105,7 @@ export async function initYdoc(pageId: string): Promise<string[]> {
  * They are returned rather than enqueued because the queue belongs to main.ts,
  * which is also where the reconcile sweep's results are enqueued.
  */
-export async function rebuildProjection(pageId: string): Promise<string[]> {
+export async function rebuildProjection(pageId: string): Promise<ReferrerRefresh | null> {
   const prisma = getPrisma();
   const page = await prisma.page.findUnique({ where: { id: pageId } });
   if (!page || page.deletedAt) {
@@ -107,7 +117,7 @@ export async function rebuildProjection(pageId: string): Promise<string[]> {
     const { indexAttachmentsForPage, removeFromIndex } = await import("./search.js");
     await removeFromIndex(pageId);
     await indexAttachmentsForPage(pageId);
-    return [];
+    return null;
   }
 
   let doc: JSONContent | null = null;
@@ -121,7 +131,7 @@ export async function rebuildProjection(pageId: string): Promise<string[]> {
     }
   }
   doc ??= page.documentJson as JSONContent | null;
-  if (!doc) return [];
+  if (!doc) return null;
 
   // Page-link labels are resolved for the read-path artifacts only. The Y.Doc
   // keeps the label the editor authored — resolving into it would give
@@ -148,7 +158,11 @@ export async function rebuildProjection(pageId: string): Promise<string[]> {
   await indexPage(pageId);
   await indexAttachmentsForPage(pageId);
 
-  return findStaleReferrers(prisma, pageId, page.title);
+  return {
+    targetPageId: pageId,
+    title: page.title,
+    pageIds: await findStaleReferrers(prisma, pageId, page.title),
+  };
 }
 
 /**

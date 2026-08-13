@@ -103,7 +103,31 @@ export interface RenameCommand {
   userId: string;
 }
 
-export type DocCommand = RestoreCommand | RewriteMediaCommand | RenameCommand;
+/**
+ * A page was renamed; documents linking to it are showing its old name.
+ *
+ * Names the *target*, not the documents to fix — like the space-scoped
+ * permission event, and for the same reason: a popular page can be linked from
+ * thousands of documents while realtime only cares about the handful open
+ * right now. Realtime intersects it with its open set, so the work is
+ * proportional to live sessions rather than to the link graph.
+ *
+ * Documents that are closed need no command at all: their labels are repaired
+ * when they are next loaded, and their readers are already correct because the
+ * projection resolves labels independently of the Y.Doc.
+ */
+export interface RelabelCommand {
+  type: "relabel";
+  /** The renamed page that links point at. */
+  targetPageId: string;
+  title: string;
+}
+
+export type DocCommand =
+  | RestoreCommand
+  | RewriteMediaCommand
+  | RenameCommand
+  | RelabelCommand;
 
 /** Re-emit a page's media URL forms after a cross-visibility move (ADR 0007). */
 export const JOB_MEDIA_REEMIT = "media-reemit";

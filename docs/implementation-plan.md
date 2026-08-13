@@ -276,10 +276,20 @@ Build order within the wave:
    rendered*, and a rename only enqueues referrers whose recorded label differs.
    Refreshing referrers unconditionally would cascade through the link graph
    and two pages linking to each other would never settle.
-   **Residual:** the *editor* still shows the authored label, because nothing
-   rewrites the referring Y.Docs. Closing that means a `relabel` doc command
-   per referrer on the `rewrite-media` pattern — one Y.Doc load per referring
-   page per rename — which is a cost worth deciding on rather than assuming.
+   **Editor labels** *(closed 2026-08-13)* — the editor renders the Y.Doc, so
+   the projection cannot reach it; the node itself has to be rewritten. The
+   sketched fix (a `relabel` command per referrer) was not built, for two
+   reasons found on contact. Driven off `findStaleReferrers` it fires only for
+   *future* renames — every link that already exists has a correct projection
+   and a stale Y.Doc, so the whole V1 backlog would have been skipped. And
+   per-referrer fan-out costs a Y.Doc load, a revision checkpoint and a
+   projection rebuild for every referring page, per rename. What shipped
+   instead: `onLoadDocument` repairs labels as documents open, which is
+   self-healing and covers the backlog, and one `relabel` command naming the
+   renamed *page* lets realtime rewrite the documents currently open by
+   intersecting with its own set — the space-scoped-event shape from ADR 0008.
+   The invariant that makes load-time repair free: relabelling a document
+   whose labels are already right must produce no Yjs update at all.
 3. **Mentions and tasks** on top of the same rows — each adds a `RefKind` in
    @angy/blocks and a matching `block_ref_kind` value. The mapping between them
    is exhaustive, so a kind that nobody maps is a compile error rather than a

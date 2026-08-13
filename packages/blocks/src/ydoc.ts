@@ -55,6 +55,69 @@ export function applyTextDiff(text: Y.Text, next: string): void {
   else edit();
 }
 
+/** Visit every XmlElement in a live document's body, depth first. */
+function walkElements(node: Y.XmlFragment | Y.XmlElement, visit: (el: Y.XmlElement) => void): void {
+  for (const child of node.toArray()) {
+    if (child instanceof Y.XmlElement) {
+      visit(child);
+      walkElements(child, visit);
+    }
+  }
+}
+
+/**
+ * Page ids the document links to, read straight off the CRDT.
+ *
+ * Deliberately not `ydocToJson(...)` then `extractRefs(...)`: this runs on
+ * every document load, and materialising the whole ProseMirror tree to answer
+ * "are there any links here" costs the entire document to learn, usually, that
+ * there are none.
+ */
+export function pageLinkTargets(ydoc: Y.Doc): string[] {
+  const ids = new Set<string>();
+  walkElements(ydoc.getXmlFragment(YDOC_FIELD), (el) => {
+    if (el.nodeName !== "pageLink") return;
+    const pageId = el.getAttribute("pageId");
+    if (typeof pageId === "string" && pageId) ids.add(pageId);
+  });
+  return [...ids];
+}
+
+/**
+ * Point page-link labels in a live document at their targets' current titles.
+ *
+ * The authored label is a cache that goes stale on rename. The *reader* never
+ * sees that, because the projection resolves labels on the way to
+ * rendered_html — but the editor renders straight from the Y.Doc, so the stale
+ * name survives there until the node itself is rewritten. This is that
+ * rewrite, applied as an ordinary forward edit so open collaborators converge
+ * on it like any other change.
+ *
+ * Returns the number of labels changed. Zero means no attribute was touched
+ * and therefore no Yjs update was produced — which is what keeps a document
+ * that is already correct from being re-stored, re-projected and checkpointed
+ * on every load.
+ */
+export function relabelPageLinks(ydoc: Y.Doc, titles: ReadonlyMap<string, string>): number {
+  let changed = 0;
+  const apply = () => {
+    walkElements(ydoc.getXmlFragment(YDOC_FIELD), (el) => {
+      if (el.nodeName !== "pageLink") return;
+      const pageId = el.getAttribute("pageId");
+      if (typeof pageId !== "string") return;
+      const title = titles.get(pageId);
+      // A target that is gone keeps the name it was linked under: a link that
+      // suddenly reads "Untitled" is worse than one naming what it pointed at.
+      if (title === undefined || title === el.getAttribute("title")) return;
+      el.setAttribute("title", title);
+      changed++;
+    });
+  };
+  // One transaction, so peers see a single relabel rather than a node at a time.
+  ydoc.transact(apply);
+  return changed;
+}
+
 /** Build a fresh Y.Doc from ProseMirror JSON — the ONLY place docs are born from JSON. */
 export function createYdocFromJson(doc: JSONContent | null | undefined): Y.Doc {
   return prosemirrorJSONToYDoc(getSchema(baseExtensions()), doc ?? EMPTY_DOCUMENT, YDOC_FIELD);
