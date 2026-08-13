@@ -156,7 +156,10 @@ all four consumers.
   label. Closing it means a `relabel` doc command per referrer on the
   `rewrite-media` pattern: one Y.Doc load per referring page per rename. Worth
   a decision, not an assumption.
-- [ ] **Backlinks UI** (H3) — the endpoint has no consumer yet. A hub page
-  could accumulate hundreds of inbound links, so whatever surfaces them owns
-  the limit, and must say it truncated rather than the API doing it silently.
+- [x] **Backlinks UI** *(2026-08-13)* — a "Linked from" rail group on the
+  reader, server-rendered with the rest of the rail so no JS enters the read
+  path. It owns the limit, as planned: 8 rows and then "and N more", counted
+  *after* the read filter so the overflow never includes pages the reader
+  cannot open. `filterReadablePages` resolves the whole candidate set in one
+  query — a round trip per candidate is what makes a list surface slow.
 - [ ] **Mentions and tasks** on the same rows.

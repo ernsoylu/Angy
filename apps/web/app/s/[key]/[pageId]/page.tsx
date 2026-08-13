@@ -5,12 +5,13 @@ import { Avatar } from "../../../../components/ui/Avatar";
 import { Button } from "../../../../components/ui/Button";
 import { satisfies } from "@angy/shared";
 import { PageActions } from "../../../../components/pageops/PageActions";
+import { Backlinks } from "../../../../components/reader/Backlinks";
 import { PageTags } from "../../../../components/reader/PageTags";
 import { StarButton } from "../../../../components/reader/StarButton";
 import { Toc } from "../../../../components/reader/Toc";
 import { RestrictedState } from "../../../../components/ui/SystemState";
 import { getMe } from "../../../../lib/api";
-import { getReaderPage, recordVisit } from "../../../../lib/reader";
+import { getReaderBacklinks, getReaderPage, recordVisit } from "../../../../lib/reader";
 import { timeAgo } from "../../../../lib/time";
 import { injectToc } from "../../../../lib/toc";
 import shell from "../../../../components/shell/shell.module.css";
@@ -33,6 +34,7 @@ export default async function ReaderPage({
   // Reading history for the sidebar's Recent list — throttled in Postgres, so
   // reloads and route prefetches don't turn into a write each.
   await recordVisit(pageId, BigInt(me.id));
+  const backlinks = await getReaderBacklinks(pageId, BigInt(me.id), page.spaceId);
 
   const { html, toc } = injectToc(page.renderedHtml ?? "");
   const parents = page.breadcrumb.slice(0, -1);
@@ -83,6 +85,8 @@ export default async function ReaderPage({
             <Toc items={toc} />
           </div>
         )}
+        {/* Inbound navigation sits with in-page navigation, above the metadata. */}
+        <Backlinks links={backlinks.shown} hidden={backlinks.hidden} />
         <div className={shell.railGroup}>
           <div className="t-caption">Page info</div>
           {page.version !== null && (

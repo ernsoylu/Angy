@@ -108,7 +108,9 @@ export async function getBacklinks(prisma: PrismaClient, pageId: string): Promis
     where: {
       targetPageId: pageId,
       kind: "PAGE_LINK",
-      page: { deletedAt: null },
+      // A trashed space leaves every listing (Wave E3), and its pages go with
+      // it — so a backlink from inside one must not reappear here.
+      page: { deletedAt: null, space: { deletedAt: null } },
       // A page linking to itself is not a backlink worth showing.
       NOT: { pageId },
     },

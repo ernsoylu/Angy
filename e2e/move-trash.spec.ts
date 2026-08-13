@@ -33,7 +33,12 @@ test.describe("page move + trash/restore", () => {
 
     // It shows in the trash with a 30-day countdown; restore brings it back.
     await page.goto("/s/eng/trash");
-    const row = page.locator("main > div > div").filter({ hasText: movableTitle }).last();
+    // Scoped to the row itself, not `main > div > div`: `hasText` matches
+    // ancestors too, so the outer table survived the filter and the Restore
+    // button inside it resolved to one per row. That passed only while this
+    // spec was the sole thing in the trash — any other spec leaving a page
+    // behind broke it, which says nothing about move or restore.
+    const row = page.getByTestId("trash-row").filter({ hasText: movableTitle });
     await expect(row.getByText(movableTitle)).toBeVisible();
     await expect(page.getByText(/30 days|29 days/).first()).toBeVisible();
     await row.getByRole("button", { name: "Restore" }).click();

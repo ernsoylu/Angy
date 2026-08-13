@@ -3,9 +3,20 @@ import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 /**
- * E2E suite (CLAUDE.md § Testing): runs against the local stack —
- * `pnpm docker:up` + `pnpm dev` must be running. The global setup RESEEDS the
+ * E2E suite (CLAUDE.md § Testing): runs against the local stack — `pnpm
+ * docker:up`, the API/realtime/worker, and **web from a production build**
+ * (`pnpm --filter @angy/web build && … start`). The global setup RESEEDS the
  * dev database, so anything you were hand-testing will be reset.
+ *
+ * `next dev` is not a substitute for the web app here. Under it the editor
+ * mounts but its collaboration socket closes before it establishes, the
+ * console fills with "Maximum update depth exceeded", and presence never
+ * appears — so every spec that waits for "1 live connection" fails (11 of
+ * them) while the reader specs pass. Dev-mode StrictMode double-invokes
+ * effects, which the provider mount does not survive; production is
+ * unaffected. The failures look like a broken editor and are an artefact of
+ * how the server was started — the same class of trap `assert-fresh-server`
+ * already guards for stale builds.
  */
 
 /**

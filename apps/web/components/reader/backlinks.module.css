@@ -1,0 +1,56 @@
+/* "Linked from" rail group (V2 H1). No frontend.pen frame specifies backlinks,
+   so this borrows the rail's existing metrics — .railItem's 13px/--text-2 — and
+   adds only what a list of links needs over a list of facts. */
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-2);
+  border-radius: var(--r-sm, 6px);
+  padding: 3px 6px;
+  margin: 0 -6px;
+}
+
+.item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.icon {
+  flex: none;
+  color: var(--text-3);
+}
+
+/* The title is the row's identity, so it takes the space and truncates last. */
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.count {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.more {
+  font-size: 12px;
+  color: var(--text-3);
+  padding-left: 22px;
+}

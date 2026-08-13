@@ -134,7 +134,7 @@ export function TrashView({ initial, spaceKey }: { initial: TrashItemDto[]; spac
           {visible.map((item, index) => {
             const days = daysLeft(item.hardDeleteAt);
             return (
-              <div key={item.id} className={styles.row}>
+              <div key={item.id} className={styles.row} data-testid="trash-row">
                 <span className={styles.pageCell}>
                   <FileText size={15} style={{ color: "var(--text-3)", flexShrink: 0 }} />
                   <span style={{ minWidth: 0 }}>

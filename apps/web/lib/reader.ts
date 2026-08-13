@@ -1,6 +1,8 @@
 import "server-only";
 import { config } from "dotenv";
 import {
+  filterReadablePages,
+  getBacklinks,
   getBreadcrumb,
   getEffectivePageLevel,
   getPrisma,
@@ -15,6 +17,7 @@ config({ path: `${process.cwd()}/../../.env.local`, quiet: true });
 
 export interface ReaderPage {
   id: string;
+  spaceId: bigint;
   title: string;
   renderedHtml: string | null;
   breadcrumb: { id: string; title: string }[];
@@ -65,6 +68,7 @@ export async function getReaderPage(
 
   return {
     id: page.id,
+    spaceId: page.spaceId,
     title: page.title,
     renderedHtml: page.renderedHtml,
     breadcrumb: breadcrumb.map((row) => ({ id: row.id, title: row.title })),
@@ -75,6 +79,65 @@ export async function getReaderPage(
     tags: tags.map((row) => row.tag.name),
     level,
     updatedAt: page.updatedAt.toISOString(),
+  };
+}
+
+export interface ReaderBacklink {
+  id: string;
+  title: string;
+  /** How many times that page links here. */
+  count: number;
+  /** Set only when the referring page lives in a *different* space. */
+  spaceName: string | null;
+}
+
+/** How many backlinks the rail lists before collapsing the rest into a count. */
+export const BACKLINK_LIMIT = 8;
+
+/**
+ * Pages linking to this one (V2 H1), filtered to those the caller may read.
+ *
+ * A backlink names a page and its title, so VIEW on the *target* is not
+ * enough — the filter is what stops a private page's existence leaking through
+ * the rail of a public one. Filtering happens before the limit is applied, so
+ * the "and N more" count never includes pages the reader could not open.
+ */
+export async function getReaderBacklinks(
+  pageId: string,
+  userId: bigint,
+  spaceId: bigint,
+): Promise<{ shown: ReaderBacklink[]; hidden: number }> {
+  const prisma = getPrisma();
+  const candidates = await getBacklinks(prisma, pageId);
+  if (candidates.length === 0) return { shown: [], hidden: 0 };
+
+  const readable = await filterReadablePages(
+    prisma,
+    userId,
+    candidates.map((link) => link.pageId),
+  );
+  const visible = candidates.filter((link) => readable.has(link.pageId));
+
+  // Only cross-space backlinks name their space; labelling every row with the
+  // space the reader is already in would be noise.
+  const foreign = [...new Set(visible.filter((l) => l.spaceId !== spaceId).map((l) => l.spaceId))];
+  const spaces = new Map(
+    foreign.length === 0
+      ? []
+      : (await prisma.space.findMany({ where: { id: { in: foreign } } })).map((space) => [
+          space.id,
+          space.name,
+        ]),
+  );
+
+  return {
+    shown: visible.slice(0, BACKLINK_LIMIT).map((link) => ({
+      id: link.pageId,
+      title: link.title,
+      count: link.count,
+      spaceName: link.spaceId === spaceId ? null : (spaces.get(link.spaceId) ?? null),
+    })),
+    hidden: Math.max(0, visible.length - BACKLINK_LIMIT),
   };
 }
 
