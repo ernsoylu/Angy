@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   AtSign,
-  Bell,
   Check,
   FileText,
   Home,
@@ -26,6 +25,7 @@ import { useEscape } from "../../lib/useEscape";
 import type { TreeNode } from "../../lib/tree";
 import { NewPageDialog } from "../pageops/NewPageDialog";
 import { ShareDialog } from "../share/ShareDialog";
+import { NotificationMenu } from "./NotificationMenu";
 import { PageTree } from "./PageTree";
 import { UserMenu } from "./UserMenu";
 import { Button } from "../ui/Button";
@@ -135,9 +135,7 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
                 </Link>
               )}
             </span>
-            <IconButton label="Notifications">
-              <Bell size={15} />
-            </IconButton>
+            <NotificationMenu />
             <ThemeToggle />
             <UserMenu name={user.name} email={user.email} />
           </div>

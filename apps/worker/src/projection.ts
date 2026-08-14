@@ -14,6 +14,7 @@ import {
 import {
   findStaleReferrers,
   getPrisma,
+  raiseMentionNotifications,
   replaceBlockIndex,
   type BlockRefInput,
   type BlockRefKind,
@@ -172,7 +173,19 @@ export async function rebuildProjection(pageId: string): Promise<ReferrerRefresh
   });
   // Indexed from the resolved document, so the recorded label is the one the
   // reader was served — which is what findStaleReferrers compares against.
-  await replaceBlockIndex(prisma, pageId, extractRefs(resolved).map(toBlockRef));
+  const refs = extractRefs(resolved);
+  await replaceBlockIndex(prisma, pageId, refs.map(toBlockRef));
+  // Inbox rows for whoever this page names (V2 H3). Idempotent, because a
+  // rebuild re-runs on every store, every relabel and every reconcile pass.
+  const raised = await raiseMentionNotifications(
+    prisma,
+    pageId,
+    refs.flatMap((ref) =>
+      ref.kind === "mention" && ref.targetUserId ? [BigInt(ref.targetUserId)] : [],
+    ),
+    page.updatedBy ?? page.createdBy,
+  );
+  if (raised > 0) console.log(`[worker] raised ${raised} mention notification(s) on ${pageId}`);
   // Keep search in lockstep with projections (ADR 0009). Attachments ride
   // along: a move changes their space, a restore brings them back.
   const { indexAttachmentsForPage, indexPage } = await import("./search.js");

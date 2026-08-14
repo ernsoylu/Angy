@@ -20,6 +20,8 @@
 
 | `page_template` | Reusable page skeleton (V2 H2) — a snapshot of a page's `document_json`, stamped into new pages through the normal create path. Space-scoped, name unique per space so re-saving updates rather than duplicating. Deliberately not a Page with a flag: a template that is a page must be excluded from the tree, search, backlinks, trash and every listing, and missing one leaks it | `id` bigint PK, `space_id`, `name`, `description`, `document_json` jsonb, `created_by`, `created_at`; unique (space_id, name) |
 
+| `notification` | Per-user inbox (V2 H3), raised by the projection worker when a page names someone. One row per (user, kind, page) — being named three times in a document is one thing to look at, and the unique key is what makes the worker's insert idempotent under repeated rebuilds. Not deleted when a mention is removed: an inbox records that something happened | `id` bigint PK, `user_id`, `kind` (notification_kind), `page_id`, `actor_id`, `created_at`, `read_at`; unique (user_id, kind, page_id) |
+
 Deferred to V2: group/team principals for permissions.
 
 Open TODOs for the DDL pass: indexes (page.space_id, page_ancestor.descendant_id, page_revision.page_id+created_at, attachment.sha256), FK/on-delete behavior for trash vs hard-delete, and the revision retention policy (ADR 0006).

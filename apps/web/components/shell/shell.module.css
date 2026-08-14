@@ -411,3 +411,107 @@
 .skipLink:focus {
   top: 10px;
 }
+
+/* ---------- Notification bell (V2 H3) ---------- */
+
+.bellWrap {
+  position: relative;
+  display: flex;
+}
+
+/* Sits on the icon's corner; pointer-events off so it never eats the click. */
+.bellBadge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: var(--r-pill);
+  background: var(--clay);
+  color: var(--on-pastel);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Catches the outside click that closes the menu, under the menu itself. */
+.menuScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+}
+
+.bellMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-menu);
+  padding: 6px;
+}
+
+.bellHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+}
+
+.bellAction {
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.bellEmpty {
+  padding: 14px 10px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.bellItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--r-btn);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.bellItem:hover {
+  background: var(--surface-hover);
+}
+
+.bellItemUnread {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.bellIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-text);
+}
+
+.bellText {
+  min-width: 0;
+}
+
+.bellTime {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-3);
+  font-size: 11.5px;
+}

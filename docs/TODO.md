@@ -214,6 +214,11 @@ all four consumers.
 - [ ] **Confluence/Notion importer UI + attachment handling** — the engine is
   built; what is left is unpacking an export archive (zip), rewriting its
   media references to Angy attachments, and a screen to drive it.
-- [ ] **Workspace-wide mention inbox + notifications** — the roadmap's item.
-  The space-scoped list is deliberately not it: an inbox needs notifications
-  behind it to be worth opening.
+- [x] **Mention notifications + in-app inbox** *(2026-08-14)* — a
+  `notification` table raised by the projection worker, unique on
+  (user, kind, page) so a rebuild cannot manufacture a duplicate, and the bell
+  menu that was inert since Phase 1. Polled, not pushed: the realtime tier
+  carries document traffic and a reader who is not editing has no socket at
+  all, so a push would miss the people most likely to want it. Read access is
+  re-checked at *serve* time, because access can be revoked after a
+  notification exists.

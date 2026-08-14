@@ -6,6 +6,7 @@ import { HealthController } from "./health.controller";
 import { AttachmentsController } from "./pages/attachments.controller";
 import { ExportController } from "./pages/export.controller";
 import { ImportController } from "./pages/import.controller";
+import { NotificationsController } from "./pages/notifications.controller";
 import { PageOpsController } from "./pages/page-ops.controller";
 import { PagePermissionsController } from "./pages/page-permissions.controller";
 import { PagesController } from "./pages/pages.controller";
@@ -36,6 +37,7 @@ import { UsersController } from "./users/users.controller";
     TemplatesController,
     ExportController,
     ImportController,
+    NotificationsController,
     UsersController,
   ],
   providers: [OidcService, SessionGuard, PagePermissionGuard],

@@ -274,3 +274,35 @@ export async function getBacklinks(prisma: PrismaClient, pageId: string): Promis
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     .map(({ updatedAt: _updatedAt, ...backlink }) => backlink);
 }
+
+/**
+ * Raise inbox rows for everyone newly mentioned on a page (V2 H3).
+ *
+ * Called from the projection rebuild, so it must be **idempotent**: a rebuild
+ * re-runs freely (reconcile sweep, every store, a relabel) and must not
+ * manufacture a fresh notification each time. `skipDuplicates` against the
+ * unique (user, kind, page) key is what buys that — being named three times
+ * in one document is still one thing to look at.
+ *
+ * Deliberately not deleted when a mention is removed: an inbox records that
+ * something happened, and un-mentioning someone does not un-happen it.
+ * Notifications for a page that is hard-deleted go with it via the FK cascade.
+ */
+export async function raiseMentionNotifications(
+  prisma: PrismaClient,
+  pageId: string,
+  mentionedUserIds: readonly bigint[],
+  actorId: bigint | null,
+): Promise<number> {
+  if (mentionedUserIds.length === 0) return 0;
+  const result = await prisma.notification.createMany({
+    data: [...new Set(mentionedUserIds)].map((userId) => ({
+      userId,
+      kind: "MENTION" as const,
+      pageId,
+      actorId,
+    })),
+    skipDuplicates: true,
+  });
+  return result.count;
+}

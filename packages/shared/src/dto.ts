@@ -295,6 +295,19 @@ export const importResultSchema = z.object({
 });
 export type ImportResultDto = z.infer<typeof importResultSchema>;
 
+/** An inbox row (V2 H3) — raised by the worker, read in the bell menu. */
+export const notificationSchema = z.object({
+  id: z.string(),
+  kind: z.literal("MENTION"),
+  pageId: z.uuid(),
+  pageTitle: z.string(),
+  spaceKey: z.string(),
+  actorName: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  read: z.boolean(),
+});
+export type NotificationDto = z.infer<typeof notificationSchema>;
+
 /** A reusable page skeleton (V2 H2), scoped to the space that owns it. */
 export const pageTemplateSchema = z.object({
   id: z.string(),

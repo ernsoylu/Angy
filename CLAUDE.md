@@ -148,7 +148,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 - SCIM provisioning
 - GraphQL API
-- block_index — **H1 is complete** (V2): table, worker, backlinks, `@` mentions and the tasks board. Still open: the workspace-wide mention inbox and notifications
+- block_index — **H1 is complete** (V2): table, worker, backlinks, `@` mentions and the tasks board. Mention notifications + the bell inbox are built too (H3). Still open: databases-in-pages (ADR 0013)
 - Confluence-style macros (Jira, TOC, decision, meeting notes)
 - Extension manager / runtime block-type registry (XWiki-style plugins)
 - Federated search connectors (Slack, Drive, Jira)

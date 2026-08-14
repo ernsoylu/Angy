@@ -72,11 +72,12 @@ model AppUser {
   deactivatedAt DateTime? @map("deactivated_at")
   createdAt     DateTime  @default(now()) @map("created_at")
 
-  memberships SpaceMember[]
-  permissions PagePermission[]
-  visits      PageVisit[]
-  stars       PageStar[]
-  mentions    BlockIndex[]
+  memberships   SpaceMember[]
+  permissions   PagePermission[]
+  visits        PageVisit[]
+  stars         PageStar[]
+  mentions      BlockIndex[]
+  notifications Notification[]
 
   @@map("app_user")
 }
@@ -114,19 +115,20 @@ model Page {
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at")
 
-  space        Space            @relation(fields: [spaceId], references: [id])
-  parent       Page?            @relation("PageTree", fields: [parentId], references: [id])
-  children     Page[]           @relation("PageTree")
-  ancestors    PageAncestor[]   @relation("Descendant")
-  descendants  PageAncestor[]   @relation("Ancestor")
-  permissions  PagePermission[]
-  revisions    PageRevision[]
-  attachments  Attachment[]
-  visits       PageVisit[]
-  stars        PageStar[]
-  tags         PageTag[]
-  refs         BlockIndex[]     @relation("RefSource")
-  referencedBy BlockIndex[]     @relation("RefTargetPage")
+  space         Space            @relation(fields: [spaceId], references: [id])
+  parent        Page?            @relation("PageTree", fields: [parentId], references: [id])
+  children      Page[]           @relation("PageTree")
+  ancestors     PageAncestor[]   @relation("Descendant")
+  descendants   PageAncestor[]   @relation("Ancestor")
+  permissions   PagePermission[]
+  revisions     PageRevision[]
+  attachments   Attachment[]
+  visits        PageVisit[]
+  stars         PageStar[]
+  tags          PageTag[]
+  notifications Notification[]
+  refs          BlockIndex[]     @relation("RefSource")
+  referencedBy  BlockIndex[]     @relation("RefTargetPage")
 
   @@unique([spaceId, slug])
   @@index([spaceId])
@@ -253,6 +255,38 @@ model PageTemplate {
   @@unique([spaceId, name])
   @@index([spaceId])
   @@map("page_template")
+}
+
+/// What a notification is about. Only kinds something actually raises belong
+/// here, mirroring `block_index`'s rule.
+enum NotificationKind {
+  MENTION
+
+  @@map("notification_kind")
+}
+
+/// Per-user inbox (V2 H3) — raised by the projection worker, read by the app.
+///
+/// One row per (user, page, kind), not one per mention: being named three
+/// times in one document is one thing to look at. The unique key is what makes
+/// the worker's insert idempotent, which matters because a projection rebuild
+/// is re-run freely and must not manufacture a new notification each time.
+model Notification {
+  id        BigInt           @id @default(autoincrement())
+  userId    BigInt           @map("user_id")
+  kind      NotificationKind
+  pageId    String           @map("page_id") @db.Uuid
+  /// Who caused it — the page's last editor at the time it was raised.
+  actorId   BigInt?          @map("actor_id")
+  createdAt DateTime         @default(now()) @map("created_at")
+  readAt    DateTime?        @map("read_at")
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page Page    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind, pageId])
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notification")
 }
 
 /// Closure table over pages only — never blocks (hard rule 2).

@@ -7,6 +7,7 @@ export {
   getBacklinks,
   getMentions,
   getTasks,
+  raiseMentionNotifications,
   refLabel,
   replaceBlockIndex,
   taskDone,
