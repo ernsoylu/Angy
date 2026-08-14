@@ -152,8 +152,8 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - Confluence-style macros (Jira, TOC, decision, meeting notes)
 - Extension manager / runtime block-type registry (XWiki-style plugins)
 - Federated search connectors (Slack, Drive, Jira)
-- Git import (export: **built**, V2 — `documentToMarkdown` + `/pages/:id/export.md`; one-directional, ADR 0005)
-- Confluence/Notion importer (page templates: **built**, V2 H2)
+- Markdown import/export are **built** (V2, ADR 0005): `markdownToDocument` + `POST /spaces/:id/import`, `documentToMarkdown` + `/pages/:id/export.md`. Still one-directional — never add a merge-back path
+- Confluence/Notion importer — the Markdown engine is built; the archive unpacking, media rewriting and UI are not
 - Notion-style databases-in-pages — **a row is a Page, not a block** (ADR 0013); needs `block_index` first
 - PDF / Word export via headless Puppeteer queue
 - Per-line authorship / blame view

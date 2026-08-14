@@ -204,9 +204,16 @@ all four consumers.
   construct one, and the projection is what the reader was shown, so an export
   and a read cannot disagree. A subtree filters per page by read access and
   states how many it withheld.
-- [ ] **Markdown import** — the other half of ADR 0005, and the engine the
-  Confluence/Notion importer needs. Needs a Markdown parser dependency;
-  export needed none.
+- [x] **Markdown import** *(2026-08-14)* — `markdownToDocument` (markdown-it
+  tokens → our schema) plus `POST /spaces/:id/import`, taking a generic bundle
+  of `{path, markdown}` so a Notion or Confluence export becomes this after
+  unpacking rather than the server learning one format per vendor. Directories
+  become parent pages; an `index.md`/`README.md` *is* its folder's page, and a
+  bare `Page.md` stands in for a sibling `Page/` directory — the shape Notion
+  exports use. Files that could not be placed are reported, never dropped.
+- [ ] **Confluence/Notion importer UI + attachment handling** — the engine is
+  built; what is left is unpacking an export archive (zip), rewriting its
+  media references to Angy attachments, and a screen to drive it.
 - [ ] **Workspace-wide mention inbox + notifications** — the roadmap's item.
   The space-scoped list is deliberately not it: an inbox needs notifications
   behind it to be worth opening.

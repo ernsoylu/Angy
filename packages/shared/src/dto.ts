@@ -266,6 +266,35 @@ export const backlinkSchema = z.object({
 });
 export type BacklinkDto = z.infer<typeof backlinkSchema>;
 
+/**
+ * A Markdown bundle to import (ADR 0005). Generic rather than vendor-shaped:
+ * a Notion or Confluence export becomes this after unpacking, so the server
+ * learns one format instead of one per source.
+ *
+ * Bounded on purpose — an import is a single request that creates a page and
+ * queues a job per file, so an unbounded bundle is an unbounded write.
+ */
+export const importMarkdownSchema = z.object({
+  files: z
+    .array(
+      z.object({
+        /** Slash-separated, relative. Directories become parent pages. */
+        path: z.string().min(1).max(400),
+        markdown: z.string().max(2_000_000),
+      }),
+    )
+    .min(1)
+    .max(200),
+});
+export type ImportMarkdownDto = z.infer<typeof importMarkdownSchema>;
+
+export const importResultSchema = z.object({
+  created: z.array(z.object({ id: z.uuid(), title: z.string(), path: z.string() })),
+  /** Files that did not become pages, each with why — never a silent drop. */
+  skipped: z.array(z.object({ path: z.string(), reason: z.string() })),
+});
+export type ImportResultDto = z.infer<typeof importResultSchema>;
+
 /** A reusable page skeleton (V2 H2), scoped to the space that owns it. */
 export const pageTemplateSchema = z.object({
   id: z.string(),

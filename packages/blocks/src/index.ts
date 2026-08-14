@@ -33,6 +33,7 @@ export {
   documentToMarkdown,
   type MarkdownOptions,
 } from "./markdown.js";
+export { markdownToDocument, type ImportedDocument } from "./markdown-import.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";
 export { applyDocJson } from "./restore.js";
 export {
