@@ -198,7 +198,15 @@ all four consumers.
 - [ ] **Confluence/Notion importer** — the roadmap's highest-value
   non-structural item, and a multi-session one. Build it adjacent to Git import
   (ADR 0005) or the Markdown→Y.Doc path gets written twice.
-- [ ] **Git import / Git export** — two one-directional flows.
+- [x] **Markdown export** *(2026-08-14)* — `documentToMarkdown` in
+  @angy/blocks plus `GET /pages/:id/export.md` and `export-subtree.md`. Serves
+  the *projection*, not a decoded Y.Doc: the API is CommonJS and must never
+  construct one, and the projection is what the reader was shown, so an export
+  and a read cannot disagree. A subtree filters per page by read access and
+  states how many it withheld.
+- [ ] **Markdown import** — the other half of ADR 0005, and the engine the
+  Confluence/Notion importer needs. Needs a Markdown parser dependency;
+  export needed none.
 - [ ] **Workspace-wide mention inbox + notifications** — the roadmap's item.
   The space-scoped list is deliberately not it: an inbox needs notifications
   behind it to be worth opening.

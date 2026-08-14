@@ -4,6 +4,7 @@ import { OidcService } from "./auth/oidc.service";
 import { SessionGuard } from "./auth/session.guard";
 import { HealthController } from "./health.controller";
 import { AttachmentsController } from "./pages/attachments.controller";
+import { ExportController } from "./pages/export.controller";
 import { PageOpsController } from "./pages/page-ops.controller";
 import { PagePermissionsController } from "./pages/page-permissions.controller";
 import { PagesController } from "./pages/pages.controller";
@@ -32,6 +33,7 @@ import { UsersController } from "./users/users.controller";
     PersonalController,
     TagsController,
     TemplatesController,
+    ExportController,
     UsersController,
   ],
   providers: [OidcService, SessionGuard, PagePermissionGuard],

@@ -29,6 +29,10 @@ export {
   type RefKind,
   type RefLabels,
 } from "./refs.js";
+export {
+  documentToMarkdown,
+  type MarkdownOptions,
+} from "./markdown.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";
 export { applyDocJson } from "./restore.js";
 export {
