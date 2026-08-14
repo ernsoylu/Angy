@@ -23,6 +23,7 @@
     "@nestjs/platform-express": "^11",
     "bullmq": "^5.81.3",
     "dotenv": "^17.4.2",
+    "fflate": "^0.8.3",
     "ioredis": "^5.11.1",
     "jose": "^6.2.8",
     "meilisearch": "^0.53.0",

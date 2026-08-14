@@ -1,17 +1,20 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
+  NotFoundException,
   Param,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
-import { markdownToDocument } from "@angy/blocks";
-import { createPage, getEffectiveSpaceLevel, getPrisma, type Prisma } from "@angy/db";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { getEffectiveSpaceLevel, getPrisma } from "@angy/db";
 import {
   importMarkdownSchema,
-  JOB_PROJECTION_INIT,
   ok,
   satisfies,
   type ApiOk,
@@ -19,23 +22,28 @@ import {
   type ImportResultDto,
 } from "@angy/shared";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
-import { projectionsQueue } from "../queue";
 import { ZodValidationPipe } from "../zod.pipe";
+import { normaliseArchivePath, unpackArchive } from "./archive";
+import { importBundle } from "./import.service";
+
+/** Compressed bytes on the wire; `unpackArchive` owns the inflated bound. */
+const MAX_ARCHIVE_BYTES = 60 * 1024 * 1024;
 
 /**
- * Markdown import (ADR 0005, the one-directional *in* flow) — and the engine a
- * Confluence/Notion importer needs, which is why it takes a generic bundle of
- * files rather than one vendor's export format.
+ * Markdown import (ADR 0005, the one-directional *in* flow) in its two forms.
  *
- * Every imported page is a **fresh** page with a fresh Y.Doc, built through the
- * same `createPage(documentJson)` → `initYdoc` path a blank or templated page
- * takes. Import never merges into an existing document: Markdown carries no
- * CRDT tombstones, so merging would discard the history concurrent editing
- * depends on.
+ * `POST /spaces/:id/import` takes a generic bundle of `{path, markdown}`. It is
+ * the engine, and it stays generic on purpose: the server learns one shape
+ * rather than one format per vendor.
+ *
+ * `POST /spaces/:id/import/archive` takes the `.zip` a person actually has in
+ * their downloads folder, unpacks it into that same bundle, and carries the
+ * media along so an imported page's images are Angy attachments rather than
+ * references to a folder that no longer exists.
  *
  * The API is CommonJS and must never construct a Y.Doc (CLAUDE.md gotcha), and
- * it does not need to — `markdownToDocument` returns plain JSON and the worker
- * turns it into a document.
+ * it does not need to — the import produces plain JSON and the worker turns it
+ * into a document.
  */
 @Controller()
 @UseGuards(SessionGuard)
@@ -46,104 +54,78 @@ export class ImportController {
     @Body(new ZodValidationPipe(importMarkdownSchema)) body: ImportMarkdownDto,
     @Req() req: AuthedRequest,
   ): Promise<ApiOk<ImportResultDto>> {
+    const space = await this.writableSpace(spaceId, req);
+    return ok(
+      await importBundle(getPrisma(), {
+        spaceId: space.id,
+        spaceVisibility: space.visibility,
+        userId: req.user.id,
+        files: body.files.map((file) => ({
+          path: normaliseArchivePath(file.path),
+          markdown: file.markdown,
+        })),
+      }),
+    );
+  }
+
+  /**
+   * Unpacking happens in the request, like the bundle import it delegates to.
+   * The work is bounded before it starts — the archive's own headers say how
+   * much it inflates to, and `unpackArchive` refuses anything past the limit —
+   * and the person who chose the file is waiting for the list of what became a
+   * page and what did not. A queued job would have to invent somewhere to put
+   * that answer.
+   */
+  @Post("spaces/:spaceId/import/archive")
+  // Multer's own ceiling sits just above the checked one, so an ordinary
+  // oversize archive gets the message below and a pathological upload is cut
+  // off at the socket instead of being buffered into the API's heap.
+  @UseInterceptors(
+    FileInterceptor("file", { limits: { fileSize: MAX_ARCHIVE_BYTES + 1024 * 1024 } }),
+  )
+  async importArchive(
+    @Param("spaceId") spaceId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<ImportResultDto>> {
+    if (!file) throw new BadRequestException("Attach the export archive under the 'file' field");
+    if (file.size > MAX_ARCHIVE_BYTES) {
+      throw new BadRequestException(
+        `That archive is larger than ${MAX_ARCHIVE_BYTES / 1024 / 1024} MB — split the export`,
+      );
+    }
+    const space = await this.writableSpace(spaceId, req);
+
+    const archive = unpackArchive(file.buffer);
+    if (archive.files.length === 0) {
+      throw new BadRequestException(
+        "No Markdown files in that archive — export as Markdown, not HTML or PDF",
+      );
+    }
+
+    return ok(
+      await importBundle(getPrisma(), {
+        spaceId: space.id,
+        spaceVisibility: space.visibility,
+        userId: req.user.id,
+        files: archive.files,
+        media: archive.media,
+        skipped: archive.skipped,
+      }),
+    );
+  }
+
+  /** Import writes pages, so it needs what writing a page needs. */
+  private async writableSpace(spaceId: string, req: AuthedRequest) {
     const prisma = getPrisma();
-    const id = BigInt(spaceId);
-    const level = await getEffectiveSpaceLevel(prisma, req.user.id, id);
+    const space = await prisma.space.findFirst({
+      where: { id: BigInt(spaceId), deletedAt: null },
+    });
+    if (!space) throw new NotFoundException("Space not found");
+    const level = await getEffectiveSpaceLevel(prisma, req.user.id, space.id);
     if (!satisfies(level, "EDIT")) {
       throw new ForbiddenException("You need edit access to import into this space");
     }
-
-    // Shallowest first, so a folder's page exists before its children need it
-    // as a parent. Without this a nested file would create its own ancestors
-    // and then collide with the real ones later in the bundle.
-    const files = [...body.files].sort(
-      (a, b) => depthOf(a.path) - depthOf(b.path) || a.path.localeCompare(b.path),
-    );
-
-    const taken = new Set(
-      (await prisma.page.findMany({ where: { spaceId: id }, select: { slug: true } })).map(
-        (p) => p.slug,
-      ),
-    );
-    /** Folder path → the page standing for it, so siblings share one parent. */
-    const folders = new Map<string, string>();
-    const created: { id: string; title: string; path: string }[] = [];
-    const skipped: { path: string; reason: string }[] = [];
-
-    for (const file of files) {
-      const segments = normalisePath(file.path);
-      if (segments.length === 0) {
-        skipped.push({ path: file.path, reason: "Not a usable path" });
-        continue;
-      }
-
-      const parsed = markdownToDocument(file.markdown);
-      const name = segments.at(-1)!.replace(/\.mdx?$/i, "");
-      const title = (parsed.title ?? titleFromFilename(name)).slice(0, 200);
-
-      // An index file *is* its folder's page, so it hangs off the folder
-      // above — asking for its own folder would be asking to be its own
-      // parent, and the page it needs does not exist yet by definition.
-      const dir = segments.slice(0, -1);
-      const parentPath = (isIndex(name) ? dir.slice(0, -1) : dir).join("/");
-      const parentId = parentPath === "" ? null : (folders.get(parentPath) ?? null);
-      if (parentPath !== "" && parentId === null) {
-        // The bundle referenced a directory no file stands for. Import at the
-        // root rather than dropping it: a misplaced page beats a lost one.
-        skipped.push({ path: file.path, reason: "Parent folder had no page; imported at root" });
-      }
-
-      const page = await createPage(prisma, {
-        spaceId: id,
-        parentId,
-        title,
-        slug: uniqueSlug(title, taken),
-        createdBy: req.user.id,
-        documentJson: parsed.doc as Prisma.InputJsonValue,
-      });
-      await projectionsQueue().add(JOB_PROJECTION_INIT, { pageId: page.id });
-
-      created.push({ id: page.id, title, path: file.path });
-      // What this page stands in for, so later files can nest under it: an
-      // index file represents its own folder; any other file represents a
-      // folder of its own name, which is how Notion exports pair `Page.md`
-      // with a sibling `Page/` directory of children.
-      const folderPath = isIndex(name) ? dir.join("/") : segments.join("/").replace(/\.mdx?$/i, "");
-      if (folderPath) folders.set(folderPath, page.id);
-    }
-
-    return ok({ created, skipped });
+    return space;
   }
-}
-
-const depthOf = (path: string) => normalisePath(path).length;
-
-/** Reject traversal and empty segments — a path here only names a hierarchy. */
-function normalisePath(path: string): string[] {
-  return path
-    .split("/")
-    .map((segment) => segment.trim())
-    .filter((segment) => segment !== "" && segment !== "." && segment !== "..");
-}
-
-const isIndex = (name: string) => /^(index|readme)$/i.test(name);
-
-function titleFromFilename(name: string): string {
-  const words = name.replace(/[-_]+/g, " ").trim();
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Untitled";
-}
-
-function uniqueSlug(title: string, taken: Set<string>): string {
-  const base =
-    title
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim()
-      .replace(/[\s-]+/g, "-")
-      .slice(0, 60) || "page";
-  let slug = base;
-  for (let i = 2; taken.has(slug); i++) slug = `${base}-${i}`;
-  taken.add(slug);
-  return slug;
 }

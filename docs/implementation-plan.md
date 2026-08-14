@@ -318,8 +318,9 @@ Build order within the wave:
    nothing is lost — and `kind` is what keeps the two queries apart, since both
    populate the same column.
 
-**H1 is complete**: three kinds indexed, four consumers built. What remains in
-V2 is the adoption path (H2) and the workspace-wide mention inbox (H3).
+**H1 is complete**: three kinds indexed, four consumers built. H2 and the
+inbox have since closed too, so the one structural item left in V2 is
+databases-in-pages (ADR 0013) — everything else is H4, waiting on a reason.
 
 **Hard rule it must not break:** rule 2 forbids a block *relational* table.
 `block_index` is a projection — derived, disposable, rebuildable from the
@@ -327,25 +328,43 @@ Y.Doc, never a source of truth and never written by the editor. If it ever
 becomes the thing an edit writes to, the rule has been broken. Rebuilding it
 from scratch for every page must stay a supported operation.
 
-### H2 · Adoption path (independent of H1, parallelisable)
+### H2 · Adoption path (independent of H1, parallelisable) — complete
 
-Nothing here is blocked; these are gated on wanting them.
+- ✅ **Page templates** *(2026-08-14)* — cheap next to the rest, and the thing
+  that makes an empty workspace usable.
+- ✅ **Markdown export, then import** *(2026-08-14)* — two one-directional
+  flows (ADR 0005), built adjacent exactly as this section warned, so the
+  Markdown→Y.Doc path exists once.
+- ✅ **Confluence/Notion importer** *(2026-08-14)* — the migration path for
+  teams adopting Angy, and the item the roadmap ranks highest outside the
+  structural work. It is a front end on the bundle importer rather than a
+  second importer: `unpackArchive` turns a `.zip` into the same
+  `{path, markdown}` plus its media, and `importBundle` does the rest.
 
-- **Confluence/Notion importer** — the roadmap calls this the migration path
-  for teams adopting Angy, which makes it the highest-value non-structural
-  item. Import writes a fresh Y.Doc per page, the same one-directional shape
-  ADR 0005 settled for Git; never a round-trip.
-- **Page templates** — cheap next to the rest, and the thing that makes an
-  empty workspace usable. Note TODO.md's warning: there is no production seed
-  by design, so first-run paths are load-bearing and under-exercised.
-- **Git import / Git export** — two one-directional flows (ADR 0005). Import
-  shares its machinery with the importer above; build them adjacent or the
-  Markdown→Y.Doc path gets written twice.
+  Three things were decided on contact:
+
+  1. **Ids before writes.** The plan phase assigns every page's id, title, slug
+     and parent before a row exists, because an export's links point forward as
+     often as back — a one-pass loop can only rewrite links to pages it has
+     already created, and the rest stay relative paths to files that no longer
+     exist. `createPage` grew an optional `id` for this.
+  2. **Links become hrefs, not `pageLink` nodes.** `pageLink` is a block-level
+     atom, so promoting an inline link would mean rewriting the paragraph
+     around it and discarding the author's link text. Imported links resolve
+     through `/p/{id}` and work; they do not produce backlinks. A node that
+     swallows its own sentence would be the worse trade.
+  3. **Bound the archive before inflating it.** Each zip entry header states
+     its uncompressed size, so a bomb is refused without being allocated. A
+     check after unzipping is a check the API has already lost.
+
+  Markdown exports only. A Confluence *HTML* export is refused with a reason
+  rather than half-parsed: HTML→ProseMirror is a second engine, not a flag.
 
 ### H3 · Waiting on H1
 
-- **Backlinks + mentions UI**, then **per-user mention notifications and the
-  in-app inbox** — the inbox has no reason to exist before mentions do.
+- ✅ **Backlinks + mentions UI**, then **per-user mention notifications and the
+  in-app inbox** *(2026-08-14)* — the inbox had no reason to exist before
+  mentions did.
 - **Databases-in-pages** (ADR 0013): a row is a Page, a database is a view over
   a set of pages plus a property schema. The ADR is explicit that it "should
   not start before `block_index` exists". The `page_property` schema it

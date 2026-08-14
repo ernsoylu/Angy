@@ -290,8 +290,15 @@ export type ImportMarkdownDto = z.infer<typeof importMarkdownSchema>;
 
 export const importResultSchema = z.object({
   created: z.array(z.object({ id: z.uuid(), title: z.string(), path: z.string() })),
-  /** Files that did not become pages, each with why — never a silent drop. */
+  /**
+   * Everything the import could not place — a file that became no page, an
+   * image the archive did not contain, media nobody referenced — each with
+   * why. Never a silent drop: a migration that quietly loses a file is worse
+   * than one that refuses it.
+   */
   skipped: z.array(z.object({ path: z.string(), reason: z.string() })),
+  /** Archive media that became attachments on the pages referencing them. */
+  attachments: z.number().int(),
 });
 export type ImportResultDto = z.infer<typeof importResultSchema>;
 

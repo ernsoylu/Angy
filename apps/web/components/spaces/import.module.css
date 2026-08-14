@@ -1,0 +1,144 @@
+/* Import screen. Full-width content region like Trash and Settings: the result
+   list is the substance here, so nothing competes with it in a right rail. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 30px 44px 56px;
+  max-width: 860px;
+}
+
+.title {
+  font-family: var(--font-body), serif;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 4px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.count {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+/* Dashed drop target, doubling as the file-picker button — one affordance, so
+   there is no second control that looks like it does something different. */
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 30px 20px;
+  text-align: center;
+  background: var(--elevated);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-card);
+}
+
+.dropActive {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.drop:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.dropTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.dropBody {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.list {
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  /* Long enough to read, short enough that the page stays navigable — an
+     import of 200 files would otherwise be the whole screen. */
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row-h);
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+a.row:hover {
+  background: var(--elevated);
+}
+
+.rowTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowPath {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .wrap {
+    padding: 24px;
+  }
+
+  .rowPath {
+    display: none;
+  }
+}

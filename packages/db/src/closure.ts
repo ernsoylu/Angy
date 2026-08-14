@@ -10,6 +10,13 @@ import {
 export class PageMoveError extends Error {}
 
 export interface CreatePageInput {
+  /**
+   * Assigned by the caller instead of the database. Import needs it: a
+   * document that links to its siblings can only be rewritten once every id in
+   * the bundle is known, and `document_json` is written at create time — so
+   * the ids have to exist before the first page does.
+   */
+  id?: string;
   spaceId: bigint;
   parentId?: string | null;
   title: string;
@@ -29,6 +36,7 @@ export async function createPage(prisma: PrismaClient, input: CreatePageInput): 
   return prisma.$transaction(async (tx) => {
     const page = await tx.page.create({
       data: {
+        ...(input.id ? { id: input.id } : {}),
         spaceId: input.spaceId,
         parentId: input.parentId ?? null,
         title: input.title,

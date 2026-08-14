@@ -14,7 +14,6 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { Queue } from "bullmq";
 import {
   getEffectivePageLevel,
   getEffectiveSpaceLevel,
@@ -26,7 +25,6 @@ import {
   JOB_ATTACHMENT_REINDEX,
   JOB_THUMBNAIL,
   ok,
-  QUEUE_MAINTENANCE,
   satisfies,
   type ApiOk,
   type AttachmentDto,
@@ -37,16 +35,9 @@ import {
   PagePermissionGuard,
   RequirePageLevel,
 } from "../permissions/page-permission.guard";
-import { getRedis } from "../redis";
+import { maintenanceQueue } from "../queue";
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-
-let maintenance: Queue | undefined;
-
-function maintenanceQueue(): Queue {
-  maintenance ??= new Queue(QUEUE_MAINTENANCE, { connection: getRedis() });
-  return maintenance;
-}
 
 async function toDto(
   attachment: Attachment & { page?: { title: string } | null },

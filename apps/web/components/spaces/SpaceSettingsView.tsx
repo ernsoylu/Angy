@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Trash2, UserPlus, X } from "lucide-react";
+import { Lock, Trash2, Upload, UserPlus, X } from "lucide-react";
 import type { PermLevelDto, SpaceDto, SpaceMemberDto } from "@angy/shared";
 import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
@@ -315,6 +315,23 @@ export function SpaceSettingsView({ space, members, pageCount }: SpaceSettingsVi
               </button>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className={styles.card}>
+        <div className="t-caption">Content</div>
+        <div className={styles.actionRow}>
+          <span>
+            <span className={styles.actionTitle}>Import from Notion or Confluence</span>
+            <span className={styles.actionBody}>
+              Unpacks a Markdown export into real pages, with its images stored here as
+              attachments. One-directional (ADR 0005) — imported pages never sync back.
+            </span>
+          </span>
+          {/* Anyone who can write here can import; this is only where it is found. */}
+          <Button variant="secondary" href={`/s/${space.key}/import`} icon={<Upload size={14} />}>
+            Import content
+          </Button>
         </div>
       </section>
 

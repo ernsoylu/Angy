@@ -34,6 +34,12 @@ export {
   type MarkdownOptions,
 } from "./markdown.js";
 export { markdownToDocument, type ImportedDocument } from "./markdown-import.js";
+export {
+  documentUrls,
+  rewriteDocumentUrls,
+  type DocUrl,
+  type DocUrlKind,
+} from "./doc-urls.js";
 export { EMPTY_DOCUMENT, extractText, renderDocumentToHtml } from "./render.js";
 export { applyDocJson } from "./restore.js";
 export {

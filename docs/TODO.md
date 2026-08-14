@@ -195,9 +195,13 @@ all four consumers.
   `is_template` flag: that would have to be excluded from the tree, search,
   backlinks, trash, Recent, Starred and every future listing, and missing one
   leaks a template into a surface where it reads as real content.
-- [ ] **Confluence/Notion importer** — the roadmap's highest-value
-  non-structural item, and a multi-session one. Build it adjacent to Git import
-  (ADR 0005) or the Markdown→Y.Doc path gets written twice.
+- [x] **Confluence/Notion importer** *(2026-08-14)* — the roadmap's
+  highest-value non-structural item, built adjacent to Markdown import as
+  planned, so the Markdown→Y.Doc path exists once: `POST
+  /spaces/:id/import/archive` unpacks a `.zip` into the same generic bundle and
+  hands it to the same `importBundle`. Markdown exports only — a Confluence
+  *HTML* export is refused with a reason rather than half-parsed, because
+  HTML→ProseMirror is a second engine, not a flag.
 - [x] **Markdown export** *(2026-08-14)* — `documentToMarkdown` in
   @angy/blocks plus `GET /pages/:id/export.md` and `export-subtree.md`. Serves
   the *projection*, not a decoded Y.Doc: the API is CommonJS and must never
@@ -211,9 +215,21 @@ all four consumers.
   become parent pages; an `index.md`/`README.md` *is* its folder's page, and a
   bare `Page.md` stands in for a sibling `Page/` directory — the shape Notion
   exports use. Files that could not be placed are reported, never dropped.
-- [ ] **Confluence/Notion importer UI + attachment handling** — the engine is
-  built; what is left is unpacking an export archive (zip), rewriting its
-  media references to Angy attachments, and a screen to drive it.
+- [x] **Confluence/Notion importer UI + attachment handling** *(2026-08-14)* —
+  archive unpacking, media rewriting and the screen at `/s/{key}/import`
+  (EDIT-gated like the endpoint; found from space settings).
+  Two decisions carried the wave. **Ids are assigned before anything is
+  written**: an export's links point forward as often as back, so a document can
+  only be rewritten once every id in the bundle is known — `planPages` decides
+  the tree and `createPage` now accepts an `id`. And **cross-file links become
+  `/p/{id}` hrefs, not `pageLink` nodes**: that node is block-level, so
+  converting an inline link would mean rewriting the paragraph around it.
+  Imported links therefore work but produce no backlinks — the honest trade,
+  since a `pageLink` that swallows its own sentence is worse.
+  Media is content-addressed on the way in, so an image used on ten pages is
+  one S3 object and ten attachment rows, exactly as an upload would be. Nothing
+  is dropped in silence: a missing image, an unreferenced file and an HTML
+  export all come back with a reason and are shown on the screen.
 - [x] **Mention notifications + in-app inbox** *(2026-08-14)* — a
   `notification` table raised by the projection worker, unique on
   (user, kind, page) so a rebuild cannot manufacture a duplicate, and the bell

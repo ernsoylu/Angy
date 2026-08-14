@@ -233,6 +233,34 @@
   flex-shrink: 0;
 }
 
+/* The danger zone's row shape without the alarm: one description, one action.
+   Written out rather than composed — nothing else in the app uses `composes`,
+   and Turbopack's CSS Modules support carves out enough of it to be worth
+   avoiding for three aliases. */
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.actionRow > :last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.actionTitle {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.actionBody {
+  display: block;
+  font-size: 12.5px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
 @media (max-width: 1024px) {
   .wrap {
     padding: 24px;
@@ -242,13 +270,15 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .dangerRow {
+  .dangerRow,
+  .actionRow {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
 
-  .dangerRow > :last-child {
+  .dangerRow > :last-child,
+  .actionRow > :last-child {
     margin-left: 0;
   }
 }
