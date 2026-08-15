@@ -47,7 +47,10 @@ test.describe("reader SSR + edit-on-click", () => {
 
     const dialog = page.getByRole("dialog", { name: "Space settings" });
     await expect(dialog.getByText("Mira Kalvo")).toBeVisible();
-    await expect(dialog.getByText("Space baseline", { exact: false })).toBeVisible();
+    // Exact: the dialog says "space baseline" twice — once as the caption and
+    // once inside "N members · space baseline" — so a substring match is two
+    // elements and strict mode fails on the assertion rather than the app.
+    await expect(dialog.getByText("Space baseline", { exact: true })).toBeVisible();
     // The way through to the things this dialog deliberately does not do.
     await expect(dialog.getByRole("link", { name: "All settings" })).toBeVisible();
 
