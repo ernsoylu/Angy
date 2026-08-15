@@ -266,6 +266,23 @@ If it closes early with 1006, raise the idle timeout on the `rt.` resource in
 Pangolin. Do **not** compensate by shortening the client timeout — that trades
 a visible failure for constant reconnect churn that quietly degrades editing.
 
+**A third outcome, seen 2026-08-15: no close at all.** Through the tunnel the
+idle socket survived past 95s with no close frame, twice, where the same
+command had produced 4408 the day before. The app had not changed — running the
+identical test *inside* the container, with the tunnel out of the path, still
+closed at exactly 60s with `4408`:
+
+```bash
+docker exec angy-realtime-1 node -e '…new WebSocket("ws://localhost:3002/")…'
+```
+
+So the connection is being held open upstream, in Pangolin or newt, rather than
+by anything Hocuspocus did. That is the *safe* direction — this check exists to
+catch a proxy that reaps too early, and a real editor connection carries
+traffic constantly, so the idle timeout never applies to it anyway. Read a
+missing close as "verify from the loopback before believing the app changed",
+not as a pass or a failure on its own.
+
 ### 5.2 Sign-in
 
 Sign in through the browser and confirm:
