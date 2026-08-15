@@ -377,6 +377,7 @@
   .wsName,
   .crumbSlash,
   .editBtn,
+  .newSpaceBtn,
   .presence {
     display: none;
   }

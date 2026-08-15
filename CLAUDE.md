@@ -189,7 +189,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 ## UI Design Source
 
-- frontend.pen — Pencil design file, the source of truth for all V1 screens (reader, editor, search, history & diff, space home, sign-in, share & permissions, attachments, trash, move page, system states) plus design-system frames (foundations, components, responsive, interaction & density), each in light and dark. Build apps/web to match these frames.
+- frontend.pen — Pencil design file, the source of truth for every screen (reader, editor, search, history & diff, space home, sign-in, share & permissions, attachments, trash, move page, system states, space settings, space-settings modal) plus design-system frames (foundations, components, responsive, interaction & density), each in light and dark. Build apps/web to match these frames. **Edit it only through the Pencil MCP** (`mcp__pencil__*`) — never Read/Grep/Write the file. In that editor, `Copy` an existing node and customise it; freshly `Insert`ed subtrees have been observed not to render, and `ctx.bounds` can lag a mutation, so verify with `get_screenshot`, not with bounds.
 - screenshots/ — PNG renders of every frontend.pen frame (`NN-name-{light,dark}.png`); read these instead of parsing the 2.5MB .pen JSON.
 
 ---

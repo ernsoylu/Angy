@@ -25,6 +25,7 @@ import { useEscape } from "../../lib/useEscape";
 import type { TreeNode } from "../../lib/tree";
 import { NewPageDialog } from "../pageops/NewPageDialog";
 import { ShareDialog } from "../share/ShareDialog";
+import { NewSpaceButton } from "../spaces/NewSpaceButton";
 import { NotificationMenu } from "./NotificationMenu";
 import { PageTree } from "./PageTree";
 import { UserMenu } from "./UserMenu";
@@ -103,6 +104,11 @@ export function AppShell({ user, space, tree, children }: AppShellProps) {
             <SearchField id="global-search" name="q" placeholder={`Search ${space.name}...`} />
           </form>
           <div className={styles.topRight}>
+            {/* Creating a space belongs to the workspace, not to whichever
+                space is open — so it sits here rather than on one screen. */}
+            <span className={styles.newSpaceBtn}>
+              <NewSpaceButton />
+            </span>
             {onPage && currentPageId && (
               <Button variant="secondary" onClick={() => setShareOpen(true)}>
                 Share

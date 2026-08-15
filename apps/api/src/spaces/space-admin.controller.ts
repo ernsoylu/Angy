@@ -152,8 +152,8 @@ export class SpaceAdminController {
     @Req() req: AuthedRequest,
   ): Promise<ApiOk<SpaceMemberDto[]>> {
     const spaceId = BigInt(id);
-    // Members are visible to anyone who can read the space (frame 5's rail
-    // already lists them); only changing them needs ADMIN.
+    // Members are visible to anyone who can read the space (frame 13's
+    // Settings dialog lists them); only changing them needs ADMIN.
     const level = await getEffectiveSpaceLevel(getPrisma(), req.user.id, spaceId);
     if (!satisfies(level, "VIEW")) {
       throw new ForbiddenException("You don't have access to this space");
