@@ -86,7 +86,12 @@ export function EditorView({
         </article>
 
         <aside className={shell.rail}>
-          <CommentsRail threads={threads} canEdit currentUserId={user.id} />
+          <CommentsRail
+            threads={threads}
+            canEdit
+            currentUserId={user.id}
+            onThreadsChange={setThreads}
+          />
           <div className={shell.railGroup}>
             <div className="t-caption">Editing now</div>
             {presence.length === 0 && (

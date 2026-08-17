@@ -86,6 +86,12 @@ test.describe("comments", () => {
     const mine = inbox.filter((row) => row.pageId === created.id);
     expect(mine).toHaveLength(1);
     expect(mine[0].kind).toBe("COMMENT");
+
+    // Leave the inbox as it was found. The suite shares one seeded backend, and
+    // `notifications.spec` later asserts that the person who *wrote* a mention
+    // has no bell badge — an unread COMMENT row from here fails it, in a spec
+    // that has nothing to do with comments.
+    await api("e2e-eren", "/notifications/read", { method: "POST" });
   });
 
   test("a thread is exactly as readable as the page it hangs off", async () => {

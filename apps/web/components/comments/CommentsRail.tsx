@@ -39,13 +39,26 @@ export function CommentsRail({
   threads: initial,
   canEdit,
   currentUserId,
+  onThreadsChange,
 }: {
   threads: CommentThreadDto[];
   canEdit: boolean;
   currentUserId: string;
+  /** Set by an owner that keeps its own copy — the editor, which appends to it. */
+  onThreadsChange?: (threads: CommentThreadDto[]) => void;
 }) {
   const { toast } = useToast();
   const [threads, setThreads] = useState(initial);
+  // The rail owns its list so a reply or a resolve updates without a round
+  // trip — but the *parent* also changes it: opening a thread in the editor
+  // appends to `initial`, and a plain `useState(initial)` would ignore that
+  // for the lifetime of the mount. The new thread's anchor would appear in the
+  // document while the rail stayed empty.
+  const [rendered, setRendered] = useState(initial);
+  if (rendered !== initial) {
+    setRendered(initial);
+    setThreads(initial);
+  }
   const [showResolved, setShowResolved] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -56,11 +69,17 @@ export function CommentsRail({
   const shown = showResolved ? threads : open;
 
   function replace(updated: CommentThreadDto | null, id: string) {
-    setThreads((prev) =>
-      updated === null
-        ? prev.filter((thread) => thread.id !== id)
-        : prev.map((thread) => (thread.id === id ? updated : thread)),
-    );
+    setThreads((prev) => {
+      const next =
+        updated === null
+          ? prev.filter((thread) => thread.id !== id)
+          : prev.map((thread) => (thread.id === id ? updated : thread));
+      // Tell the owner too. Without this the editor's copy keeps the
+      // pre-reply thread, and the next time it appends one — opening a second
+      // thread — it would push that stale copy back down over this one.
+      onThreadsChange?.(next);
+      return next;
+    });
   }
 
   async function run(id: string, work: () => Promise<CommentThreadDto | null>) {

@@ -1,11 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  api,
-  pageIdBySlug,
-  plantSession,
-  SEEDED_USER_ID,
-  sessionContext,
-} from "./helpers";
+import { SEEDED_USER_ID, api, pageIdBySlug, pageTitle, plantSession, sessionContext } from "./helpers";
 
 /** Wave C: reading history, stars, and the surfaces built on them. */
 test.describe("recent, starred and the Me tab", () => {
@@ -17,11 +11,11 @@ test.describe("recent, starred and the Me tab", () => {
 
     // Reading is what populates Recent — no explicit action.
     await page.goto(`/s/eng/${pageId}`);
-    await expect(page.locator("h1")).toHaveText("Storage Model");
+    await expect(pageTitle(page)).toHaveText("Storage Model");
 
     await page.getByRole("link", { name: "Recent" }).click();
     await expect(page).toHaveURL(/\/s\/eng\/recent$/);
-    await expect(page.locator("h1")).toHaveText("Recent");
+    await expect(pageTitle(page)).toHaveText("Recent");
     await expect(page.getByRole("link", { name: /Storage Model/ })).toBeVisible();
 
     // Starred starts empty and says so, rather than rendering a blank panel.
@@ -64,7 +58,7 @@ test.describe("recent, starred and the Me tab", () => {
     await page.setViewportSize({ width: 390, height: 780 });
 
     await page.goto(`/s/eng/${pageId}`);
-    await expect(page.locator("h1")).toHaveText("Permissions");
+    await expect(pageTitle(page)).toHaveText("Permissions");
 
     const tabs = page.getByRole("navigation").last();
     // exact: "Home" contains "me".
@@ -86,7 +80,7 @@ test.describe("recent, starred and the Me tab", () => {
     const mira = await sessionContext(browser, "e2e-mira");
     const miraPage = await mira.newPage();
     await miraPage.goto(`/s/eng/${pageId}`);
-    await expect(miraPage.locator("h1")).toHaveText("Onboarding");
+    await expect(pageTitle(miraPage)).toHaveText("Onboarding");
 
     const recent = await api<{ id: string }[]>("e2e-mira", "/spaces/1/recent");
     expect(recent.some((r) => r.id === pageId)).toBe(true);

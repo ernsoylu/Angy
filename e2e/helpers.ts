@@ -76,6 +76,21 @@ export function articleBody(page: Page): Locator {
   return page.locator(".article-prose:visible");
 }
 
+/**
+ * The reader's page title. Same streaming race as `articleBody`, same fix, and
+ * for the same reason: `page.locator("h1")` resolves to two elements while the
+ * hidden template is still in the DOM, and the spec that samples mid-swap dies
+ * with "resolved to 2 elements" no matter what it was actually asserting.
+ *
+ * The window widens with everything the page streams *after* the title, so
+ * specs that were reliable before a rail group was added are not evidence that
+ * a bare locator was ever safe — H5 added three (comments, properties, the
+ * database table) and the trap fired on the next run.
+ */
+export function pageTitle(page: Page): Locator {
+  return page.locator("h1:visible");
+}
+
 export async function pageIdBySlug(session: SessionName, slug: string): Promise<string> {
   const pages = await api<{ id: string; slug: string }[]>(session, "/spaces/1/pages");
   const page = pages.find((p) => p.slug === slug);

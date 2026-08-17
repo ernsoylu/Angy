@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, sessionContext } from "./helpers";
+import { api, pageTitle, sessionContext } from "./helpers";
 
 /**
  * Databases-in-pages, first slice (V2 H5.3, ADR 0013). The claim under test is
@@ -71,10 +71,18 @@ test.describe("database view", () => {
 
     // A row is a Page: its title is the way into it.
     await titles.first().getByRole("link").click();
-    await expect(page.locator("h1")).toHaveText(`Drop it ${stamp}`);
+    await expect(pageTitle(page)).toHaveText(`Drop it ${stamp}`);
 
     // And its cells are edited there, on the row's own page — never in the table.
     await expect(page.getByTestId("page-properties")).toBeVisible();
+
+    // Clean up the vocabulary. A property left behind puts a Properties group
+    // on *every* page in the space for every later spec — which is both noise
+    // and, because the reader is streamed, a wider window for the
+    // duplicate-node race that `pageTitle`/`articleBody` exist to dodge.
+    for (const property of [status, estimate]) {
+      await api("e2e-eren", `/spaces/1/properties/${property.id}`, { method: "DELETE" });
+    }
 
     await context.close();
   });
@@ -102,5 +110,7 @@ test.describe("database view", () => {
     // Rejected on save rather than dropped on read: a view that quietly
     // ignores half its filter shows more rows than it was asked for.
     expect(res.status).toBe(400);
+
+    await api("e2e-eren", `/spaces/1/properties/${text.id}`, { method: "DELETE" });
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { api, pageIdBySlug, sessionContext } from "./helpers";
+import { api, pageIdBySlug, pageTitle, sessionContext } from "./helpers";
 
 /** Frame D's interaction contract and frame E's mobile tab bar. */
 test.describe("shell interaction", () => {
@@ -34,7 +34,7 @@ test.describe("shell interaction", () => {
     await page.keyboard.press("ArrowUp");
     await expect(architecture).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.locator("h1")).toHaveText("Architecture");
+    await expect(pageTitle(page)).toHaveText("Architecture");
 
     await context.close();
   });
