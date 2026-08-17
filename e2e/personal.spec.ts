@@ -26,7 +26,20 @@ test.describe("recent, starred and the Me tab", () => {
     await page.goto(`/s/eng/${pageId}`);
     const star = page.getByRole("button", { name: "Star page" });
     await expect(star).toHaveAttribute("aria-pressed", "false");
-    await star.click();
+    // The control is optimistic: aria-pressed flips before the write lands, so
+    // asserting on it and then reloading races the server render — the reload
+    // can be served by a database that has not seen the star yet, and the
+    // failure looks like "Starred does not exist" a page later. Wait for the
+    // write itself, then the optimistic state is merely confirmation.
+    await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          res.url().includes(`/pages/${pageId}/star`) &&
+          res.request().method() === "PUT" &&
+          res.ok(),
+      ),
+      star.click(),
+    ]);
     await expect(page.getByRole("button", { name: "Starred" })).toHaveAttribute(
       "aria-pressed",
       "true",
