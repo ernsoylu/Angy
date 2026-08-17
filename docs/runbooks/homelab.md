@@ -452,6 +452,66 @@ Two other scanner findings are accepted rather than fixed:
   Hardcoding a path would break portability to buy protection against an
   attacker who already controls the environment running the tests.
 
+## 8. Upgrading a running deployment
+
+Section 4 brings up an empty install. This is the other case: a deployment
+with real content in it, taking a new version. The order below exists because
+**new code against an old schema fails, old code against a new schema mostly
+does not** — so the database moves first, and the images follow.
+
+```bash
+cd ~/angy
+./backup.sh --verify        # 1. a snapshot you have actually restored
+./verify-secrets.sh         # 2. a green baseline, so a later failure is new
+```
+
+3. **Build the images on the build host.** The web image bakes
+   `NEXT_PUBLIC_*` at build time (§2), so it is specific to this deployment
+   and cannot be promoted from another one.
+
+4. **Migrate before starting the new images** — same throwaway-container
+   recipe as §4.1, after re-extracting `prisma/` from the *new* api image.
+
+5. `docker compose -f compose.prod.yml up -d` — this also creates any new
+   service the compose file gained.
+
+6. **Verify** in the order §5 gives, then `./verify-secrets.sh` again.
+
+### Rolling back is not symmetric
+
+The migrations are additive — new tables and columns — so the *old* images
+keep working against the new schema in almost every respect. One exception
+matters, and it is not obvious:
+
+> **`page.ord` is NOT NULL with no database default.** New code always supplies
+> it; old code does not know the column exists, so rolling the images back
+> while keeping the schema makes **every page creation fail** with a not-null
+> violation. Reads, edits and everything else keep working, which is what makes
+> it easy to miss.
+
+If you must run the old images against the new schema, give the column a
+default first — `ALTER TABLE page ALTER COLUMN ord SET DEFAULT 'V00000'` — and
+drop it again when you roll forward. Every page created in the meantime lands
+at the same sibling key, which sorts by id and is untidy but not broken.
+Restoring the pre-upgrade snapshot is the cleaner answer if the window is
+short enough to afford it.
+
+### What the H5 upgrade specifically adds
+
+- **Three migrations.** `add_page_ord` is the only one that touches existing
+  rows: it adds a column, backfills every page's sibling key from `created_at`,
+  then sets NOT NULL. Measured at **512 ms for 50,000 pages** on this hardware,
+  so the table lock it holds is not the concern at homelab scale — but it is a
+  lock, and it is the reason step 1 is a backup rather than a hope.
+- **A new `walreceiver` service**, which `up -d` starts. It creates a
+  replication slot on first connect, and from then on Postgres will **retain
+  WAL until this container has it**. That is what makes the archive lossless
+  and also what fills the disk if the container stays down — check it after
+  the upgrade, and see [pitr.md](pitr.md) for dropping the slot in a hurry.
+- **Nothing to do for search or projections.** The new tables are read
+  directly; `block_index`, `rendered_html` and the Meilisearch indexes are
+  unchanged by H5 and need no reindex.
+
 ## Related
 
 - [ADR 0012](../adr/0012-homelab-tunnel-topology.md) — topology and the five hostnames

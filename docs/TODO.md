@@ -293,6 +293,14 @@ contact: [implementation-plan.md § H5](implementation-plan.md#h5--the-wave-that
   - [ ] **A copy that leaves the building.** `BACKUP_OFFSITE` is a share on the
     same LAN. `backup.sh` writes locally and replicates second, so it would
     take a second destination the same way — the open question is where.
+- [ ] **Deploy H5 to the homelab.** The live stack still runs the pre-H5 build.
+  Procedure: runbooks/homelab.md §8, which is new — §4 only covered bringing up
+  an *empty* install. Two things it exists to say: the database moves before
+  the images, because new code against an old schema fails while old code
+  against a new one mostly does not; and rolling back is **not symmetric** —
+  `page.ord` is NOT NULL with no default, so old images against the new schema
+  keep serving reads and fail every page *creation*. The backfill itself is not
+  the risk (512 ms for 50,000 pages, measured).
 
 **Not carried forward:** e2e `retries: 0` stays as it is. The flake that
 prompted the question turned out to be a real bug (the streaming-locator race),
