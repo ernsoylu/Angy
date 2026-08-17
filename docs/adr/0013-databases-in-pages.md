@@ -1,6 +1,25 @@
 # ADR 0013: Databases-in-Pages Are Deferred, and Rows Will Be Pages
 
-**Status:** Accepted (2026-08-07)
+**Status:** Accepted (2026-08-07) · **first slice implemented** (2026-08-17, V2 H5.3)
+
+> **What was built, and what the decision got wrong.** The first slice landed as
+> described — `page_property` per space, typed values per page, one read-only
+> table view over a page's children, filter and sort. Two things this ADR did
+> not anticipate:
+>
+> 1. **A database cannot be a block.** The static renderer is a pure JSON→HTML
+>    function with no database access, so a `database` node in the document
+>    could never carry live rows. The table renders as its own server-rendered
+>    section after the article — which keeps the invariant *and* keeps the read
+>    path JavaScript-free.
+> 2. **"Rows inherit page permissions" does not mean "rows are visible".** The
+>    consequences below say permissions "work already", and they do — but page
+>    grants resolve per page, with no walk up the closure table, so a caller
+>    who can open the database page may not be able to open its children. The
+>    view read-filters its rows for that reason, and counts only what survived.
+>
+> Ordering, listed below as unsolved, was solved first (H5.1): `page.ord`, a
+> fractional index, which the sidebar uses too.
 
 ## Context
 

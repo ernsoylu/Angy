@@ -7,7 +7,7 @@
 **Blocks are not database rows** — they live inside the page as JSONB and CRDT state (ADR 0001):
 
 - **One page** = one Postgres row + one Y.Doc blob in S3 (ADR 0002) + read projections (`document_json`, `rendered_html`, `text_extract`). The Y.Doc holds both the body fragment and a `title` Y.Text, so the title syncs, persists, and restores with the content; `page.title` is a projection of it, written by `onStoreDocument`.
-- **Read path**: Next.js RSC streams cached `rendered_html` from Postgres; the worker generated it with `@tiptap/static-renderer`. Readers get fast TTFB (<100ms budget) with zero editor JS.
+- **Read path**: Next.js RSC streams cached `rendered_html` from Postgres; the worker generated it with `@tiptap/static-renderer`. Readers get fast TTFB (<100ms budget) with zero editor JS. Everything the rail shows — backlinks, comment threads, page properties, a database view over the page's children — is resolved server-side **in one parallel batch** beside that HTML, so a reader still ships no JavaScript for any of it. The budget is what makes that a rule rather than a preference: each of those groups arrived as one more sequential `await`, and four round trips in series is how a streamed page stops being fast without anything looking wrong.
 - **Edit path**: the Tiptap editor mounts client-only on "Edit" click, connects to Hocuspocus (auth: ADR 0008), hydrates from the live Y.Doc in Redis.
 - **Realtime**: Yjs CRDT; debounced persistence to S3 every ~2s; presence + awareness in Redis.
 - **Live-by-default**: readers trail editors by debounce + projection lag (~2–5s); no draft/publish state in V1 (ADR 0010).

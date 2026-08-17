@@ -42,12 +42,20 @@ export default async function ReaderPage({
   const page = await getReaderPage(pageId, BigInt(me.id));
   if (!page) notFound();
   if (page === "forbidden") return <RestrictedState />;
-  // Reading history for the sidebar's Recent list — throttled in Postgres, so
-  // reloads and route prefetches don't turn into a write each.
-  await recordVisit(pageId, BigInt(me.id));
-  const backlinks = await getReaderBacklinks(pageId, BigInt(me.id), page.spaceId);
-  const threads = await getReaderThreads(pageId);
-  const database = await getReaderDatabase(pageId, page.spaceId, BigInt(me.id));
+  // Everything below needs only the page and the caller, so it goes in one
+  // round trip rather than four. This is the read path's whole argument — the
+  // reader streams a projection and pays for nothing it does not need — and
+  // each rail group added since (backlinks, comments, properties) arrived as
+  // one more sequential `await`, quietly turning a TTFB budget into a queue.
+  //
+  // The visit write rides along: it is throttled in Postgres and swallows its
+  // own failures, so nothing here waits on it being useful.
+  const [, backlinks, threads, database] = await Promise.all([
+    recordVisit(pageId, BigInt(me.id)),
+    getReaderBacklinks(pageId, BigInt(me.id), page.spaceId),
+    getReaderThreads(pageId),
+    getReaderDatabase(pageId, page.spaceId, BigInt(me.id)),
+  ]);
 
   const { html, toc } = injectToc(page.renderedHtml ?? "");
   const parents = page.breadcrumb.slice(0, -1);
