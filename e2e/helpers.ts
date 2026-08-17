@@ -91,6 +91,28 @@ export function pageTitle(page: Page): Locator {
   return page.locator("h1:visible");
 }
 
+/**
+ * A test id **on a server-rendered page** — the reader and anything else whose
+ * markup arrives by streaming RSC.
+ *
+ * Third form of the same trap, after `articleBody` and `pageTitle`: while
+ * React's hidden template is still in the DOM, every id inside it matches
+ * twice and a strict locator dies with "resolved to 2 elements", naming
+ * whatever spec sampled mid-swap rather than the code.
+ *
+ * The window is not fixed — it widens or narrows with how the page fetches.
+ * Making the reader's four rail queries parallel (one round trip instead of
+ * four) is what turned this from rare to reliable for `database-view`, which
+ * is a good reminder that "it has always passed" is not evidence a bare
+ * locator is safe.
+ *
+ * Client-only widgets (slash menu, mention menu, bell) never stream, so they
+ * are fine with a plain `getByTestId`.
+ */
+export function readerTestId(page: Page, testId: string): Locator {
+  return page.locator(`[data-testid="${testId}"]:visible`);
+}
+
 export async function pageIdBySlug(session: SessionName, slug: string): Promise<string> {
   const pages = await api<{ id: string; slug: string }[]>(session, "/spaces/1/pages");
   const page = pages.find((p) => p.slug === slug);

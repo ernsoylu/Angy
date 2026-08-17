@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, articleBody, sessionContext } from "./helpers";
+import { api, articleBody, readerTestId, sessionContext } from "./helpers";
 
 /**
  * Comments (V2 H5.2, ADR 0014). The anchor is a mark in the Y.Doc; the thread
@@ -36,7 +36,7 @@ test.describe("comments", () => {
     await page.keyboard.press("Enter");
 
     // The rail is the editor's own copy of the thread list.
-    await expect(page.getByTestId("comments").getByText(`Is this right? ${stamp}`)).toBeVisible();
+    await expect(readerTestId(page, "comments").getByText(`Is this right? ${stamp}`)).toBeVisible();
 
     // Checkpoint so the projection rebuilds from the stored document. The
     // rebuild is a worker job, so the reader has to be re-fetched until it

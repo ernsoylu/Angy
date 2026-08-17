@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, pageTitle, sessionContext } from "./helpers";
+import { api, pageTitle, readerTestId, sessionContext } from "./helpers";
 
 /**
  * Databases-in-pages, first slice (V2 H5.3, ADR 0013). The claim under test is
@@ -61,7 +61,7 @@ test.describe("database view", () => {
     });
 
     await page.goto(`/s/eng/${root.id}`);
-    const table = page.getByTestId("database-view");
+    const table = readerTestId(page, "database-view");
     await expect(table).toBeVisible();
 
     // Filtered to Done, ordered by estimate: "Drop it" (1) then "Ship it" (3).
@@ -74,7 +74,7 @@ test.describe("database view", () => {
     await expect(pageTitle(page)).toHaveText(`Drop it ${stamp}`);
 
     // And its cells are edited there, on the row's own page — never in the table.
-    await expect(page.getByTestId("page-properties")).toBeVisible();
+    await expect(readerTestId(page, "page-properties")).toBeVisible();
 
     // Clean up the vocabulary. A property left behind puts a Properties group
     // on *every* page in the space for every later spec — which is both noise

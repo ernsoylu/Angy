@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { api, articleBody, sessionContext } from "./helpers";
+import { api, articleBody, readerTestId, sessionContext } from "./helpers";
 
 /**
  * `block_index` end to end (V2 H1).
@@ -58,7 +58,7 @@ test.describe("backlinks", () => {
     // The target now knows who points at it — the query the index exists for.
     await expect(async () => {
       await page.goto(`/s/eng/${target.id}`);
-      await expect(page.getByTestId("backlinks")).toContainText(sourceTitle, { timeout: 5_000 });
+      await expect(readerTestId(page, "backlinks")).toContainText(sourceTitle, { timeout: 5_000 });
     }).toPass({ timeout: 60_000 });
 
     // Renaming the target must reach the *reader* of the page linking to it.
@@ -107,7 +107,7 @@ test.describe("backlinks", () => {
     await expect(page.locator("#main-content")).toBeVisible();
     // Absent, not an empty group: a rail heading with nothing under it reads as
     // a loading state.
-    await expect(page.getByTestId("backlinks")).toHaveCount(0);
+    await expect(readerTestId(page, "backlinks")).toHaveCount(0);
 
     await api("e2e-eren", `/pages/${lonely.id}/trash`, { method: "POST" }).catch(() => {});
     await context.close();
