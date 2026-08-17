@@ -6,6 +6,7 @@ import * as Y from "yjs";
 import { getPrisma } from "@angy/db";
 import { env } from "../src/env.js";
 import { buildServer, PERM_CHANGED_CHANNEL } from "../src/server.js";
+import { ORDER_KEY_START } from "@angy/shared";
 
 /**
  * Live revocation (ADR 0008): an editor whose rights are removed mid-session
@@ -45,6 +46,8 @@ beforeAll(async () => {
       spaceId,
       title: "Revocable",
       slug: `revocable-${Date.now()}`,
+      // Fixtures write the row directly, so the sibling key comes from here.
+      ord: ORDER_KEY_START,
       createdBy: outsiderId,
       documentJson: { type: "doc", content: [{ type: "paragraph" }] },
     },
@@ -126,6 +129,8 @@ describe("live revocation", () => {
         spaceId,
         title: "Space-wide",
         slug: `space-wide-${Date.now()}`,
+        // Fixtures write the row directly, so the sibling key comes from here.
+        ord: ORDER_KEY_START,
         createdBy: outsiderId,
         documentJson: { type: "doc", content: [{ type: "paragraph" }] },
       },

@@ -5,4 +5,6 @@ FROM page_ancestor pa
 JOIN page p ON p.id = pa.descendant_id
 WHERE pa.ancestor_id = $1::uuid
   AND p.deleted_at IS NULL
-ORDER BY pa.depth, p.created_at
+-- (ord, id): the sibling order someone chose, with the tie-break that makes
+-- two pages sharing a key come back the same way for everyone.
+ORDER BY pa.depth, p.ord, p.id

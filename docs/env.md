@@ -30,9 +30,23 @@ Canonical reference for all deployments. [`.env.example`](../.env.example) mirro
 | `REVISION_THIN_AFTER_MS` | — | worker | Age past which revisions thin to one/day (default 30 days, ADR 0006) |
 | `COMPACTION_SIZE_THRESHOLD_BYTES` | — | realtime | Doc size that triggers immediate compaction (default 2 MiB) |
 
+## Deployment-host variables (not read by any app)
+
+Read by the scripts beside `compose.prod.yml`, from the deployment's `.env`.
+
+| Variable | Used by | Purpose |
+|---|---|---|
+| `BACKUP_RETAIN_DAYS` | backup.sh | Local snapshot retention (default 14) |
+| `BACKUP_OFFSITE` | backup.sh | Replica path; a missing mount **fails the run** rather than degrading to local-only (default `/mnt/Backups/angy`) |
+| `BACKUP_OFFSITE_RETAIN_DAYS` | backup.sh | Retention on the replica (default 60) |
+| `ALERT_WEBHOOK` | alert-relay.sh | Where `[alert]` lines are POSTed. An ntfy topic URL works as-is |
+| `ALERT_FORMAT` | alert-relay.sh | `text` (default, ntfy) or `json` (Slack/Discord-style body) |
+| `ALERT_SERVICES` | alert-relay.sh | Compose services to watch (default `worker api realtime web`) |
+| `ALERT_COOLDOWN_SECONDS` | alert-relay.sh | Repeat suppression per distinct line (default 300) |
+
 ## Production notes
 
-- **Postgres**: enable continuous archiving/PITR; size for metadata + projections only (content blobs live in S3).
+- **Postgres**: PITR is on — `walreceiver` streams the WAL and `./backup.sh --base` takes the weekly base backup ([runbooks/pitr.md](runbooks/pitr.md)). Size for metadata + projections only (content blobs live in S3).
 - **Redis**: `noeviction` policy; AOF persistence to smooth restarts; alert on memory (Y.Doc hot cache growth).
 - **S3**: enable bucket versioning; lifecycle rules for revision retention and GC of hard-deleted media.
 - **CDN**: configure the signing keypair / signed-cookie behavior for private-space media (ADR 0007). A homelab deployment with no CDN sets `S3_PUBLIC_ENDPOINT` to a tunnel-exposed MinIO instead — see [ADR 0007](adr/0007-media-access-control.md) and [runbooks/homelab.md](runbooks/homelab.md).

@@ -3,9 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CloudUpload, GitCommitHorizontal, Radio, Users } from "lucide-react";
+import type { CommentThreadDto } from "@angy/shared";
 import { Banner } from "../ui/Feedback";
 import { Avatar } from "../ui/Avatar";
 import { StatusDot } from "../ui/Badge";
+import { CommentHighlights } from "../comments/CommentHighlights";
+import { CommentsRail } from "../comments/CommentsRail";
 import shell from "../shell/shell.module.css";
 import { RestrictedState } from "../ui/SystemState";
 import { Editor, type PresenceUser } from "./Editor";
@@ -16,7 +19,9 @@ interface EditorViewProps {
   version: number | null;
   spaceKey: string;
   breadcrumb: { id: string; title: string }[];
-  user: { name: string };
+  user: { id: string; name: string };
+  /** Comment threads as the server had them when the editor was opened. */
+  threads: CommentThreadDto[];
 }
 
 /** Editor screen chrome per frame 2: live banner, article column, presence rail. */
@@ -27,10 +32,12 @@ export function EditorView({
   spaceKey,
   breadcrumb,
   user,
+  threads: initialThreads,
 }: EditorViewProps) {
   const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [status, setStatus] = useState("connecting");
   const [accessLost, setAccessLost] = useState(false);
+  const [threads, setThreads] = useState(initialThreads);
   // The Y.Doc owns the title now, so the breadcrumb tracks it rather than the
   // value the server rendered with.
   const [liveTitle, setLiveTitle] = useState(title);
@@ -58,10 +65,17 @@ export function EditorView({
             ))}
             <span style={{ color: "var(--text)" }}>{liveTitle}</span>
           </nav>
+          {/* Same rule as the reader: only open threads paint their anchor. */}
+          <CommentHighlights
+            threadIds={threads
+              .filter((thread) => !thread.resolved && !thread.orphaned)
+              .map((thread) => thread.id)}
+          />
           <Editor
             pageId={pageId}
             user={user}
             title={title}
+            onThreadCreated={(thread) => setThreads((prev) => [...prev, thread])}
             onAccessLost={() => setAccessLost(true)}
             onTitleChange={setLiveTitle}
             onPresenceChange={(users, s) => {
@@ -72,6 +86,7 @@ export function EditorView({
         </article>
 
         <aside className={shell.rail}>
+          <CommentsRail threads={threads} canEdit currentUserId={user.id} />
           <div className={shell.railGroup}>
             <div className="t-caption">Editing now</div>
             {presence.length === 0 && (

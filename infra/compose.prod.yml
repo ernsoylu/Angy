@@ -144,6 +144,38 @@ services:
       timeout: 3s
       retries: 10
 
+  # Point-in-time recovery (V2 H5.0). Nightly dumps recover to "last night";
+  # this streams the write-ahead log continuously, so a base backup plus these
+  # segments recovers to any moment in between — which is what you want after
+  # a bad migration or a mistaken bulk delete at 4pm.
+  #
+  # A *receiver* rather than an `archive_command` on the server: the archive
+  # directory would be a fresh named volume, owned by root, which the postgres
+  # user cannot write to — the archive silently fails and WAL piles up in
+  # pg_wal until the disk fills. pg_receivewal is a client, so it may run as
+  # root and write there happily, and it streams rather than waiting for a
+  # segment to fill.
+  #
+  # The replication slot is what makes it lossless: the server keeps segments
+  # until this has them. That is also its failure mode — a receiver stopped for
+  # days fills the server's disk. runbooks/pitr.md covers dropping the slot.
+  walreceiver:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    user: root
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    command:
+      - sh
+      - -c
+      - >
+        pg_receivewal -h postgres -U angy -D /wal --slot angy_wal
+        --create-slot --if-not-exists --compress=gzip:6 --no-password
+    volumes:
+      - walarchive:/wal
+    depends_on:
+      postgres: { condition: service_healthy }
+
   redis:
     # noeviction is not optional: this holds live Y.Docs, and an eviction is
     # silent data loss for whoever is editing that page (CLAUDE.md gotcha).
@@ -290,6 +322,7 @@ services:
 
 volumes:
   pgdata:
+  walarchive:
   authentikdb:
   redisdata:
   meilidata:

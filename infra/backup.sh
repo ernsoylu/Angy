@@ -22,7 +22,15 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 VERIFY=0
-[ "${1:-}" = "--verify" ] && VERIFY=1
+BASE=0
+for arg in "$@"; do
+  case "$arg" in
+    --verify) VERIFY=1 ;;
+    # Weekly. A base backup plus the streamed WAL is what makes recovery to an
+    # arbitrary moment possible; the nightly dump alone recovers to last night.
+    --base) BASE=1 ;;
+  esac
+done
 
 COMPOSE="docker compose -f compose.prod.yml"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
@@ -48,6 +56,52 @@ $COMPOSE exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres \
 log "dumping authentik database"
 $COMPOSE exec -T -e PGPASSWORD="$AUTHENTIK_POSTGRES_PASSWORD" authentik-postgres \
   pg_dump -U authentik -d authentik -Fc > "$OUT/authentik.dump"
+
+# ── Base backup, for point-in-time recovery ─────────────────────────────────
+# The dump above is a logical snapshot: restoring it puts you at the moment it
+# ran. A *physical* base backup plus the WAL the receiver has been streaming
+# since lets you stop anywhere in between — which is the difference between
+# losing a day and losing the twenty minutes after a bad migration.
+#
+# Weekly, not nightly: it is the size of the database, and the WAL chain is
+# what carries you forward from it. Older bases are pruned once a newer one has
+# been verified to exist, along with the WAL that predates it — a segment older
+# than the oldest base can never be replayed into anything.
+if [ "$BASE" = 1 ]; then
+  log "taking a base backup (point-in-time recovery)"
+  BASE_OUT="backup/base/$STAMP"
+  mkdir -p "$BASE_OUT"
+  NET=$(docker network ls --format '{{.Name}}' | grep -m1 -E '^angy_default$')
+  docker run --rm --network "$NET" -e PGPASSWORD="$POSTGRES_PASSWORD" \
+    -v "$(pwd)/$BASE_OUT":/base postgres:17-alpine \
+    pg_basebackup -h postgres -U angy -D /base -Ft -z -Xnone --no-password
+  [ -s "$BASE_OUT/base.tar.gz" ] || { log "FAILED: base backup is empty"; exit 1; }
+
+  # Two bases are kept: pruning down to one leaves no fallback if the newest
+  # turns out to be unreadable on the day it is needed.
+  KEEP=$(ls -1 backup/base | sort | tail -2 | head -1)
+  for old in backup/base/*; do
+    # `|| true`: the comparison failing is the normal case, and under `set -e`
+    # a false test as the loop body's last command ends the run.
+    { [ "$(basename "$old")" \< "$KEEP" ] && rm -rf "$old"; } || true
+  done
+
+  # WAL written before the oldest surviving base can never be replayed into
+  # anything, and the archive volume grows without bound if nothing removes it.
+  #
+  # Pruned by time, with a day of margin, rather than by parsing the base's
+  # start segment out of its backup_label: a base needs the segments written
+  # *during* it, so the cut has to sit safely before it began. A day of extra
+  # WAL is cheap; deleting a segment a base turns out to need is not.
+  KEEP_ISO=$(printf '%s' "$KEEP" |
+    sed -E 's/^([0-9]{4})([0-9]{2})([0-9]{2})T([0-9]{2})([0-9]{2})([0-9]{2})Z$/\1-\2-\3 \4:\5:\6/')
+  CUT=$(date -u -d "$KEEP_ISO -1 day" +"%Y-%m-%d %H:%M:%S" 2>/dev/null || true)
+  if [ -n "$CUT" ]; then
+    PRUNED=$(docker run --rm -v angy_walarchive:/wal alpine sh -c \
+      "touch -d '$CUT' /tmp/cut && find /wal -type f ! -newer /tmp/cut -print -delete | wc -l")
+    log "pruned $PRUNED WAL segment(s) older than $CUT"
+  fi
+fi
 
 # ── Object store ────────────────────────────────────────────────────────────
 # Read the volume directly from a throwaway container rather than going through

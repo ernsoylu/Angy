@@ -18,11 +18,27 @@ export {
 } from "./block-index.js";
 export { getPrisma } from "./client.js";
 export {
+  commentAudience,
+  raiseCommentNotifications,
+  syncCommentAnchors,
+} from "./comments.js";
+export {
+  getDatabaseView,
+  getPageValues,
+  queryDatabaseRows,
+  type DatabaseCell,
+  type DatabaseQuery,
+  type DatabaseRow,
+  type PropertyFilter,
+  type PropertySort,
+} from "./database.js";
+export {
   createPage,
   getBreadcrumb,
   getSubtree,
   movePage,
   PageMoveError,
+  reorderPage,
   restorePage,
   trashPage,
   type CreatePageInput,

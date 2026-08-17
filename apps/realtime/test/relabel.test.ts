@@ -5,7 +5,7 @@ import { Redis } from "ioredis";
 import * as Y from "yjs";
 import { extractRefs, ydocToJson } from "@angy/blocks";
 import { getPrisma } from "@angy/db";
-import { DOC_COMMAND_CHANNEL, type RelabelCommand } from "@angy/shared";
+import { DOC_COMMAND_CHANNEL, type RelabelCommand, ORDER_KEY_START } from "@angy/shared";
 import { env } from "../src/env.js";
 import { buildServer } from "../src/server.js";
 
@@ -48,6 +48,8 @@ async function makeLinkingPage(title: string, linkLabel: string): Promise<string
       spaceId,
       title,
       slug: `relabel-${Date.now()}-${Math.round(performance.now())}`,
+      // Fixtures write the row directly, so the sibling key comes from here.
+      ord: ORDER_KEY_START,
       createdBy: userId,
       documentJson: {
         type: "doc",
@@ -99,7 +101,7 @@ beforeAll(async () => {
     create: { spaceId, userId, permLevel: "EDIT" },
   });
   const targetPage = await prisma.page.create({
-    data: { spaceId, title: "Architecture", slug: `relabel-target-${Date.now()}`, createdBy: userId },
+    data: { spaceId, ord: ORDER_KEY_START, title: "Architecture", slug: `relabel-target-${Date.now()}`, createdBy: userId },
   });
   target = targetPage.id;
 
@@ -162,7 +164,7 @@ describe("page-link labels in the editor", () => {
 
   it("ignores a rename of a page it does not link to", async () => {
     const other = await prisma.page.create({
-      data: { spaceId, title: "Unrelated", slug: `relabel-other-${Date.now()}`, createdBy: userId },
+      data: { spaceId, ord: ORDER_KEY_START, title: "Unrelated", slug: `relabel-other-${Date.now()}`, createdBy: userId },
     });
     const pageId = await makeLinkingPage("Untouched", "System Architecture");
     const { doc, provider } = await open(pageId);

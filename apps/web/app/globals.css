@@ -26,6 +26,9 @@
   --lilac: #b49cd0;
   --lilac-soft: #eee8f6;
   --surface-hover: #efece5;
+  /* Comment anchor wash — amber rather than accent, so a commented sentence
+     does not read as a link (V2 H5.2). */
+  --comment-highlight: #f8efdd;
   --focus-ring: #4a6baa;
   --disabled-fill: #eae7e0;
   --disabled-border: #ddd8ce;
@@ -60,6 +63,7 @@
   --lilac: #c7aee0;
   --lilac-soft: #322b3d;
   --surface-hover: #2c3037;
+  --comment-highlight: #3a3124;
   --focus-ring: #b9ccf2;
   --disabled-fill: #252930;
   --disabled-border: #2f343b;
@@ -234,6 +238,17 @@ button {
   background: var(--surface-hover);
   border-radius: var(--r-chip);
   padding: 1px 5px;
+}
+
+/* Comment anchors (V2 H5.2, ADR 0014). Inert by default: a mark whose thread
+   was deleted stays in the document forever and must read as plain text — that
+   is what lets resolving and deleting a thread avoid writing to the Y.Doc at
+   all. `CommentHighlights` then emits one rule per *live* thread.
+   Wrapped in :where() so it carries no specificity and the per-thread rules
+   win by their own weight rather than by stylesheet order. */
+:where(.article-prose, .tiptap) :where(mark[data-thread-id]) {
+  background: none;
+  color: inherit;
 }
 
 .article-prose pre {

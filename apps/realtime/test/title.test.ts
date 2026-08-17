@@ -5,7 +5,7 @@ import { Redis } from "ioredis";
 import * as Y from "yjs";
 import { applyTextDiff, TITLE_FIELD, ydocTitle } from "@angy/blocks";
 import { getPrisma } from "@angy/db";
-import { DOC_COMMAND_CHANNEL, type RenameCommand } from "@angy/shared";
+import { DOC_COMMAND_CHANNEL, type RenameCommand, ORDER_KEY_START } from "@angy/shared";
 import { env } from "../src/env.js";
 import { buildServer } from "../src/server.js";
 
@@ -42,6 +42,8 @@ async function makePage(title: string): Promise<string> {
       spaceId,
       title,
       slug: `title-${Date.now()}-${Math.round(performance.now())}`,
+      // Fixtures write the row directly, so the sibling key comes from here.
+      ord: ORDER_KEY_START,
       createdBy: userId,
       documentJson: {
         type: "doc",

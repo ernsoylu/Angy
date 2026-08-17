@@ -230,6 +230,12 @@ all four consumers.
   one S3 object and ten attachment rows, exactly as an upload would be. Nothing
   is dropped in silence: a missing image, an unreferenced file and an HTML
   export all come back with a reason and are shown on the screen.
+- [x] **Space home rail → Settings dialog** *(2026-08-15)* — the space home
+  lost its rail; what it held (members, access, the way through to the full
+  settings screen) now sits behind one Settings button beside New page
+  (frames 12 and 13). The dialog is read-only: membership editing already has
+  an ADMIN-gated home on the settings screen, and splitting the same rules
+  across two surfaces would mean showing controls that fail on submit.
 - [x] **Mention notifications + in-app inbox** *(2026-08-14)* — a
   `notification` table raised by the projection worker, unique on
   (user, kind, page) so a rebuild cannot manufacture a duplicate, and the bell
@@ -238,3 +244,68 @@ all four consumers.
   all, so a push would miss the people most likely to want it. Read access is
   re-checked at *serve* time, because access can be revoked after a
   notification exists.
+
+## V2 · H5 — ordering, comments, databases, and the operational debt *(2026-08-17)*
+
+The wave that closed the rest of V2. Full narrative and the decisions taken on
+contact: [implementation-plan.md § H5](implementation-plan.md#h5--the-wave-that-closed-the-rest-of-v2-2026-08-17).
+
+- [x] **H5.1 · Sibling ordering** — `page.ord`, a fractional index
+  (`orderKeyBetween` in @angy/shared). Sibling order did not previously exist:
+  the tree was sorted by `created_at`, so nobody could put the overview above
+  the appendix. Reordering one page updates one row; concurrent drops into the
+  same slot produce the same key, and every ordered query sorts `(ord, id)` so
+  the tie resolves identically for everyone. Drag or alt+↑/↓ in the sidebar;
+  `POST /pages/:id/order` deliberately separate from `move`.
+  **The column is `COLLATE "C"`** — a locale collation folds case and ignores
+  punctuation, and would order the keys differently from the code that made
+  them.
+- [x] **H5.2 · Comments** *(ADR 0014)* — pulled forward from V3. The anchor is
+  a `comment` mark in the page's Y.Doc, so the CRDT moves it with the text;
+  threads and replies are relational. Opening a thread is the only comment
+  action that writes to the document — replying, resolving and deleting produce
+  no Yjs update, no revision checkpoint and no projection rebuild, because a
+  page's history should record edits, not conversations. A mark whose thread is
+  gone renders as plain text; a thread whose text is gone is flagged
+  `orphaned_at` by the projection worker. Notifications reuse H3's inbox
+  wholesale.
+- [x] **H5.3 · Databases-in-pages, first slice** *(ADR 0013)* — `page_property`
+  per space, typed values per page, one **read-only** table view over a page's
+  children, with filters in SQL and sorts over the filtered rows. Rows are
+  Pages, so permissions, history, search and trash are inherited rather than
+  reimplemented. Cells are edited on the row's own page, never in the table.
+  The view renders as its own server-rendered section rather than as a block:
+  the static renderer must not query a database.
+- [x] **H5.0 · Operational close-out** — ADR 0013 made this a precondition of
+  H5.3, not hygiene.
+  - [x] **PITR** — `walreceiver` streams the WAL; `./backup.sh --base` takes
+    the weekly base backup it replays onto; WAL older than the oldest kept base
+    is pruned. Procedure: runbooks/pitr.md.
+  - [x] **Alerts reach a human** — `infra/alert-relay.sh` under systemd on the
+    host. The runbook had described a log pipeline that did not exist.
+  - [x] **Rotation is provable** — `infra/verify-secrets.sh` asks the running
+    stack whether each secret still works, including whether api and realtime
+    agree on `JWT_SECRET`.
+  - [ ] **Rotate the secrets.** Needs hands on the live deployment: run
+    `verify-secrets.sh` for a baseline, then one secret at a time per
+    runbooks/key-rotation.md, re-running it in between. **Oldest outstanding
+    item in the repo.**
+  - [ ] **A copy that leaves the building.** `BACKUP_OFFSITE` is a share on the
+    same LAN. `backup.sh` writes locally and replicates second, so it would
+    take a second destination the same way — the open question is where.
+
+**Not carried forward:** e2e `retries: 0` stays as it is. The flake that
+prompted the question turned out to be a real bug (the streaming-locator race),
+which silent retries would have hidden — so the policy is "re-run the commit,
+not the test", and it stays a visible manual act.
+
+### Design-file drift, recorded rather than fixed
+
+`frontend.pen` is the source of truth for every screen, and the V2 surfaces
+have outrun it: the tasks board, mentions list, import screen, inbox, backlinks
+rail and now the comment rail, property editor and database table were all
+built without frames, borrowing the rail and table metrics the design system
+already sets. Frame 12 is also missing its dark render
+(`screenshots/12-space-settings-dark.png`). Either the file catches up in one
+pass or the convention is narrowed to "frames govern the screens they cover" —
+it should not stay ambiguous.

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
 import { cx } from "../../lib/cx";
-import type { TreeNode } from "../../lib/tree";
+import { reorderTree, siblingIds, type TreeNode } from "../../lib/tree";
+import { useToast } from "../ui/ToastProvider";
 import styles from "./shell.module.css";
 
 interface Row {
@@ -14,6 +15,9 @@ interface Row {
   expanded: boolean;
   parentId: string | null;
 }
+
+/** Where a drop would land relative to the row under the pointer. */
+type DropEdge = "before" | "after";
 
 /** Depth-first walk of everything currently on screen — the traversal order. */
 function visibleRows(
@@ -31,23 +35,46 @@ function visibleRows(
   });
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
 /**
  * Sidebar page tree with frame D's keyboard contract:
  * ↑↓ move · → expand · ← collapse · Enter opens. Roving tabindex, so the tree
  * is a single tab stop rather than one per page.
+ *
+ * Rows also reorder (V2 H5.1) — by drag, or with alt+↑/↓ so the feature has a
+ * keyboard path rather than being mouse-only. Both are **sibling** reorders:
+ * dropping a page under a different parent is a move, which rewrites the
+ * closure table and re-checks access in the destination, and that stays with
+ * the Move dialog rather than becoming something a stray drag can trigger.
  */
 export function PageTree({ tree, activeHref }: { tree: TreeNode[]; activeHref: string }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const rows = useMemo(() => visibleRows(tree, collapsed), [tree, collapsed]);
+
+  // Optimistic order, dropped as soon as the server's tree arrives. `tree` is
+  // a fresh array on every RSC render, so comparing identity is what tells a
+  // refresh apart from an ordinary client re-render.
+  const [optimistic, setOptimistic] = useState<TreeNode[] | null>(null);
+  const [rendered, setRendered] = useState(tree);
+  if (rendered !== tree) {
+    setRendered(tree);
+    setOptimistic(null);
+  }
+
+  const current = optimistic ?? tree;
+  const rows = useMemo(() => visibleRows(current, collapsed), [current, collapsed]);
 
   const activeIndex = rows.findIndex((row) => row.node.href === activeHref);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; edge: DropEdge } | null>(null);
   const container = useRef<HTMLDivElement>(null);
 
   // Roving tabindex: the focused row, else the current page, else the first.
-  const current = rows.findIndex((row) => row.node.id === focusId);
-  const tabIndex = current >= 0 ? current : activeIndex >= 0 ? activeIndex : 0;
+  const focusIndex = rows.findIndex((row) => row.node.id === focusId);
+  const tabIndex = focusIndex >= 0 ? focusIndex : activeIndex >= 0 ? activeIndex : 0;
 
   function toggle(id: string, expand: boolean) {
     setCollapsed((prev) => {
@@ -67,10 +94,55 @@ export function PageTree({ tree, activeHref }: { tree: TreeNode[]; activeHref: s
       ?.focus();
   }
 
+  /**
+   * Reorder locally, then tell the server. The anchor is a sibling id rather
+   * than an index: the API resolves neighbours from its own copy of the tree,
+   * so a list that went stale mid-drag lands the page where the user aimed it
+   * or fails honestly, instead of somewhere else entirely.
+   */
+  async function reorder(id: string, parentId: string | null, afterId: string | null) {
+    const before = current;
+    setOptimistic(reorderTree(before, parentId, id, afterId));
+    try {
+      const res = await fetch(`${API_URL}/pages/${id}/order`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ afterId }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      router.refresh();
+    } catch {
+      setOptimistic(before);
+      toast("error", "Could not reorder", "The page stayed where it was.");
+    }
+  }
+
+  /** The sibling a page must follow to sit at `edge` of `target`. */
+  function anchorFor(target: Row, edge: DropEdge, movingId: string): string | null {
+    const group = siblingIds(current, target.parentId).filter((id) => id !== movingId);
+    const at = group.indexOf(target.node.id);
+    if (edge === "after") return target.node.id;
+    return at > 0 ? group[at - 1] : null;
+  }
+
   function onKeyDown(event: React.KeyboardEvent) {
     const index = rows.findIndex((row) => row.node.id === focusId);
     const row = rows[index];
     if (!row) return;
+
+    // alt+↑/↓ reorders; the same keys without alt still traverse.
+    if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      event.preventDefault();
+      const group = siblingIds(current, row.parentId);
+      const at = group.indexOf(row.node.id);
+      if (event.key === "ArrowDown") {
+        if (at < group.length - 1) void reorder(row.node.id, row.parentId, group[at + 1]);
+      } else if (at > 0) {
+        void reorder(row.node.id, row.parentId, at >= 2 ? group[at - 2] : null);
+      }
+      return;
+    }
 
     switch (event.key) {
       case "ArrowDown":
@@ -117,10 +189,15 @@ export function PageTree({ tree, activeHref }: { tree: TreeNode[]; activeHref: s
       aria-label="Pages"
       className={styles.treeGroup}
       onKeyDown={onKeyDown}
+      onDragEnd={() => {
+        setDragId(null);
+        setDropAt(null);
+      }}
     >
       {rows.map((row, index) => {
         const isFolder = row.node.children.length > 0;
         const active = row.node.href === activeHref;
+        const dropping = dropAt?.id === row.node.id ? dropAt.edge : null;
         return (
           <Link
             key={row.node.id}
@@ -132,7 +209,42 @@ export function PageTree({ tree, activeHref }: { tree: TreeNode[]; activeHref: s
             data-tree-id={row.node.id}
             tabIndex={index === tabIndex ? 0 : -1}
             onFocus={() => setFocusId(row.node.id)}
-            className={cx(styles.treeRow, active && styles.treeRowActive)}
+            draggable
+            onDragStart={(event) => {
+              setDragId(row.node.id);
+              event.dataTransfer.effectAllowed = "move";
+              // Firefox ignores a drag that carries no payload.
+              event.dataTransfer.setData("text/plain", row.node.id);
+            }}
+            onDragOver={(event) => {
+              // Only siblings: a drop across parents would be a move.
+              if (!dragId || dragId === row.node.id) return;
+              const dragged = rows.find((r) => r.node.id === dragId);
+              if (!dragged || dragged.parentId !== row.parentId) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              const box = event.currentTarget.getBoundingClientRect();
+              setDropAt({
+                id: row.node.id,
+                edge: event.clientY < box.top + box.height / 2 ? "before" : "after",
+              });
+            }}
+            onDragLeave={() => setDropAt((at) => (at?.id === row.node.id ? null : at))}
+            onDrop={(event) => {
+              event.preventDefault();
+              const edge = dropAt?.edge ?? "after";
+              setDropAt(null);
+              setDragId(null);
+              if (!dragId || dragId === row.node.id) return;
+              void reorder(dragId, row.parentId, anchorFor(row, edge, dragId));
+            }}
+            className={cx(
+              styles.treeRow,
+              active && styles.treeRowActive,
+              dragId === row.node.id && styles.treeRowDragging,
+              dropping === "before" && styles.treeRowDropBefore,
+              dropping === "after" && styles.treeRowDropAfter,
+            )}
             style={{ paddingLeft: 8 + row.depth * 20 }}
           >
             {isFolder && (

@@ -5,13 +5,24 @@ import { Avatar } from "../../../../components/ui/Avatar";
 import { Button } from "../../../../components/ui/Button";
 import { satisfies } from "@angy/shared";
 import { PageActions } from "../../../../components/pageops/PageActions";
+import { CommentHighlights } from "../../../../components/comments/CommentHighlights";
+import { CommentsRail } from "../../../../components/comments/CommentsRail";
 import { Backlinks } from "../../../../components/reader/Backlinks";
 import { PageTags } from "../../../../components/reader/PageTags";
 import { StarButton } from "../../../../components/reader/StarButton";
 import { Toc } from "../../../../components/reader/Toc";
 import { RestrictedState } from "../../../../components/ui/SystemState";
 import { getMe } from "../../../../lib/api";
-import { getReaderBacklinks, getReaderPage, recordVisit } from "../../../../lib/reader";
+import {
+  getReaderBacklinks,
+  getReaderDatabase,
+  getReaderPage,
+  getReaderThreads,
+  recordVisit,
+} from "../../../../lib/reader";
+import { DatabaseTable } from "../../../../components/database/DatabaseTable";
+import { PageDatabaseButton } from "../../../../components/database/PageDatabaseButton";
+import { PageProperties } from "../../../../components/database/PageProperties";
 import { timeAgo } from "../../../../lib/time";
 import { injectToc } from "../../../../lib/toc";
 import shell from "../../../../components/shell/shell.module.css";
@@ -35,6 +46,8 @@ export default async function ReaderPage({
   // reloads and route prefetches don't turn into a write each.
   await recordVisit(pageId, BigInt(me.id));
   const backlinks = await getReaderBacklinks(pageId, BigInt(me.id), page.spaceId);
+  const threads = await getReaderThreads(pageId);
+  const database = await getReaderDatabase(pageId, page.spaceId);
 
   const { html, toc } = injectToc(page.renderedHtml ?? "");
   const parents = page.breadcrumb.slice(0, -1);
@@ -69,7 +82,17 @@ export default async function ReaderPage({
           />
         </div>
         <hr className={styles.divider} />
+        {/* Only threads that are still open paint their anchor; a mark whose
+            thread was resolved or deleted reads as plain text (ADR 0014). */}
+        <CommentHighlights
+          threadIds={threads
+            .filter((thread) => !thread.resolved && !thread.orphaned)
+            .map((thread) => thread.id)}
+        />
         <div className="article-prose" dangerouslySetInnerHTML={{ __html: html }} />
+        {/* A database is a view over this page's children, so it renders after
+            the page's own words rather than replacing them (ADR 0013). */}
+        {database.view && <DatabaseTable view={database.view} spaceKey={key} />}
         {/* Frame E mobile: full-width edit affordance replaces the hidden top-bar button. */}
         <Link href={`/s/${key}/${pageId}/edit`} className={styles.mobileEdit}>
           <Button icon={<Pencil size={15} />} style={{ width: "100%" }}>
@@ -87,6 +110,17 @@ export default async function ReaderPage({
         )}
         {/* Inbound navigation sits with in-page navigation, above the metadata. */}
         <Backlinks links={backlinks.shown} hidden={backlinks.hidden} />
+        <CommentsRail
+          threads={threads}
+          canEdit={satisfies(page.level, "EDIT")}
+          currentUserId={me.id}
+        />
+        <PageProperties
+          pageId={pageId}
+          properties={database.properties}
+          initial={database.values}
+          canEdit={satisfies(page.level, "EDIT")}
+        />
         <div className={shell.railGroup}>
           <div className="t-caption">Page info</div>
           {page.version !== null && (
@@ -113,6 +147,13 @@ export default async function ReaderPage({
         <div className={shell.railGroup}>
           <div className="t-caption">Page actions</div>
           <PageActions pageId={pageId} pageTitle={page.title} spaceKey={key} />
+          {satisfies(page.level, "EDIT") && (
+            <PageDatabaseButton
+              pageId={pageId}
+              properties={database.properties}
+              view={database.view}
+            />
+          )}
         </div>
       </aside>
     </div>

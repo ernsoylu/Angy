@@ -4,27 +4,72 @@ import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { isTextSelection } from "@tiptap/core";
-import { Bold, Code, Italic, Link2, Link2Off, Strikethrough, UnderlineIcon } from "lucide-react";
+import {
+  Bold,
+  Code,
+  Italic,
+  Link2,
+  Link2Off,
+  MessageSquarePlus,
+  Strikethrough,
+  UnderlineIcon,
+} from "lucide-react";
 import { IconButton } from "../ui/IconButton";
+import { useToast } from "../ui/ToastProvider";
 import styles from "./editor.module.css";
 
 /**
- * Format toolbar per frame 2: B I U S · link · code. The link button swaps the
- * row for a URL field; everything else is a one-shot mark toggle.
+ * Format toolbar per frame 2: B I U S · link · code, plus comment (V2 H5.2).
+ * The link button swaps the row for a URL field and the comment button for a
+ * remark field; everything else is a one-shot mark toggle.
  */
-export function BubbleToolbar({ editor }: { editor: Editor }) {
+export function BubbleToolbar({
+  editor,
+  onComment,
+}: {
+  editor: Editor;
+  onComment?: (body: string) => Promise<void>;
+}) {
+  const { toast } = useToast();
   const [linkOpen, setLinkOpen] = useState(false);
   const [href, setHref] = useState("");
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [comment, setComment] = useState("");
+  const [saving, setSaving] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const commentInput = useRef<HTMLInputElement>(null);
 
   // shouldShow runs inside the ProseMirror plugin, which captured this callback
   // once — a ref is the only way it sees the current value.
   const linkOpenRef = useRef(false);
   linkOpenRef.current = linkOpen;
+  // Same trap, same fix: typing the remark blurs the editor, and without this
+  // the menu closes over the field the caret is in.
+  const commentOpenRef = useRef(false);
+  commentOpenRef.current = commentOpen;
 
   useEffect(() => {
     if (linkOpen) input.current?.focus();
   }, [linkOpen]);
+
+  useEffect(() => {
+    if (commentOpen) commentInput.current?.focus();
+  }, [commentOpen]);
+
+  async function submitComment() {
+    const body = comment.trim();
+    if (body.length === 0 || !onComment) return;
+    setSaving(true);
+    try {
+      await onComment(body);
+      setComment("");
+      setCommentOpen(false);
+    } catch (err) {
+      toast("error", "Could not add the comment", err instanceof Error ? err.message : undefined);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function openLinkEditor() {
     setHref((editor.getAttributes("link").href as string | undefined) ?? "");
@@ -46,7 +91,7 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
       shouldShow={({ editor: instance, view, state, from, to }) => {
         // Editing the URL blurs the editor, which would otherwise hide the
         // menu out from under the field.
-        if (linkOpenRef.current) return true;
+        if (linkOpenRef.current || commentOpenRef.current) return true;
         if (!instance.isEditable || !view.hasFocus() || state.selection.empty) return false;
         return !(isTextSelection(state.selection) && !state.doc.textBetween(from, to).trim());
       }}
@@ -56,7 +101,38 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
         if (!(event.target instanceof HTMLInputElement)) event.preventDefault();
       }}
     >
-      {linkOpen ? (
+      {commentOpen ? (
+        <>
+          <input
+            ref={commentInput}
+            className={styles.linkInput}
+            aria-label="Comment"
+            placeholder="Add a comment…"
+            value={comment}
+            disabled={saving}
+            onChange={(event) => setComment(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void submitComment();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setCommentOpen(false);
+                setComment("");
+                editor.chain().focus().run();
+              }
+            }}
+          />
+          <IconButton
+            label="Save comment"
+            disabled={saving || comment.trim().length === 0}
+            onClick={() => void submitComment()}
+          >
+            <MessageSquarePlus size={14} />
+          </IconButton>
+        </>
+      ) : linkOpen ? (
         <>
           <input
             ref={input}
@@ -132,6 +208,18 @@ export function BubbleToolbar({ editor }: { editor: Editor }) {
           >
             <Code size={14} />
           </IconButton>
+          {onComment && (
+            <IconButton
+              label="Comment"
+              active={editor.isActive("comment")}
+              onClick={() => {
+                setComment("");
+                setCommentOpen(true);
+              }}
+            >
+              <MessageSquarePlus size={14} />
+            </IconButton>
+          )}
         </>
       )}
     </BubbleMenu>

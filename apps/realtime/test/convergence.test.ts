@@ -6,6 +6,7 @@ import { getPrisma } from "@angy/db";
 import { env } from "../src/env.js";
 import { buildServer } from "../src/server.js";
 import { getObject } from "../src/s3.js";
+import { ORDER_KEY_START } from "@angy/shared";
 
 /**
  * The required CRDT convergence test (CLAUDE.md § Testing): two clients edit
@@ -85,6 +86,8 @@ beforeAll(async () => {
       spaceId,
       title: "Convergence",
       slug: `convergence-${Date.now()}`,
+      // Fixtures write the row directly, so the sibling key comes from here.
+      ord: ORDER_KEY_START,
       createdBy: userId,
       documentJson: {
         type: "doc",

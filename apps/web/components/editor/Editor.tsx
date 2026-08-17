@@ -6,7 +6,7 @@ import { Collaboration } from "@tiptap/extension-collaboration";
 import { CollaborationCaret } from "@tiptap/extension-collaboration-caret";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { editorExtensions } from "@angy/blocks";
-import { REVOKED_CLOSE_REASON } from "@angy/shared";
+import { COMMENT_ANCHOR_MAX_LENGTH, REVOKED_CLOSE_REASON, type CommentThreadDto } from "@angy/shared";
 import { cx } from "../../lib/cx";
 import { BlockGutter } from "./BlockGutter";
 import { BubbleToolbar } from "./BubbleToolbar";
@@ -32,6 +32,8 @@ interface EditorProps {
   user: { name: string };
   /** Server-known title, shown until the doc syncs (see CollaborativeTitle). */
   title: string;
+  /** A thread was opened on the current selection (V2 H5.2). */
+  onThreadCreated?: (thread: CommentThreadDto) => void;
   onPresenceChange?: (users: PresenceUser[], status: string) => void;
   /** Fired when auth fails — first connect or live revocation (ADR 0008). */
   onAccessLost?: () => void;
@@ -48,6 +50,7 @@ export function Editor({
   pageId,
   user,
   title,
+  onThreadCreated,
   onPresenceChange,
   onAccessLost,
   onTitleChange,
@@ -172,6 +175,40 @@ export function Editor({
       .run();
   }
 
+  /**
+   * Open a comment thread on the current selection (V2 H5.2, ADR 0014).
+   *
+   * The thread is created first and the mark applied second, because the mark
+   * needs the thread's id — server-generated, so the document can never carry
+   * an anchor the database has not agreed to. If the mark never lands (the tab
+   * closes between the two), the next projection flags the thread as anchored
+   * to removed text rather than leaving it a mystery.
+   */
+  async function openThread(body: string): Promise<void> {
+    if (!editor) return;
+    const { from, to } = editor.state.selection;
+    const anchorText = editor.state.doc
+      .textBetween(from, to, " ")
+      .trim()
+      .slice(0, COMMENT_ANCHOR_MAX_LENGTH);
+    if (anchorText.length === 0) return;
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/pages/${pageId}/comments`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ anchorText, body }),
+      },
+    );
+    const payload = await res.json();
+    if (!payload.success) throw new Error(payload.error?.message ?? "Could not add the comment");
+    const thread = payload.data as CommentThreadDto;
+    editor.chain().focus().setMark("comment", { threadId: thread.id }).run();
+    onThreadCreated?.(thread);
+  }
+
   async function uploadImage(file: File) {
     if (!editor) return;
     const form = new FormData();
@@ -205,7 +242,7 @@ export function Editor({
       />
       {!editor ? null : (
         <>
-          <BubbleToolbar editor={editor} />
+          <BubbleToolbar editor={editor} onComment={openThread} />
           <TableToolbar editor={editor} />
           <BlockGutter editor={editor} />
           <EditorContent editor={editor} />

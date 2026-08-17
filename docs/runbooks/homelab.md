@@ -301,20 +301,41 @@ deployment directory:
 ```bash
 ./backup.sh            # dated snapshot under ./backup
 ./backup.sh --verify   # ...then restore it and assert the counts match
+./backup.sh --base     # ...plus a physical base backup, for PITR
 ```
 
 Scheduled by cron under the deploying user — no sudo, since docker-group
 membership is the only privilege it needs:
 
 ```
-20 3 * * 1-6  cd $HOME/angy && ./backup.sh          >> backup/backup.log 2>&1
-20 3 * * 0    cd $HOME/angy && ./backup.sh --verify >> backup/backup.log 2>&1
+20 3 * * 1-6  cd $HOME/angy && ./backup.sh                 >> backup/backup.log 2>&1
+20 3 * * 0    cd $HOME/angy && ./backup.sh --verify --base >> backup/backup.log 2>&1
 ```
 
 Daily on weekdays, **drilled weekly**. The drill is the part that matters: the
 usual way a backup fails is not corruption, it is a dump that was always empty
 or a role that does not exist on restore — and you find out on the day you
 cannot afford to.
+
+### Point-in-time recovery (V2 H5.0)
+
+The nightly dump recovers to "last night", which is the wrong granularity for
+the likeliest disaster: a bad migration or a mistaken bulk delete at a known
+minute. The `walreceiver` service streams the write-ahead log continuously, and
+the weekly `--base` run gives it something to replay onto.
+
+Procedure, including the replication slot's sharp edge — a receiver that stops
+makes Postgres hoard WAL until the disk fills — is **runbooks/pitr.md**.
+
+### Still open: the replica is on the same LAN
+
+`BACKUP_OFFSITE` points at a SMB share on the same network as the server. That
+covers a failed disk and a bad migration; it does not cover the room — a fire,
+a theft, or a flood takes the server and its replica together. Closing it is a
+decision about where the third copy lives (a remote box over SSH, an
+object-store bucket somewhere else, or a rotated disk that leaves the building)
+rather than a change to `backup.sh`, which already writes locally first and
+replicates second and would take a second destination the same way.
 
 ### What it captures, and what it deliberately does not
 

@@ -4,12 +4,14 @@ import {
   filterReadablePages,
   getBacklinks,
   getBreadcrumb,
+  getDatabaseView,
   getEffectivePageLevel,
+  getPageValues,
   getPrisma,
   isPageStarred,
   recordPageVisit,
 } from "@angy/db";
-import { satisfies, type PermLevelDto } from "@angy/shared";
+import { satisfies, type CommentThreadDto, type PermLevelDto } from "@angy/shared";
 
 // The read path (CLAUDE.md): RSC streams rendered_html from Postgres directly —
 // no API hop for page content. Auth and the page tree stay on the REST API.
@@ -138,6 +140,96 @@ export async function getReaderBacklinks(
       spaceName: link.spaceId === spaceId ? null : (spaces.get(link.spaceId) ?? null),
     })),
     hidden: Math.max(0, visible.length - BACKLINK_LIMIT),
+  };
+}
+
+/**
+ * Comment threads on a page (V2 H5.2), server-rendered with the rail.
+ *
+ * Call only after `getReaderPage` has cleared permissions: a thread is exactly
+ * as readable as the page it hangs off (ADR 0014), so there is no second check
+ * to make here.
+ *
+ * Resolved threads come back too — the rail hides them behind a count, and the
+ * highlight styling needs to know which anchors have stopped being live.
+ */
+export async function getReaderThreads(pageId: string): Promise<CommentThreadDto[]> {
+  const threads = await getPrisma().commentThread.findMany({
+    where: { pageId },
+    orderBy: { createdAt: "asc" },
+    include: {
+      comments: {
+        where: { deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        include: { author: { select: { displayName: true } } },
+      },
+    },
+  });
+
+  const resolverIds = [...new Set(threads.flatMap((t) => (t.resolvedBy ? [t.resolvedBy] : [])))];
+  const resolvers = new Map(
+    resolverIds.length === 0
+      ? []
+      : (
+          await getPrisma().appUser.findMany({
+            where: { id: { in: resolverIds } },
+            select: { id: true, displayName: true },
+          })
+        ).map((user) => [user.id.toString(), user.displayName] as const),
+  );
+
+  return threads.map((thread) => ({
+    id: thread.id,
+    pageId: thread.pageId,
+    anchorText: thread.anchorText,
+    createdAt: thread.createdAt.toISOString(),
+    resolved: thread.resolvedAt !== null,
+    resolvedByName: thread.resolvedBy
+      ? (resolvers.get(thread.resolvedBy.toString()) ?? null)
+      : null,
+    orphaned: thread.orphanedAt !== null,
+    comments: thread.comments.map((comment) => ({
+      id: comment.id.toString(),
+      authorId: comment.authorId.toString(),
+      authorName: comment.author.displayName,
+      body: comment.body,
+      createdAt: comment.createdAt.toISOString(),
+      editedAt: comment.editedAt?.toISOString() ?? null,
+    })),
+  }));
+}
+
+/**
+ * Everything the property model puts on a page (V2 H5.3): the space's
+ * vocabulary, this page's own values, and — if it has been configured as one —
+ * the database view over its children.
+ *
+ * Server-rendered like the rest of the reader: the table is already filtered
+ * and sorted by the time the page streams, so a view ships no JavaScript.
+ * Called after `getReaderPage` has cleared permissions; rows are children of a
+ * readable page, and page grants only ever widen access, so a child of a page
+ * you can read is a page you can read.
+ */
+export async function getReaderDatabase(pageId: string, spaceId: bigint) {
+  const prisma = getPrisma();
+  const [properties, values, view] = await Promise.all([
+    prisma.pageProperty.findMany({
+      where: { spaceId },
+      orderBy: [{ ord: "asc" }, { id: "asc" }],
+    }),
+    getPageValues(prisma, pageId),
+    getDatabaseView(prisma, pageId),
+  ]);
+
+  return {
+    properties: properties.map((property) => ({
+      id: property.id.toString(),
+      name: property.name,
+      type: property.type,
+      options: property.options,
+    })),
+    values,
+    view,
   };
 }
 

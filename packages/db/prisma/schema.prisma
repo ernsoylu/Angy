@@ -55,9 +55,10 @@ model Space {
   deletedAt        DateTime?       @map("deleted_at")
   deletedBy        BigInt?         @map("deleted_by")
 
-  members   SpaceMember[]
-  pages     Page[]
-  templates PageTemplate[]
+  members    SpaceMember[]
+  pages      Page[]
+  templates  PageTemplate[]
+  properties PageProperty[]
 
   @@map("space")
 }
@@ -78,6 +79,7 @@ model AppUser {
   stars         PageStar[]
   mentions      BlockIndex[]
   notifications Notification[]
+  comments      Comment[]
 
   @@map("app_user")
 }
@@ -103,6 +105,14 @@ model Page {
   parentId            String?   @map("parent_id") @db.Uuid
   title               String
   slug                String
+  /// Place among siblings — a fractional index (`orderKeyBetween` in
+  /// @angy/shared), not a position. Reordering one page updates one row and
+  /// never renumbers the rest, and two people inserting at the same slot
+  /// produce the same key rather than overwriting each other; every ordered
+  /// query therefore sorts by `(ord, id)` so the tie breaks identically for
+  /// everyone. The column is `COLLATE "C"` — see the migration for why the
+  /// database's own collation cannot be trusted with these keys.
+  ord                 String
   ydocS3Key           String?   @map("ydoc_s3_key")
   ydocStateVector     Bytes?    @map("ydoc_state_vector")
   documentJson        Json?     @map("document_json")
@@ -129,10 +139,17 @@ model Page {
   notifications Notification[]
   refs          BlockIndex[]     @relation("RefSource")
   referencedBy  BlockIndex[]     @relation("RefTargetPage")
+  commentThreads CommentThread[]
+  propertyValues PagePropertyValue[]
+  database       PageDatabase?
 
   @@unique([spaceId, slug])
   @@index([spaceId])
   @@index([parentId])
+  /// Sibling groups are read whole and in order: children by parent, roots by
+  /// space (where parent_id is null and cannot serve as the group key).
+  @@index([parentId, ord])
+  @@index([spaceId, ord])
   @@map("page")
 }
 
@@ -261,6 +278,7 @@ model PageTemplate {
 /// here, mirroring `block_index`'s rule.
 enum NotificationKind {
   MENTION
+  COMMENT
 
   @@map("notification_kind")
 }
@@ -287,6 +305,152 @@ model Notification {
   @@unique([userId, kind, pageId])
   @@index([userId, readAt, createdAt(sort: Desc)])
   @@map("notification")
+}
+
+/// What a page property holds (V2 H5.3, ADR 0013). Deliberately few: each one
+/// is a column on `page_property_value`, a filter operator set and a cell
+/// renderer, so a type nobody asked for is three things to maintain.
+enum PropertyType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  CHECKBOX
+  USER
+
+  @@map("property_type")
+}
+
+/// A property definition, scoped to a space (V2 H5.3, ADR 0013).
+///
+/// This is the "small and genuinely relational" half of databases-in-pages:
+/// properties are page *metadata*, not blocks, so hard rule 2 is untouched.
+/// Definitions live at the space level rather than per database so that two
+/// views can agree on what "Status" means — the alternative is a Status column
+/// per page and no way to query across them.
+model PageProperty {
+  id        BigInt       @id @default(autoincrement())
+  spaceId   BigInt       @map("space_id")
+  name      String
+  type      PropertyType
+  /// Choices for SELECT, in display order. Empty for every other type.
+  options   String[]     @default([])
+  /// Place in the space's property list — the same fractional key pages use.
+  ord       String
+  createdBy BigInt       @map("created_by")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  space  Space               @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  values PagePropertyValue[]
+
+  @@unique([spaceId, name])
+  @@index([spaceId, ord])
+  @@map("page_property")
+}
+
+/// One page's value for one property.
+///
+/// Typed columns rather than a JSON blob, because the whole point of the
+/// property model is that a view can *filter and sort* on it: `WHERE
+/// text_value ILIKE …` is an index away from being fast, while
+/// `value->>'text'` is a scan and a cast. Exactly one column is populated —
+/// which one is decided by the property's type.
+model PagePropertyValue {
+  pageId       String    @map("page_id") @db.Uuid
+  propertyId   BigInt    @map("property_id")
+  textValue    String?   @map("text_value")
+  numberValue  Float?    @map("number_value")
+  dateValue    DateTime? @map("date_value")
+  checkboxValue Boolean? @map("checkbox_value")
+  userValue    BigInt?   @map("user_value")
+  updatedBy    BigInt    @map("updated_by")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  page     Page         @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  property PageProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, propertyId])
+  @@index([propertyId, textValue])
+  @@index([propertyId, numberValue])
+  @@index([propertyId, dateValue])
+  @@map("page_property_value")
+}
+
+/// A page that presents its children as a table (V2 H5.3, ADR 0013).
+///
+/// A database is a *view*, not a container: the rows are the page's children,
+/// which are Pages with their own permissions, history, search and trash. This
+/// row holds only how to present them — which properties are columns, what to
+/// filter by, what to sort by.
+///
+/// The first slice is read-only by design (ADR 0013). Editing cells in the
+/// table would make a projection an edit target, which is the mistake hard
+/// rule 2 exists to prevent; values are edited on the row's own page.
+model PageDatabase {
+  pageId    String   @id @map("page_id") @db.Uuid
+  /// Property ids in column order. An array rather than a join table: column
+  /// order is a property *of the view*, and a join table would need its own
+  /// ordering column to say the same thing.
+  columns   BigInt[] @default([])
+  /// `[{ propertyId, op, value }]` — validated by zod on write, translated to
+  /// SQL on read. Never interpolated.
+  filters   Json     @default("[]")
+  /// `[{ propertyId, direction }]`, applied in order.
+  sorts     Json     @default("[]")
+  createdBy BigInt   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@map("page_database")
+}
+
+/// A comment conversation anchored to a range of text (V2 H5.2, ADR 0014).
+///
+/// The anchor is **not** here: it is a `comment` mark carrying this row's id,
+/// inside the page's Y.Doc, so the CRDT moves it with the text it covers. What
+/// lives relationally is everything a document should not carry — who, when,
+/// resolved, and the replies — because a reply must not be an edit.
+///
+/// A thread whose mark has been deleted is `orphanedAt`, flagged by the
+/// projection worker (which already walks the document) rather than deleted:
+/// the sentence is gone, the conversation about it usually still matters.
+model CommentThread {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pageId     String    @map("page_id") @db.Uuid
+  /// The text the mark covered when the thread was opened. A label for the
+  /// rail, never the anchor — the document is the anchor.
+  anchorText String    @map("anchor_text")
+  createdBy  BigInt    @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  resolvedBy BigInt?   @map("resolved_by")
+  resolvedAt DateTime? @map("resolved_at")
+  orphanedAt DateTime? @map("orphaned_at")
+
+  page     Page      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  comments Comment[]
+
+  @@index([pageId, resolvedAt])
+  @@map("comment_thread")
+}
+
+/// One remark in a thread — the first is the thread's opening comment, the
+/// rest are replies. Plain text, deliberately: a two-line remark does not need
+/// a CRDT, an S3 object and a revision history (ADR 0014).
+model Comment {
+  id        BigInt    @id @default(autoincrement())
+  threadId  String    @map("thread_id") @db.Uuid
+  authorId  BigInt    @map("author_id")
+  body      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  editedAt  DateTime? @map("edited_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  thread CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author AppUser       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("comment")
 }
 
 /// Closure table over pages only — never blocks (hard rule 2).

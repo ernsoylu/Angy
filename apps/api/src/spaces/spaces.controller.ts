@@ -131,7 +131,9 @@ export class SpacesController {
     await assertSpaceView(req.user.id, BigInt(id));
     const pages = await getPrisma().page.findMany({
       where: { spaceId: BigInt(id), deletedAt: null },
-      orderBy: { createdAt: "asc" },
+      // (ord, id) is the sibling order, tie-break included — the client
+      // rebuilds the tree by parentId and must not re-sort.
+      orderBy: [{ ord: "asc" }, { id: "asc" }],
       select: { id: true, title: true, slug: true, parentId: true },
     });
     return ok(pages);

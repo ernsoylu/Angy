@@ -18,6 +18,7 @@ export const V1_BLOCK_TYPES = [
 export type BlockType = (typeof V1_BLOCK_TYPES)[number];
 
 export { Callout, CALLOUT_TONES, type CalloutTone } from "./callout.js";
+export { CommentMark, extractCommentThreadIds } from "./comment.js";
 export { Mention } from "./mention.js";
 export { PageLink } from "./page-link.js";
 export { diffDocuments, diffWords, type DiffBlock, type WordDiffPart } from "./diff.js";

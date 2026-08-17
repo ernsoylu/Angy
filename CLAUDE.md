@@ -104,7 +104,6 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 ## Critical Gotchas
 
-- **encodeStateAsUpdate on large Y.Docs** can consume 75× the doc size in memory — run compaction in the worker, never in the API request path.
 - **Redis BITFIELD bitmaps** are keyed perm:page:{pageId}:{permLevel}; on any page_permission change, delete the page's bitmap AND all descendants' bitmaps (query page_ancestor), then let them recompute lazily. Bitmaps carry a TTL — memory ≈ max_user_id/8 bytes × perm levels × hot pages.
 - **Permission revocation must reach live editors**: after bitmap deletion, emit a perm-changed event; the realtime server re-checks that page's connections and downgrades/disconnects them (ADR 0008). Membership/baseline changes publish the *space* instead of its pages — realtime intersects it with the open documents. The client discriminates on the close **reason** (`REVOKED_CLOSE_REASON`), never the code: Hocuspocus hardcodes 1000 for a document-level close, so the server's 4403 never arrives.
 - **Meilisearch authz = tenant tokens** whose `searchRules` embed the user's effective read filter (ADR 0009). Never index private content behind a shared client key; never ship the master key to a client. Every index the token covers (`pages`, `attachments`) must carry `space_id`/`page_id` — that shared shape is what lets one filter scope them all.
@@ -117,24 +116,26 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - **Page move** = closure-table delete+insert in one transaction under a pg advisory lock with a cycle check.
 - **Enforce a single yjs copy** via pnpm overrides — duplicate yjs instances in the workspace break CRDT editing silently. The CJS/ESM boundary is a second instance vector: apps/api (CommonJS) must never import yjs or construct Y.Docs — convert doc bytes only through @angy/blocks helpers (mixing the two builds makes y-prosemirror throw "Unexpected case").
 - **BullMQ custom job ids must not contain ":"** — it's reserved for key namespacing.
-- **Compaction candidacy compares state vectors, never timestamps** — compaction itself touches page.updated_at, so a timestamp check re-enqueues every page forever.
+- **Compaction runs in the worker, never in the API request path** — `encodeStateAsUpdate` on a large Y.Doc can consume 75× the doc size in memory. Candidacy compares **state vectors, never timestamps**: compaction itself touches page.updated_at, so a timestamp check re-enqueues every page forever.
 - **Crashed browser tabs reap at Hocuspocus's ~30s health timeout** (no WS close frame), so idle-cutoff checkpoints from them arrive late — the Done button's explicit checkpoint is the deterministic save path.
 - **pg_advisory_xact_lock returns void** — cast it (`::text`) under Prisma $queryRaw or deserialization fails.
 - **Public ≠ internal origins behind a proxy.** `S3_ENDPOINT` is for SDK calls; `S3_PUBLIC_ENDPOINT` is for anything a browser fetches — bare media URLs *and presigning*, since SigV4 signs the Host header. `PUBLIC_API_URL` (not the listen port) forms the OIDC redirect_uri and drives the session cookie's `Secure` flag. Collapsing either pair works on localhost and breaks everywhere else (ADR 0012).
 - **`NEXT_PUBLIC_*` are baked into the web image at build time**, so the `angy-env` Secret cannot change what the browser talks to — pass them to infra/docker/build.sh per deployment target. Server-side code uses `API_INTERNAL_URL`, which *is* runtime env.
 - **Editor plugins registered from React (drag handle) must take referentially stable props** — a new `onNodeChange` identity each render re-registers the ProseMirror plugin, and the reconfigure tears down every other plugin's view (the slash menu silently stops opening).
-- **Page links are named at creation time**, because the node is an atom — its label cannot be edited in place, and letting the parent document write it would give `page.title` a second writer alongside `onStoreDocument`.
-- **Page links (`pageLink`) resolve through `/p/{pageId}`, never `/s/{key}/{id}`** — a space key baked into a link goes stale the moment the page moves. The cached `title` attribute is repaired in **two** places, because the reader and the editor render from different sources. Readers: `resolvePageLinkTitles` substitutes the target's current title before `rendered_html`/`text_extract` are generated, so the static renderer stays a pure JSON→HTML function and `document_json` keeps the authored label. Editors render the Y.Doc, so the node itself is rewritten — `relabelPageLinks` on `onLoadDocument` (self-healing, and the only thing that fixes links authored before the rename), plus a `relabel` doc command for documents already open. Neither writes `page.title`; `onStoreDocument` stays its only writer.
+- **Page links (`pageLink`) are named at creation time and resolve through `/p/{pageId}`, never `/s/{key}/{id}`.** The node is an atom, so its label cannot be edited in place, and letting the parent document write it would give `page.title` a second writer alongside `onStoreDocument`; a space key baked into a link goes stale the moment the page moves. The cached `title` attribute is repaired in **two** places, because the reader and the editor render from different sources. Readers: `resolvePageLinkTitles` substitutes the target's current title before `rendered_html`/`text_extract` are generated, so the static renderer stays a pure JSON→HTML function and `document_json` keeps the authored label. Editors render the Y.Doc, so the node itself is rewritten — `relabelPageLinks` on `onLoadDocument` (self-healing, and the only thing that fixes links authored before the rename), plus a `relabel` doc command for documents already open. Neither writes `page.title`; `onStoreDocument` stays its only writer.
 - **A rename must never fan out over the link graph.** The `relabel` command names the renamed *page*, and realtime intersects it with its open documents — same shape as space-scoped permission events, for the same reason: a hub page is linked from thousands of documents but only a handful are open. Loading each referrer to rewrite an attribute would turn one rename into a storm of S3 reads, revision checkpoints and projection rebuilds. Closed documents need nothing: their readers are already correct, and the doc is repaired on next load. `relabelPageLinks` returning 0 must produce **no** Yjs update, or merely opening a page re-stores and checkpoints it.
 - **`block_index` is a projection, never a block table** (hard rule 2) — one row per *actionable* node (page links, mentions, tasks; macros next), written only by `rebuildProjection` and rebuildable from the Y.Doc at any time. Each row records the label **as rendered**, and a rename only re-projects referrers whose recorded label differs: refreshing them unconditionally cascades through the link graph and mutual links never settle. `ord` is a single document-order sequence across kinds — it is half the primary key, so per-kind numbering would collide.
 - **Two `@tiptap/suggestion` plugins need distinct `pluginKey`s.** Every instance defaults to the same key and ProseMirror refuses two keyed plugins sharing one, which throws during editor construction — so adding a second menu (`@` beside `/`) takes the *whole editor* down, not just the new menu. The symptom is that `.tiptap[contenteditable]` never mounts.
 - **Import assigns page ids before it writes anything** — `planPages` decides the whole tree (ids, titles, slugs, parents) up front and `createPage` takes an optional `id` for exactly that reason. Half an export's links point *forward*, so a one-pass loop can only rewrite links to pages it has already created; the rest silently stay relative paths to files that no longer exist. Archive entries are also bounded *before* being inflated (each zip entry header states its uncompressed size) — checking after unzipping means the bomb already landed in the API's heap.
+- **`page.ord` is a fractional key in a `COLLATE "C"` column, and every ordered query sorts `(ord, id)`.** A locale collation folds case and ignores punctuation, so Postgres would order `V00001.l` and `V00002` differently from `orderKeyBetween` that produced them — the tree comes back shuffled on one deployment and not another. The `(ord, id)` tie-break is what makes two concurrent inserts at the same slot a resolved order rather than a conflict. Anything writing a page row directly (fixtures, seeds) must supply `ord`; `createPage` appends for everyone else, and reorder-within-siblings is `POST /pages/:id/order`, deliberately *not* `move`.
+- **No comment action but opening a thread may touch the Y.Doc** (ADR 0014). Replying, resolving and deleting are relational, so they raise no Yjs update, revision checkpoint or projection rebuild — history records edits, not conversations. Two consequences that must not be "fixed": a `comment` mark can outlive its thread and **must render as plain text**, and because the static renderer cannot know which threads are live, the reader paints anchors with one CSS rule per open thread instead of rewriting the article HTML.
+- **A database view cannot live in `rendered_html`** — the static renderer is a pure JSON→HTML function with no database access, so a database *block* could never carry live rows. The table is its own server-rendered section after the article. Cells are edited on the row's own page and never in the table: a view that writes back is a projection being edited (hard rule 2). Filters run in SQL over typed value columns; sorts run over the filtered rows, and `total` vs `rows` is what says so.
 - **The page title is a `title` Y.Text in the page's own Y.Doc** (`TITLE_FIELD`), not a plain column write: `onStoreDocument` copies it into `page.title`, so anything renaming a page must go through the doc (`rename` doc command) or the next store overwrites it. Never persist an empty title — reseed the doc from the row instead.
 
 ## V1 Scope (Ship the Core Editing Experience)
 
 - Spaces + pages + page closure table
-- Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote, page link (`/page` links an existing page or creates a named child). V2 adds `@` mentions and `/todo` task lists.
+- Tiptap block editor: paragraph, heading, list, code, image, table, callout, divider, blockquote, page link (`/page` links an existing page or creates a named child). V2 adds `@` mentions, `/todo` task lists and the `comment` mark.
 - Yjs + Hocuspocus real-time collab, Y.Doc in S3, compaction worker
 - SSR read path via @tiptap/static-renderer; edit-on-click mount
 - Page-level permissions + Redis bitfield cache + space baseline
@@ -149,16 +150,16 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 
 - SCIM provisioning
 - GraphQL API
-- block_index — **H1 is complete** (V2): table, worker, backlinks, `@` mentions and the tasks board. Mention notifications + the bell inbox are built too (H3). Still open: databases-in-pages (ADR 0013)
+- block_index — **H1 is complete** (V2): table, worker, backlinks, `@` mentions and the tasks board. Mention notifications + the bell inbox are built too (H3)
 - Confluence-style macros (Jira, TOC, decision, meeting notes)
 - Extension manager / runtime block-type registry (XWiki-style plugins)
 - Federated search connectors (Slack, Drive, Jira)
 - Markdown import/export are **built** (V2, ADR 0005): `markdownToDocument` + `POST /spaces/:id/import`, `documentToMarkdown` + `/pages/:id/export.md`. Still one-directional — never add a merge-back path
 - Confluence/Notion importer — **built** (V2 H2): `POST /spaces/:id/import/archive` unpacks a `.zip` into that same bundle, uploads its media as attachments and rewrites both image sources and cross-file links; screen at `/s/{key}/import`. Only Markdown exports — a Confluence *HTML* export is refused with a reason, not parsed
-- Notion-style databases-in-pages — **a row is a Page, not a block** (ADR 0013); needs `block_index` first
+- Notion-style databases-in-pages — **first slice built** (V2 H5.3, ADR 0013): `page_property` per space, typed values per page, one **read-only** table view over a page's children. A row is a Page, so permissions/history/search/trash are inherited, not reimplemented. Boards, calendars, relations and rollups stay deferred
 - PDF / Word export via headless Puppeteer queue
 - Per-line authorship / blame view
-- Comments (V3 in the roadmap; strong V2 candidate)
+- Comments — **built** (V2 H5.2, ADR 0014): the anchor is a `comment` mark in the page's Y.Doc, threads and replies are relational rows. Still deferred: search over comment bodies, per-thread reply notifications
 
 ## Reference Documents
 
@@ -174,7 +175,8 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/adr/0010-live-editing-vs-publish.md — live-by-default, no draft state in V1
 - docs/adr/0011-authentik-single-idp.md — Authentik as the one IdP; why not multi-IdP
 - docs/adr/0012-homelab-tunnel-topology.md — five public hostnames behind a Pangolin tunnel
-- docs/adr/0013-databases-in-pages.md — deferred; a database row is a Page, and why
+- docs/adr/0013-databases-in-pages.md — a database row is a Page, and why
+- docs/adr/0014-comment-anchoring.md — comments anchor as a mark in the Y.Doc, live in Postgres
 - docs/architecture.md — system narrative, data flow, consistency & backup model
 - docs/schema.md — table inventory (DDL TODO)
 - docs/env.md + .env.example — canonical environment variables
@@ -185,6 +187,7 @@ The Page is the primary relational entity. Blocks are a JSONB/CRDT payload insid
 - docs/runbooks/dev-debugging.md — local debugging recipes
 - docs/runbooks/alerts.md — log-based alert signals ([alert] lines) and responses
 - docs/runbooks/key-rotation.md — rotation procedures for every deployment secret
+- docs/runbooks/pitr.md — point-in-time recovery: the WAL receiver, base backups, and the slot's sharp edge
 - docs/runbooks/homelab.md — deploying to the home server behind the tunnel
 
 ## UI Design Source

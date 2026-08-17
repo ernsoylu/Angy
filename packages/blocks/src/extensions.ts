@@ -4,6 +4,7 @@ import { Image } from "@tiptap/extension-image";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Table, TableCell, TableHeader, TableRow } from "@tiptap/extension-table";
 import { Callout } from "./callout.js";
+import { CommentMark } from "./comment.js";
 import { Mention } from "./mention.js";
 import { PageLink } from "./page-link.js";
 
@@ -26,6 +27,7 @@ function makeExtensions(options: { undoRedo: boolean }): Extensions {
     TableHeader,
     TableCell,
     Callout,
+    CommentMark,
     PageLink,
     Mention,
     TaskList,

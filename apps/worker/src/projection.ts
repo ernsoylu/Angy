@@ -2,6 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import * as Y from "yjs";
 import {
   createYdocFromJson,
+  extractCommentThreadIds,
   extractRefs,
   extractText,
   renderDocumentToHtml,
@@ -16,6 +17,7 @@ import {
   getPrisma,
   raiseMentionNotifications,
   replaceBlockIndex,
+  syncCommentAnchors,
   type BlockRefInput,
   type BlockRefKind,
   type Prisma,
@@ -186,6 +188,15 @@ export async function rebuildProjection(pageId: string): Promise<ReferrerRefresh
     page.updatedBy ?? page.createdBy,
   );
   if (raised > 0) console.log(`[worker] raised ${raised} mention notification(s) on ${pageId}`);
+  // Comment anchors are marks in the document, so this job — which already
+  // holds the document — is the only place that can tell a thread whose text
+  // was deleted from one that is simply quiet (ADR 0014).
+  const anchors = await syncCommentAnchors(prisma, pageId, extractCommentThreadIds(doc));
+  if (anchors.orphaned + anchors.revived > 0) {
+    console.log(
+      `[worker] comment anchors on ${pageId}: ${anchors.orphaned} orphaned, ${anchors.revived} revived`,
+    );
+  }
   // Keep search in lockstep with projections (ADR 0009). Attachments ride
   // along: a move changes their space, a restore brings them back.
   const { indexAttachmentsForPage, indexPage } = await import("./search.js");

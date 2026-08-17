@@ -1,0 +1,138 @@
+/* Comment rail and anchor highlights (V2 H5.2). No frontend.pen frame
+   specifies comments, so this borrows the rail's metrics the way "Linked from"
+   did — 13px on --text-2 — and adds only what a conversation needs. */
+
+.thread {
+  border-left: 2px solid var(--accent);
+  padding: 6px 0 6px 8px;
+  margin-bottom: 10px;
+}
+
+.threadResolved {
+  border-left-color: var(--border);
+  opacity: 0.7;
+}
+
+.anchor {
+  font-size: 12px;
+  color: var(--text-3);
+  font-style: italic;
+  margin-bottom: 6px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+}
+
+.orphaned {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-style: normal;
+}
+
+.comment {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.commentBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.commentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.author {
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.edited {
+  font-style: italic;
+}
+
+.text {
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action,
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-3);
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.action:hover,
+.toggle:hover {
+  color: var(--text);
+}
+
+.iconAction {
+  flex: none;
+  background: none;
+  border: 0;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.iconAction:hover {
+  color: var(--danger, var(--text));
+}
+
+.draft {
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 6px);
+  padding: 6px;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+.resolvedBy {
+  font-size: 11px;
+  color: var(--text-3);
+}

@@ -4,6 +4,28 @@ Rotation procedures for every signing/access secret in the deployment
 (ADR 0007 required this before GA). All secrets live in the `angy-env`
 Secret (k8s) or `.env.local` (dev); see docs/env.md for the inventory.
 
+> **Nothing here has ever been executed on the live deployment**, and several
+> of these values were typed in plaintext while it was being built. That is the
+> outstanding item, not the procedure.
+
+## Before and after every step: `infra/verify-secrets.sh`
+
+```bash
+./verify-secrets.sh      # green baseline before you touch anything
+# … rotate one secret …
+./verify-secrets.sh      # the same green, or exactly one thing newly red
+```
+
+The reason rotation kept not happening is that there was no way to tell whether
+it had worked short of waiting for someone to complain. The script asks the
+running stack, not the config file: it authenticates to Postgres, lists the
+bucket with the S3 pair, calls Meilisearch with the master key, and compares
+`JWT_SECRET` **between api and realtime** — which is the failure rotation
+actually introduces, when one service is restarted and the other is not.
+
+Rotate one secret at a time, and re-run it in between. Two at once turns a
+five-minute fix into a bisection.
+
 ## JWT_SECRET (realtime connect + media tokens)
 
 Signs 15-minute page-scoped tokens only — never long-lived credentials — so

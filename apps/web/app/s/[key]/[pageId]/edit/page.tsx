@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { EditorView } from "../../../../../components/editor/EditorView";
 import { RestrictedState } from "../../../../../components/ui/SystemState";
 import { getMe } from "../../../../../lib/api";
-import { getReaderPage } from "../../../../../lib/reader";
+import { getReaderPage, getReaderThreads } from "../../../../../lib/reader";
 
 /** Edit-on-click: the editor and its WebSocket exist only behind this route. */
 export default async function EditPage({
@@ -23,7 +23,8 @@ export default async function EditPage({
       version={page.version}
       spaceKey={key}
       breadcrumb={page.breadcrumb}
-      user={{ name: me.displayName }}
+      user={{ id: me.id, name: me.displayName }}
+      threads={await getReaderThreads(pageId)}
     />
   );
 }

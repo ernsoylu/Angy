@@ -253,6 +253,162 @@ export const movePageSchema = z.object({
 export type MovePageDto = z.infer<typeof movePageSchema>;
 
 /**
+ * Reorder within a sibling group (V2 H5.1). The anchor is a *page*, not an
+ * index: the client's list is a render of a tree that anyone else may have
+ * changed, and an index computed against a stale list silently lands the page
+ * somewhere else. `null` means "first".
+ */
+export const reorderPageSchema = z.object({
+  afterId: z.uuid().nullable(),
+});
+export type ReorderPageDto = z.infer<typeof reorderPageSchema>;
+
+/**
+ * Databases-in-pages, first slice (V2 H5.3, ADR 0013). A row is a Page; a
+ * database is a view over a page's children plus a property schema.
+ */
+export const propertyTypeSchema = z.enum(["TEXT", "NUMBER", "DATE", "SELECT", "CHECKBOX", "USER"]);
+export type PropertyTypeDto = z.infer<typeof propertyTypeSchema>;
+
+export const propertySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: propertyTypeSchema,
+  options: z.array(z.string()),
+});
+export type PropertyDto = z.infer<typeof propertySchema>;
+
+export const createPropertySchema = z.object({
+  name: z.string().min(1).max(60),
+  type: propertyTypeSchema,
+  options: z.array(z.string().min(1).max(60)).max(50).default([]),
+});
+export type CreatePropertyDto = z.infer<typeof createPropertySchema>;
+
+/**
+ * A cell. One field is set, chosen by the property's type; everything else is
+ * null. `userName` rides along because a table that prints a user id is
+ * useless and the reader must not query per row.
+ */
+export const propertyValueSchema = z.object({
+  propertyId: z.string(),
+  text: z.string().nullable(),
+  number: z.number().nullable(),
+  date: z.iso.datetime().nullable(),
+  checkbox: z.boolean().nullable(),
+  userId: z.string().nullable(),
+  userName: z.string().nullable(),
+});
+export type PropertyValueDto = z.infer<typeof propertyValueSchema>;
+
+/** Setting a value: the shape mirrors the cell, and the server casts per type. */
+export const setPropertyValueSchema = z.object({
+  propertyId: z.string(),
+  /** null clears the value. Everything arrives as text and is cast by type. */
+  value: z.string().nullable(),
+});
+export type SetPropertyValueDto = z.infer<typeof setPropertyValueSchema>;
+
+export const FILTER_OPS = [
+  "equals",
+  "contains",
+  "gt",
+  "lt",
+  "is_empty",
+  "not_empty",
+] as const;
+
+export const propertyFilterSchema = z.object({
+  propertyId: z.string(),
+  op: z.enum(FILTER_OPS),
+  /** Unused by is_empty / not_empty. */
+  value: z.string().nullable().default(null),
+});
+export type PropertyFilterDto = z.infer<typeof propertyFilterSchema>;
+
+export const propertySortSchema = z.object({
+  propertyId: z.string(),
+  direction: z.enum(["asc", "desc"]),
+});
+export type PropertySortDto = z.infer<typeof propertySortSchema>;
+
+export const databaseConfigSchema = z.object({
+  columns: z.array(z.string()).max(20),
+  filters: z.array(propertyFilterSchema).max(10).default([]),
+  sorts: z.array(propertySortSchema).max(3).default([]),
+});
+export type DatabaseConfigDto = z.infer<typeof databaseConfigSchema>;
+
+export const databaseRowSchema = z.object({
+  pageId: z.uuid(),
+  title: z.string(),
+  updatedAt: z.iso.datetime(),
+  values: z.array(propertyValueSchema),
+});
+export type DatabaseRowDto = z.infer<typeof databaseRowSchema>;
+
+export const databaseViewSchema = z.object({
+  columns: z.array(propertySchema),
+  filters: z.array(propertyFilterSchema),
+  sorts: z.array(propertySortSchema),
+  rows: z.array(databaseRowSchema),
+  /** Rows matching the filter, before the display limit. */
+  total: z.number().int(),
+});
+export type DatabaseViewDto = z.infer<typeof databaseViewSchema>;
+
+/**
+ * How many rows a view renders before saying so. A database is a page's
+ * children, so this is a page-tree bound rather than a table bound — but a
+ * table nobody can read is not more honest for being complete.
+ */
+export const DATABASE_ROW_LIMIT = 200;
+
+/** Comments (V2 H5.2, ADR 0014) — the thread is relational, the anchor is a mark. */
+export const COMMENT_MAX_LENGTH = 4000;
+/** Enough of the sentence to recognise it in the rail; the document is the anchor. */
+export const COMMENT_ANCHOR_MAX_LENGTH = 300;
+
+export const commentSchema = z.object({
+  id: z.string(),
+  authorId: z.string(),
+  authorName: z.string(),
+  body: z.string(),
+  createdAt: z.iso.datetime(),
+  editedAt: z.iso.datetime().nullable(),
+});
+export type CommentDto = z.infer<typeof commentSchema>;
+
+export const commentThreadSchema = z.object({
+  id: z.uuid(),
+  pageId: z.uuid(),
+  anchorText: z.string(),
+  createdAt: z.iso.datetime(),
+  resolved: z.boolean(),
+  resolvedByName: z.string().nullable(),
+  /** The text this thread was anchored to is no longer in the document. */
+  orphaned: z.boolean(),
+  comments: z.array(commentSchema),
+});
+export type CommentThreadDto = z.infer<typeof commentThreadSchema>;
+
+export const createThreadSchema = z.object({
+  anchorText: z.string().min(1).max(COMMENT_ANCHOR_MAX_LENGTH),
+  body: z.string().min(1).max(COMMENT_MAX_LENGTH),
+});
+export type CreateThreadDto = z.infer<typeof createThreadSchema>;
+
+export const commentBodySchema = z.object({
+  body: z.string().min(1).max(COMMENT_MAX_LENGTH),
+});
+export type CommentBodyDto = z.infer<typeof commentBodySchema>;
+
+export const resolveThreadSchema = z.object({
+  resolved: z.boolean(),
+});
+export type ResolveThreadDto = z.infer<typeof resolveThreadSchema>;
+
+/**
  * A page that links to the one being viewed — the query `block_index` exists
  * for (V2 H1). `count` is how many links that one page carries, so a document
  * referring to the same page three times is one backlink, not three.
@@ -302,10 +458,15 @@ export const importResultSchema = z.object({
 });
 export type ImportResultDto = z.infer<typeof importResultSchema>;
 
-/** An inbox row (V2 H3) — raised by the worker, read in the bell menu. */
+/**
+ * An inbox row (V2 H3) — raised by the worker when a page names you, or by the
+ * API when someone comments (V2 H5.2). Enumerated rather than left open: the
+ * bell menu writes a sentence per kind, and a kind nobody phrased would render
+ * as nothing.
+ */
 export const notificationSchema = z.object({
   id: z.string(),
-  kind: z.literal("MENTION"),
+  kind: z.enum(["MENTION", "COMMENT"]),
   pageId: z.uuid(),
   pageTitle: z.string(),
   spaceKey: z.string(),

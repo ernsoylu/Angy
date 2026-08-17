@@ -17,6 +17,7 @@ import {
   getPrisma,
   movePage,
   PageMoveError,
+  reorderPage,
   restorePage,
   trashPage,
 } from "@angy/db";
@@ -27,9 +28,11 @@ import {
   movePageSchema,
   ok,
   QUEUE_MAINTENANCE,
+  reorderPageSchema,
   satisfies,
   type ApiOk,
   type MovePageDto,
+  type ReorderPageDto,
   type TrashItemDto,
 } from "@angy/shared";
 import { SessionGuard, type AuthedRequest } from "../auth/session.guard";
@@ -107,6 +110,25 @@ export class PageOpsController {
       }
     }
     return ok({ moved: true });
+  }
+
+  /**
+   * Reorder within the current sibling group (V2 H5.1). Separate from `move`
+   * on purpose: this touches one row and no closure, permission or media path,
+   * and a drag in the sidebar should not pay for the ones it doesn't use.
+   */
+  @Post("pages/:id/order")
+  @RequirePageLevel("EDIT")
+  async order(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(reorderPageSchema)) body: ReorderPageDto,
+  ): Promise<ApiOk<{ ord: string }>> {
+    try {
+      return ok({ ord: await reorderPage(getPrisma(), id, body.afterId) });
+    } catch (err) {
+      if (err instanceof PageMoveError) throw new BadRequestException(err.message);
+      throw err;
+    }
   }
 
   /** Soft-delete into the 30-day trash. */

@@ -19,21 +19,33 @@
 
 ## V2
 
+Shipped:
+
+- ✅ block_index projection + worker + UI: tasks board, mentions, backlinks
+- ✅ Page templates
+- ✅ Markdown import / export (one-directional — ADR 0005)
+- ✅ **Confluence/Notion importer** — the migration path for teams adopting Angy
+- ✅ Per-user mention notifications + in-app inbox
+- ✅ Manual page ordering (fractional index — the prerequisite databases needed)
+- ✅ **Threaded comments** — pulled forward from V3 (ADR 0014)
+- ✅ Notion-style databases-in-pages, first slice: page properties + a
+  read-only table view over a page's children (ADR 0013)
+
+Waiting on a reason — each is real, none has a consumer yet:
+
 - SCIM provisioning (directory sync)
 - GraphQL API (when a consumer needs it)
-- block_index projection + worker + UI: tasks board, mentions, backlinks
 - Confluence-style macros (Jira, TOC, decision, meeting notes)
-- **Confluence/Notion importer** — the migration path for teams adopting Angy
-- Page templates
-- Notion-style databases-in-pages (class/property model)
-- Git import / Git export (one-directional — ADR 0005)
 - Federated search connectors (Slack, Drive, Jira)
-- Per-user mention notifications + in-app inbox
 - PDF / Word export via headless Puppeteer queue
+- Databases beyond the first slice: board, calendar and gallery views,
+  relations, rollups
 
 ## V3+
 
-- Real-time commenting with threaded replies *(strong V2 candidate — pull forward if enterprise adoption demands it)*
+- Comments beyond the first cut: inline reply notifications per thread, and
+  search over comment bodies (`text_extract` is built from the document, so a
+  discussion is not findable by its words)
 - Mobile apps (React Native or PWA)
 - Activity feed & audit log UI
 - Extension manager / custom block marketplace (runtime block-type registry)

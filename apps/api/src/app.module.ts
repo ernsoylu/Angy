@@ -4,6 +4,7 @@ import { OidcService } from "./auth/oidc.service";
 import { SessionGuard } from "./auth/session.guard";
 import { HealthController } from "./health.controller";
 import { AttachmentsController } from "./pages/attachments.controller";
+import { CommentsController } from "./pages/comments.controller";
 import { ExportController } from "./pages/export.controller";
 import { ImportController } from "./pages/import.controller";
 import { NotificationsController } from "./pages/notifications.controller";
@@ -11,6 +12,7 @@ import { PageOpsController } from "./pages/page-ops.controller";
 import { PagePermissionsController } from "./pages/page-permissions.controller";
 import { PagesController } from "./pages/pages.controller";
 import { PersonalController } from "./pages/personal.controller";
+import { PropertiesController } from "./pages/properties.controller";
 import { TagsController } from "./pages/tags.controller";
 import { TemplatesController } from "./pages/templates.controller";
 import { RevisionsController } from "./pages/revisions.controller";
@@ -38,6 +40,8 @@ import { UsersController } from "./users/users.controller";
     ExportController,
     ImportController,
     NotificationsController,
+    CommentsController,
+    PropertiesController,
     UsersController,
   ],
   providers: [OidcService, SessionGuard, PagePermissionGuard],

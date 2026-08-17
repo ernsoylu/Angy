@@ -11,6 +11,7 @@ import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
 import { Tag } from "../ui/Tag";
 import { useToast } from "../ui/ToastProvider";
+import { PropertyAdmin } from "./PropertyAdmin";
 import { TagAdmin } from "./TagAdmin";
 import { cx } from "../../lib/cx";
 import styles from "./space-settings.module.css";
@@ -336,6 +337,8 @@ export function SpaceSettingsView({ space, members, pageCount }: SpaceSettingsVi
       </section>
 
       <TagAdmin />
+
+      <PropertyAdmin spaceId={space.id} />
 
       <section className={cx(styles.card, styles.danger)}>
         <div className="t-caption">Danger zone</div>

@@ -318,9 +318,9 @@ Build order within the wave:
    nothing is lost — and `kind` is what keeps the two queries apart, since both
    populate the same column.
 
-**H1 is complete**: three kinds indexed, four consumers built. H2 and the
-inbox have since closed too, so the one structural item left in V2 is
-databases-in-pages (ADR 0013) — everything else is H4, waiting on a reason.
+**H1 is complete**: three kinds indexed, four consumers built. H2, the inbox
+and — since H5 — databases, comments and the operational debt are closed too.
+What is left in V2 is H4: items waiting on a reason.
 
 **Hard rule it must not break:** rule 2 forbids a block *relational* table.
 `block_index` is a projection — derived, disposable, rebuildable from the
@@ -365,11 +365,10 @@ from scratch for every page must stay a supported operation.
 - ✅ **Backlinks + mentions UI**, then **per-user mention notifications and the
   in-app inbox** *(2026-08-14)* — the inbox had no reason to exist before
   mentions did.
-- **Databases-in-pages** (ADR 0013): a row is a Page, a database is a view over
-  a set of pages plus a property schema. The ADR is explicit that it "should
-  not start before `block_index` exists". The `page_property` schema it
-  describes is new relational data and is *not* a block table — properties are
-  page metadata.
+- ✅ **Databases-in-pages** (ADR 0013) — built in H5.3 below, as the ADR's
+  first slice: a row is a Page, a database is a view over a page's children
+  plus a property schema. `page_property` is new relational data and is *not* a
+  block table — properties are page metadata.
 
 ### H4 · On demand only
 
@@ -389,17 +388,138 @@ candidate. They are genuinely independent of `block_index` (a comment anchors
 to a page and a position, not to an indexed block), so they can be pulled
 forward without disturbing H1.
 
+### H5 · The wave that closed the rest of V2 *(2026-08-17)*
+
+> H1–H3 left three things: the structural item (databases), the one V3 feature
+> the roadmap kept flagging as a V2 candidate (comments), and operational debt
+> that ADR 0013's own sequencing clause made a *precondition* for the
+> structural item. H5 is those three plus the ordering primitive both of the
+> first two turned out to need.
+
+**Order was the hidden prerequisite.** ADR 0013 named "ordering across a view"
+as unsolved, and the audit that opened this wave found it was worse than that:
+sibling order did not exist at all. `spaces.controller.ts` sorted by
+`created_at` and `pageSubtree.sql` by `depth, created_at`, so nobody could put
+the overview above the appendix without deleting and recreating it. That is one
+gap serving two features, and it went first.
+
+- ✅ **H5.1 · Sibling ordering** — `page.ord`, a fractional index
+  (`orderKeyBetween` in @angy/shared). Reordering one page updates one row and
+  never renumbers its siblings, and two people dropping a page into the same
+  slot compute the *same key* rather than overwriting each other's shifts —
+  a tie, resolved identically for everyone by sorting `(ord, id)`.
+
+  Three things were decided on contact:
+
+  1. **`COLLATE "C"` is load-bearing.** The keys mix digits with both letter
+     cases and a `.` separator, and a locale collation folds case and ignores
+     punctuation — under `en_US.UTF-8` Postgres orders `V00001.l` and `V00002`
+     differently from the code that computed them, and the tree comes back
+     subtly shuffled on one deployment and not another.
+  2. **A fixed-width integer part, then a fraction.** Appending increments the
+     integer, so the common case stays six characters forever; only repeatedly
+     inserting between the same two rows grows a key, one character per split.
+     A pure fraction would have grown a character every few appends.
+  3. **Reorder is not move.** `POST /pages/:id/order` touches one row and no
+     closure, permission or media path; reparenting stays with `move`, which
+     needs all of them. A drag in the sidebar should not pay for the ones it
+     does not use. The anchor is a sibling *id*, never an index: the client's
+     list is a render of a tree anyone else may have changed.
+
+- ✅ **H5.2 · Comments** *(ADR 0014)* — pulled forward from V3, where the
+  roadmap had already flagged them as a strong V2 candidate. The dependency
+  argument for deferring them was never real (a comment anchors to a page and a
+  position, not to an indexed node), and H3's inbox made the notification half
+  nearly free: `COMMENT` is a new enum value, not a subsystem.
+
+  **The anchor is a mark in the Y.Doc; the thread is relational.** A mark *is*
+  a position expressed in the only coordinate system that survives concurrent
+  editing — the text itself — so Yjs solves the anchoring problem for free.
+
+  The load-bearing consequence: **no comment action except opening a thread
+  writes to the document.** Replying, resolving and deleting are relational, so
+  none of them produce a Yjs update, a revision checkpoint, an S3 write or a
+  projection rebuild. A page's history should record edits, not conversations.
+  It follows that a mark can outlive its thread, so **a mark whose thread is
+  gone renders as plain text** — which is also why the reader emits one CSS
+  rule per live thread instead of rewriting the article's HTML.
+
+  The mirror case is the worker's: `rebuildProjection` already walks the
+  document, so it flags a thread whose mark has vanished rather than letting
+  the conversation disappear with the sentence.
+
+- ✅ **H5.3 · Databases-in-pages, first slice** *(ADR 0013)* — page properties
+  per space, typed values per page, and one **read-only** table view over a
+  page's children. No boards, calendars, relations or rollups: those sit
+  downstream of whether this property model survives real data.
+
+  1. **Typed columns, not a JSON blob.** The ADR rejected building this on a
+     scan filtered in application code; typed columns are what let a filter be
+     `WHERE number_value > 4` — an index away from fast — rather than a cast
+     over JSONB. It is also what makes `"8" < "10"` a non-problem.
+  2. **The view renders outside `rendered_html`.** The static renderer is a
+     pure JSON→HTML function and must not query a database, so a database
+     *block* could never carry live rows. The table is its own server-rendered
+     section after the article, which keeps the invariant and still ships no
+     JavaScript to the read path.
+  3. **Cells are edited on the row's own page, never in the table.** A view
+     that writes back is a projection being edited, which is what hard rule 2
+     exists to prevent.
+  4. **Sorting is in application code, filtering is not.** Ordering by a
+     to-many relation is not something Prisma expresses, and hand-built dynamic
+     SQL for a set already bounded by one page's children is the worse trade —
+     so the filter runs in SQL, the sort runs over the filtered rows, and
+     `total` reports what matched while `rows` is what fits
+     (`DATABASE_ROW_LIMIT`).
+
+  Two bugs the tests caught rather than the reviewer: blank cells sorted
+  *first* under a descending sort (the direction flip was negating the
+  null-handling too), and the multi-sort that depended on it.
+
+- ✅ **H5.0 · Operational close-out** — ADR 0013's sequencing clause makes this
+  a precondition, not hygiene: "a feature of this size built on an install
+  whose backups have never been tested is the wrong order of work".
+
+  - **PITR** — `walreceiver` streams the WAL continuously into its own volume
+    and `./backup.sh --base` takes the weekly physical base backup it replays
+    onto. A *receiver*, not an `archive_command`: the archive directory would
+    be a root-owned named volume the postgres user cannot write to, so the
+    archive fails silently and WAL piles up until the disk fills.
+    Procedure and the replication slot's sharp edge: runbooks/pitr.md.
+  - **Alerts reach a human** — `infra/alert-relay.sh`. The alerts runbook
+    described a "log pipeline" that paged on `[alert]` lines. There was no
+    pipeline: the lines were printed and nothing read them, so every signal in
+    that runbook was visible only to someone already tailing the logs. On the
+    host under systemd rather than in a container, because reading other
+    containers' logs means mounting the Docker socket, which is handing out
+    root.
+  - **Rotation** — `infra/verify-secrets.sh`. The procedure existed and had
+    never been run, and the reason it kept not happening is that there was no
+    way to tell whether it had worked short of waiting for a complaint. The
+    script asks the running stack, not the config file — and compares
+    `JWT_SECRET` *between api and realtime*, which is the failure rotation
+    actually introduces. **Executing the rotation is still outstanding**: it
+    runs against the live deployment.
+  - **Still open:** the replica is on the same LAN. Closing that is a decision
+    about where a third copy lives, not a change to `backup.sh`.
+
 ### Operational work, carried from V1
 
-Not features, and not blocked by any of the above — from
-[TODO.md](TODO.md):
+Not features — mostly closed by H5.0 above. What genuinely remains:
 
-- **Backups reach a NAS but not another site**, and snapshots are not PITR.
-  That covers a failed disk, not a failed room.
+- ✅ ~~snapshots are not PITR~~ — H5.0: `walreceiver` + `./backup.sh --base`.
+- **Backups reach a NAS but not another site.** That covers a failed disk and a
+  bad migration, not a failed room. The gap is a decision about where a third
+  copy lives.
+- ✅ ~~alerts reach nobody~~ — H5.0: `infra/alert-relay.sh`.
 - **No deployment secret has ever been rotated**, and several were typed in
-  plaintext during setup. Procedure exists: runbooks/key-rotation.md.
-- **The e2e suite is timing-sensitive under load.** `playwright.config.ts` sets
-  `retries: 0` deliberately, so a single flake reds the build; a green re-run
-  of the identical commit is the evidence that distinguishes flake from
-  regression. Worth revisiting only with a policy for *reporting* flakes —
-  silent retries would hide the signal that motivated `retries: 0`.
+  plaintext during setup. Procedure: runbooks/key-rotation.md; proof that a
+  rotation worked: `infra/verify-secrets.sh`. **This one needs hands on the
+  live deployment and is the oldest outstanding item in the repo.**
+- **The e2e suite is timing-sensitive under load.** `retries: 0` stays, and H5
+  settled why rather than revisiting it: the flake that motivated the question
+  turned out to be a *bug* (the streaming-locator race, fixed by
+  `articleBody()`), which silent retries would have hidden for months. The
+  policy is therefore "retry the commit, not the test" — a green re-run of the
+  identical commit is the evidence that separates a flake from a regression,
+  and it stays a manual, visible act.

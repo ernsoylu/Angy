@@ -5,6 +5,7 @@ import * as Y from "yjs";
 import { getPrisma } from "@angy/db";
 import { env } from "../src/env.js";
 import { buildServer } from "../src/server.js";
+import { ORDER_KEY_START } from "@angy/shared";
 
 /**
  * onStoreDocument when the page row is gone.
@@ -39,6 +40,8 @@ async function makePage(title: string): Promise<string> {
       spaceId,
       title,
       slug: `store-${Date.now()}-${Math.round(performance.now())}`,
+      // Fixtures write the row directly, so the sibling key comes from here.
+      ord: ORDER_KEY_START,
       createdBy: userId,
       documentJson: {
         type: "doc",

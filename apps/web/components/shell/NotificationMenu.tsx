@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AtSign, Bell } from "lucide-react";
+import { AtSign, Bell, MessageSquare } from "lucide-react";
 import type { NotificationDto } from "@angy/shared";
 import { useEscape } from "../../lib/useEscape";
 import { IconButton } from "../ui/IconButton";
@@ -92,7 +92,8 @@ export function NotificationMenu() {
 
             {items.length === 0 ? (
               <p className={styles.bellEmpty}>
-                Nothing yet. When someone @-mentions you, it shows up here.
+                Nothing yet. When someone @-mentions you or comments on a page you touched, it
+                shows up here.
               </p>
             ) : (
               items.map((item) => (
@@ -112,9 +113,14 @@ export function NotificationMenu() {
                     }).catch(() => undefined);
                   }}
                 >
-                  <AtSign size={14} className={styles.bellIcon} />
+                  {item.kind === "COMMENT" ? (
+                    <MessageSquare size={14} className={styles.bellIcon} />
+                  ) : (
+                    <AtSign size={14} className={styles.bellIcon} />
+                  )}
                   <span className={styles.bellText}>
-                    <strong>{item.actorName ?? "Someone"}</strong> mentioned you in{" "}
+                    <strong>{item.actorName ?? "Someone"}</strong>{" "}
+                    {item.kind === "COMMENT" ? "commented on" : "mentioned you in"}{" "}
                     <strong>{item.pageTitle}</strong>
                     <span className={styles.bellTime}>{timeAgo(item.createdAt)}</span>
                   </span>

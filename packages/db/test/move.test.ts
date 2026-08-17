@@ -1,5 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { ORDER_KEY_START } from "@angy/shared";
 import {
   createPage,
   getBreadcrumb,
@@ -89,6 +90,9 @@ describe("movePage", () => {
         spaceId: otherSpaceId,
         title: "Clash",
         slug: root.slug,
+        // Written directly rather than through createPage, so the sibling key
+        // has to be supplied here.
+        ord: ORDER_KEY_START,
         createdBy: userId,
       },
     });
