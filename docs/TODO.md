@@ -299,13 +299,30 @@ prompted the question turned out to be a real bug (the streaming-locator race),
 which silent retries would have hidden — so the policy is "re-run the commit,
 not the test", and it stays a visible manual act.
 
-### Design-file drift, recorded rather than fixed
+### Design-file drift — H5's half closed
 
-`frontend.pen` is the source of truth for every screen, and the V2 surfaces
-have outrun it: the tasks board, mentions list, import screen, inbox, backlinks
-rail and now the comment rail, property editor and database table were all
-built without frames, borrowing the rail and table metrics the design system
-already sets. Frame 12 is also missing its dark render
-(`screenshots/12-space-settings-dark.png`). Either the file catches up in one
-pass or the convention is narrowed to "frames govern the screens they cover" —
+`frontend.pen` is the source of truth for every screen, and the V2 surfaces had
+outrun it. H5's own surfaces have now caught up:
+
+- [x] **14 · Comments — Light/Dark** — the reader with an anchored range in the
+  article (amber wash, accent underline) and the rail's thread list: anchor
+  quote, avatars, reply, Reply/Resolve, a resolved thread and the "Hide 1
+  resolved" toggle.
+- [x] **15 · Database View — Light/Dark** — a page whose children are a table
+  (Page · Status chip · Owner · Decided), the honest "showing 4 of 4 rows ·
+  Status is Accepted · sorted by Decided" line, and the rail's property editor
+  plus "Edit database view".
+- [x] **12 · Space Settings — Dark** — the render that was missing while its
+  light twin existed.
+
+Still without frames, from earlier waves: the tasks board, mentions list,
+import screen, the bell inbox and the backlinks rail. Either they catch up the
+same way or the convention narrows to "frames govern the screens they cover";
 it should not stay ambiguous.
+
+**Working notes for the next person in the .pen file** (both cost an hour
+here): a fresh `Insert` of a nested subtree computes bounds but renders
+nothing — build new UI by `Copy`ing an existing node into place and then
+`Replace`ing it, which does render. And never rewrite text by matching on
+content: `content === "Realtime Sync"` hit the breadcrumb *and* the sidebar
+row, and a follow-up "rename the last match" renamed the page title.
