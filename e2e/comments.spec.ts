@@ -38,9 +38,24 @@ test.describe("comments", () => {
     // The rail is the editor's own copy of the thread list.
     await expect(page.getByTestId("comments").getByText(`Is this right? ${stamp}`)).toBeVisible();
 
-    // Checkpoint so the projection rebuilds from the stored document.
+    // Checkpoint so the projection rebuilds from the stored document. The
+    // rebuild is a worker job, so the reader has to be re-fetched until it
+    // lands — the same wait every editor→reader spec makes, for the same
+    // reason. Without it the article renders empty, and an empty
+    // `.article-prose` is not `:visible`, so the failure reads as "element not
+    // found" rather than "the projection has not caught up".
+    await page.waitForTimeout(2500); // store debounce
     await page.getByRole("button", { name: "Done" }).click();
-    await expect(articleBody(page)).toContainText("The claim under review.");
+    await expect(page).not.toHaveURL(/\/edit$/);
+    await expect
+      .poll(
+        async () => {
+          await page.reload();
+          return articleBody(page).innerText();
+        },
+        { timeout: 20_000, intervals: [2_000] },
+      )
+      .toContain("The claim under review.");
 
     // The anchor survived the round trip through the Y.Doc and the static
     // renderer, and the reader is painting it because the thread is open.
