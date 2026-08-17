@@ -39,6 +39,9 @@ Read by the scripts beside `compose.prod.yml`, from the deployment's `.env`.
 | `BACKUP_RETAIN_DAYS` | backup.sh | Local snapshot retention (default 14) |
 | `BACKUP_OFFSITE` | backup.sh | Replica path; a missing mount **fails the run** rather than degrading to local-only (default `/mnt/Backups/angy`) |
 | `BACKUP_OFFSITE_RETAIN_DAYS` | backup.sh | Retention on the replica (default 60) |
+| `BACKUP_REMOTE` | backup.sh | Third copy, off the premises: an rsync-over-ssh target (`user@host:/path`). **Unset skips it with a log line** — not every deployment has a third site; once set, a failure fails the run |
+| `BACKUP_REMOTE_RETAIN_DAYS` | backup.sh | Retention on the off-site copy (default 90) |
+| `BACKUP_REMOTE_SSH` | backup.sh | ssh command for the off-site copy (default `ssh -o BatchMode=yes -o ConnectTimeout=15`) — override to name a key or port |
 | `ALERT_WEBHOOK` | alert-relay.sh | Where `[alert]` lines are POSTed. An ntfy topic URL works as-is |
 | `ALERT_FORMAT` | alert-relay.sh | `text` (default, ntfy) or `json` (Slack/Discord-style body) |
 | `ALERT_SERVICES` | alert-relay.sh | Compose services to watch (default `worker api realtime web`) |

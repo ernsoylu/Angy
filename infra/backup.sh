@@ -40,6 +40,17 @@ RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-14}"
 # migration but not a failed disk, and the disk is the likelier loss.
 OFFSITE="${BACKUP_OFFSITE:-/mnt/Backups/angy}"
 OFFSITE_RETAIN_DAYS="${BACKUP_OFFSITE_RETAIN_DAYS:-60}"
+# Third copy, on a machine that is not in this building. The NAS above covers a
+# failed disk; it does not cover a fire, a theft or a flood, because it is on
+# the same LAN and usually in the same room.
+#
+# An rsync-over-ssh target: `user@host:/path`. Unset means not configured, and
+# that is the one thing here allowed to pass quietly — a deployment with no
+# third site should not fail its nightly backup over it. Once set, a failure is
+# loud, exactly like the NAS.
+REMOTE="${BACKUP_REMOTE:-}"
+REMOTE_RETAIN_DAYS="${BACKUP_REMOTE_RETAIN_DAYS:-90}"
+REMOTE_SSH="${BACKUP_REMOTE_SSH:-ssh -o BatchMode=yes -o ConnectTimeout=15}"
 
 set -a; . ./.env; set +a
 mkdir -p "$OUT"
@@ -151,6 +162,40 @@ if mountpoint -q "$(dirname "$OFFSITE")" 2>/dev/null || [ -d "$OFFSITE" ]; then
 else
   log "[alert] OFFSITE MOUNT MISSING — $(dirname "$OFFSITE") is not mounted; only a local copy exists"
   exit 1
+fi
+
+# ── Off-site copy ───────────────────────────────────────────────────────────
+# The NAS is a replica of the disk's fate, not of the room's. This is the copy
+# that survives the building.
+#
+# rsync rather than scp: the object-store archive is the large part and is
+# mostly unchanged between runs, and `--partial` means a dropped connection
+# resumes instead of restarting. Still a *push from* the source — a pull would
+# need the remote to hold credentials for this machine, which turns a backup
+# target into a way into production.
+if [ -n "$REMOTE" ]; then
+  if ! command -v rsync >/dev/null 2>&1; then
+    log "[alert] OFFSITE REMOTE FAILED — BACKUP_REMOTE is set but rsync is not installed"
+    exit 1
+  fi
+  log "replicating off-site to $REMOTE"
+  if rsync -a --partial --timeout=120 -e "$REMOTE_SSH" "$OUT" "$REMOTE/" 2>&1 | tail -3; then
+    log "off-site copy complete: $REMOTE/$STAMP"
+    # Retention runs on the remote, over the snapshot directories only: a
+    # `find -delete` let loose on a path that failed to expand is how a backup
+    # target becomes the incident.
+    $REMOTE_SSH "${REMOTE%%:*}" \
+      "find '${REMOTE#*:}' -maxdepth 1 -type d -name '20*' -mtime +$REMOTE_RETAIN_DAYS -exec rm -rf {} +" \
+      2>/dev/null || log "off-site retention sweep skipped (non-fatal)"
+  else
+    log "[alert] OFFSITE REMOTE FAILED — could not replicate to $REMOTE"
+    exit 1
+  fi
+else
+  # Deliberately not an alert: not every deployment has a third site, and a
+  # nightly false alarm is how real alerts get ignored. The gap is recorded in
+  # runbooks/homelab.md instead, where it can be decided rather than muted.
+  log "no BACKUP_REMOTE set — local + NAS only, which covers a disk but not the room"
 fi
 
 # ── Retention ───────────────────────────────────────────────────────────────

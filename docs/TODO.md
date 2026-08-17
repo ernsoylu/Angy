@@ -290,9 +290,14 @@ contact: [implementation-plan.md § H5](implementation-plan.md#h5--the-wave-that
     `verify-secrets.sh` for a baseline, then one secret at a time per
     runbooks/key-rotation.md, re-running it in between. **Oldest outstanding
     item in the repo.**
-  - [ ] **A copy that leaves the building.** `BACKUP_OFFSITE` is a share on the
-    same LAN. `backup.sh` writes locally and replicates second, so it would
-    take a second destination the same way — the open question is where.
+  - [x] **A copy that leaves the building — the mechanism.** `BACKUP_REMOTE`
+    takes an rsync-over-ssh target, pushed from here (a pull would put
+    production credentials on the backup host). Unset skips with a log line
+    rather than an alert: not every deployment has a third site, and a nightly
+    alarm nobody can act on is how real alerts get ignored.
+  - [ ] **Point it somewhere.** Still a decision — a box elsewhere, a bucket,
+    or a disk that leaves the building — plus one restore drill *from that
+    copy*, because a destination nobody has restored from is a hypothesis.
 - [ ] **Deploy H5 to the homelab.** The live stack still runs the pre-H5 build.
   Procedure: runbooks/homelab.md §8, which is new — §4 only covered bringing up
   an *empty* install. Two things it exists to say: the database moves before

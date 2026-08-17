@@ -327,15 +327,34 @@ the weekly `--base` run gives it something to replay onto.
 Procedure, including the replication slot's sharp edge — a receiver that stops
 makes Postgres hoard WAL until the disk fills — is **runbooks/pitr.md**.
 
-### Still open: the replica is on the same LAN
+### The third copy — one that leaves the building
 
 `BACKUP_OFFSITE` points at a SMB share on the same network as the server. That
 covers a failed disk and a bad migration; it does not cover the room — a fire,
-a theft, or a flood takes the server and its replica together. Closing it is a
-decision about where the third copy lives (a remote box over SSH, an
-object-store bucket somewhere else, or a rotated disk that leaves the building)
-rather than a change to `backup.sh`, which already writes locally first and
-replicates second and would take a second destination the same way.
+a theft or a flood takes the server and its replica together.
+
+`backup.sh` takes a third destination for exactly that:
+
+```bash
+# in ~/angy/.env
+BACKUP_REMOTE=angy-backup@somewhere-else:/srv/angy
+BACKUP_REMOTE_RETAIN_DAYS=90        # optional, default 90
+```
+
+rsync over ssh, pushed *from* here — a pull would mean the remote holds
+credentials for production, which turns a backup target into a route in. Give
+it a key with no passphrase (`BatchMode=yes` will not prompt) and an account
+that can write nothing but that directory; `command="rsync --server …"` in the
+remote `authorized_keys` is the tighter version if the box is shared.
+
+**Unset is the one failure this script forgives.** Not every deployment has a
+third site, and a nightly alarm nobody can act on is how real alerts get
+ignored — so it logs a line and carries on. Once set, a failure is loud and
+fails the run, exactly like the NAS.
+
+Whatever the destination is, it is only a backup once it has been *restored*
+from: point the drill at it (`§ Restoring for real`) the first time, not the
+day you need it.
 
 ### What it captures, and what it deliberately does not
 
