@@ -60,7 +60,13 @@ export function PageProperties({
   const [saved, setSaved] = useState(draft);
   const [busy, setBusy] = useState(false);
 
-  if (properties.length === 0) return null;
+  // A reader who cannot edit sees the values this page has, not the space's
+  // whole vocabulary: empty fields they cannot fill are noise, and the names
+  // of properties used elsewhere are not theirs to read.
+  const shown = canEdit
+    ? properties
+    : properties.filter((property) => (draft[property.id] ?? "") !== "");
+  if (shown.length === 0) return null;
   const dirty = properties.some((property) => draft[property.id] !== saved[property.id]);
 
   async function save() {
@@ -94,7 +100,7 @@ export function PageProperties({
   return (
     <div className={shell.railGroup} data-testid="page-properties">
       <div className="t-caption">Properties</div>
-      {properties.map((property) => {
+      {shown.map((property) => {
         const value = draft[property.id] ?? "";
         const set = (next: string) => setDraft((prev) => ({ ...prev, [property.id]: next }));
         return (

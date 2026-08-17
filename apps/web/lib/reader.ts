@@ -210,7 +210,7 @@ export async function getReaderThreads(pageId: string): Promise<CommentThreadDto
  * readable page, and page grants only ever widen access, so a child of a page
  * you can read is a page you can read.
  */
-export async function getReaderDatabase(pageId: string, spaceId: bigint) {
+export async function getReaderDatabase(pageId: string, spaceId: bigint, userId: bigint) {
   const prisma = getPrisma();
   const [properties, values, view] = await Promise.all([
     prisma.pageProperty.findMany({
@@ -218,7 +218,9 @@ export async function getReaderDatabase(pageId: string, spaceId: bigint) {
       orderBy: [{ ord: "asc" }, { id: "asc" }],
     }),
     getPageValues(prisma, pageId),
-    getDatabaseView(prisma, pageId),
+    // The rows are *other* pages, and access to this one does not extend to
+    // its children — the view filters per caller.
+    getDatabaseView(prisma, pageId, userId),
   ]);
 
   return {

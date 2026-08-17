@@ -60,9 +60,11 @@ const toPropertyDto = (property: {
  * downstream of whether this property model survives real data.
  *
  * Rows are Pages, so nothing here reimplements permissions, history, search or
- * trash. And because page grants only ever widen access (the Notion rule), a
- * child of a page you can read is a page you can read: the row list needs no
- * second filter of its own.
+ * trash — but it does have to *apply* them. Access to a page does not extend
+ * to its children: `getEffectivePageLevel` reads the grant on that page alone,
+ * with no walk up the closure table, so someone holding a page grant in a
+ * private space can open the database and none of its rows. The row list is
+ * therefore read-filtered per caller, and its total counts what survived.
  */
 @Controller()
 @UseGuards(SessionGuard, PagePermissionGuard)
@@ -197,8 +199,11 @@ export class PropertiesController {
   /** The view: columns, the filters and sorts behind them, and the rows. */
   @Get("pages/:id/database")
   @RequirePageLevel("VIEW")
-  async view(@Param("id") id: string): Promise<ApiOk<DatabaseViewDto | null>> {
-    return ok(await getDatabaseView(getPrisma(), id));
+  async view(
+    @Param("id") id: string,
+    @Req() req: AuthedRequest,
+  ): Promise<ApiOk<DatabaseViewDto | null>> {
+    return ok(await getDatabaseView(getPrisma(), id, req.user.id));
   }
 
   /** Turn a page into a database, or reconfigure the one it already is. */
@@ -255,7 +260,7 @@ export class PropertiesController {
         sorts: body.sorts,
       },
     });
-    return ok((await getDatabaseView(getPrisma(), id))!);
+    return ok((await getDatabaseView(getPrisma(), id, req.user.id))!);
   }
 
   /** Stop being a database. The children stay children; only the view goes. */

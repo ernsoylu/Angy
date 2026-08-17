@@ -1,4 +1,5 @@
 import type { PageProperty, Prisma, PrismaClient, PropertyType } from "@prisma/client";
+import { filterReadablePages } from "./permissions.js";
 import {
   DATABASE_ROW_LIMIT,
   type DatabaseViewDto,
@@ -138,20 +139,38 @@ function compare(
 }
 
 export interface DatabaseQuery {
+  /**
+   * Whose access decides which rows exist. Not optional: a row discloses a
+   * page's title and its property values, and access to the *parent* does not
+   * imply access to a child (see `queryDatabaseRows`).
+   */
+  userId: bigint;
   filters: readonly PropertyFilter[];
   sorts: readonly PropertySort[];
   limit: number;
 }
 
 /**
- * The rows of a database view: this page's live children, filtered in SQL and
- * ordered by the view's sorts.
+ * The rows of a database view: this page's live children, filtered in SQL,
+ * filtered again by what the caller may read, and ordered by the view's sorts.
+ *
+ * **Access to the parent does not imply access to a child.** The first cut of
+ * this skipped the read filter on the reasoning that page grants only ever
+ * widen access, so a child of a readable page is readable. That is false:
+ * `getEffectivePageLevel` resolves a grant on *that page*, with no walk up the
+ * closure table — so a non-member of a private space, granted VIEW on one
+ * page, cannot open its children. Without this filter the view would have
+ * listed their titles, their property values and their count. It is the same
+ * disclosure `filterReadablePages` was written for on the backlinks rail.
+ *
+ * `total` is therefore the count of rows *the caller may see*, not of rows
+ * that matched: reporting "showing 2 of 5" would disclose the three it just
+ * withheld.
  *
  * Sorting happens here rather than in SQL because ordering by a to-many
  * relation is not something Prisma expresses, and the alternative — a hand-
  * built ORDER BY over a LEFT JOIN — is dynamic SQL for a set already bounded
- * by one page's children. The bound is the honest part: `total` reports what
- * matched, `rows` is what fits.
+ * by one page's children.
  */
 export async function queryDatabaseRows(
   prisma: PrismaClient,
@@ -180,28 +199,35 @@ export async function queryDatabaseRows(
     }),
   };
 
-  const [total, pages] = await Promise.all([
-    prisma.page.count({ where }),
-    prisma.page.findMany({
-      where,
-      orderBy: [{ ord: "asc" }, { id: "asc" }],
-      include: { propertyValues: true },
-    }),
-  ]);
+  const pages = await prisma.page.findMany({
+    where,
+    orderBy: [{ ord: "asc" }, { id: "asc" }],
+    include: { propertyValues: true },
+  });
 
-  const rows: DatabaseRow[] = pages.map((page) => ({
-    pageId: page.id,
-    title: page.title,
-    updatedAt: page.updatedAt,
-    cells: page.propertyValues.map((value) => ({
-      propertyId: value.propertyId.toString(),
-      text: value.textValue,
-      number: value.numberValue,
-      date: value.dateValue,
-      checkbox: value.checkboxValue,
-      userId: value.userValue,
-    })),
-  }));
+  // One query for the whole candidate set, not one per row — the same reason
+  // the backlinks rail resolves its list this way.
+  const readable = await filterReadablePages(
+    prisma,
+    query.userId,
+    pages.map((page) => page.id),
+  );
+
+  const rows: DatabaseRow[] = pages
+    .filter((page) => readable.has(page.id))
+    .map((page) => ({
+      pageId: page.id,
+      title: page.title,
+      updatedAt: page.updatedAt,
+      cells: page.propertyValues.map((value) => ({
+        propertyId: value.propertyId.toString(),
+        text: value.textValue,
+        number: value.numberValue,
+        date: value.dateValue,
+        checkbox: value.checkboxValue,
+        userId: value.userValue,
+      })),
+    }));
 
   // Applied in order, last sort first, so the first-named sort wins — the
   // order a reader means when they say "by status, then by date".
@@ -222,7 +248,7 @@ export async function queryDatabaseRows(
     });
   }
 
-  return { rows: rows.slice(0, query.limit), total };
+  return { rows: rows.slice(0, query.limit), total: rows.length };
 }
 
 const toPropertyDto = (property: PageProperty): PropertyDto => ({
@@ -285,6 +311,7 @@ export async function getPageValues(
 export async function getDatabaseView(
   prisma: PrismaClient,
   pageId: string,
+  userId: bigint,
   limit: number = DATABASE_ROW_LIMIT,
 ): Promise<DatabaseViewDto | null> {
   const config = await prisma.pageDatabase.findUnique({ where: { pageId } });
@@ -300,7 +327,12 @@ export async function getDatabaseView(
     return property ? [toPropertyDto(property)] : [];
   });
 
-  const { rows, total } = await queryDatabaseRows(prisma, pageId, { filters, sorts, limit });
+  const { rows, total } = await queryDatabaseRows(prisma, pageId, {
+    userId,
+    filters,
+    sorts,
+    limit,
+  });
   const names = await userNames(
     prisma,
     rows.flatMap((row) => row.cells.map((cell) => cell.userId)),

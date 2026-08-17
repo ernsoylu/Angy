@@ -47,7 +47,7 @@ export default async function ReaderPage({
   await recordVisit(pageId, BigInt(me.id));
   const backlinks = await getReaderBacklinks(pageId, BigInt(me.id), page.spaceId);
   const threads = await getReaderThreads(pageId);
-  const database = await getReaderDatabase(pageId, page.spaceId);
+  const database = await getReaderDatabase(pageId, page.spaceId, BigInt(me.id));
 
   const { html, toc } = injectToc(page.renderedHtml ?? "");
   const parents = page.breadcrumb.slice(0, -1);

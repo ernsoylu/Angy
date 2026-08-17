@@ -101,6 +101,7 @@ afterAll(async () => {
 describe("queryDatabaseRows", () => {
   const query = (filters: never[] | object[] = [], sorts: object[] = []) =>
     queryDatabaseRows(prisma, root, {
+      userId,
       filters: filters as never,
       sorts: sorts as never,
       limit: 100,
@@ -196,6 +197,7 @@ describe("queryDatabaseRows", () => {
 
   it("counts what matched even when the limit cuts the list", async () => {
     const { rows, total } = await queryDatabaseRows(prisma, root, {
+      userId,
       filters: [],
       sorts: [],
       limit: 2,
@@ -215,7 +217,7 @@ describe("queryDatabaseRows", () => {
 
 describe("getDatabaseView", () => {
   it("is null for an ordinary page", async () => {
-    expect(await getDatabaseView(prisma, root)).toBeNull();
+    expect(await getDatabaseView(prisma, root, userId)).toBeNull();
   });
 
   it("returns columns in the configured order, not the schema's", async () => {
@@ -229,7 +231,7 @@ describe("getDatabaseView", () => {
       },
     });
 
-    const view = await getDatabaseView(prisma, root);
+    const view = await getDatabaseView(prisma, root, userId);
     expect(view!.columns.map((column) => column.name)).toEqual(["Estimate", "Status"]);
     expect(view!.rows[0].title).toBe("Charlie");
     expect(view!.total).toBe(5);
@@ -251,7 +253,71 @@ describe("getDatabaseView", () => {
     });
     await prisma.pageProperty.delete({ where: { id: doomed.id } });
 
-    const view = await getDatabaseView(prisma, root);
+    const view = await getDatabaseView(prisma, root, userId);
     expect(view!.columns.map((column) => column.name)).toEqual(["Estimate", "Status"]);
+  });
+});
+
+describe("who may see a row", () => {
+  /**
+   * The regression this exists for: the first cut of the view skipped the read
+   * filter, reasoning that page grants only widen access so a child of a
+   * readable page is readable. `getEffectivePageLevel` resolves the grant on
+   * *that page* with no walk up the closure table, so that is false — and the
+   * table would have disclosed the titles, values and count of pages the
+   * caller cannot open.
+   */
+  it("withholds children the caller cannot open, and does not count them", async () => {
+    const space = await prisma.space.create({
+      data: { key: "db-private", name: "Private DB", visibility: "PRIVATE" },
+    });
+    await prisma.spaceMember.create({ data: { spaceId: space.id, userId, permLevel: "ADMIN" } });
+    const outsider = await prisma.appUser.create({
+      data: {
+        oidcSubject: "test|db-outsider",
+        email: "db-outsider@test.io",
+        displayName: "Outsider",
+      },
+    });
+
+    const make = (title: string, parentId?: string) =>
+      createPage(prisma, {
+        spaceId: space.id,
+        parentId: parentId ?? null,
+        title,
+        slug: `${title.toLowerCase().replace(/\s+/g, "-")}-${Math.random().toString(36).slice(2, 8)}`,
+        createdBy: userId,
+      });
+
+    const hub = await make("Hub");
+    const shared = await make("Shared row", hub.id);
+    await make("Secret row", hub.id);
+
+    // The outsider is let into the database page and one of its rows.
+    await prisma.pagePermission.createMany({
+      data: [
+        { pageId: hub.id, userId: outsider.id, permLevel: "VIEW", grantedBy: userId },
+        { pageId: shared.id, userId: outsider.id, permLevel: "VIEW", grantedBy: userId },
+      ],
+    });
+
+    const asOutsider = await queryDatabaseRows(prisma, hub.id, {
+      userId: outsider.id,
+      filters: [],
+      sorts: [],
+      limit: 100,
+    });
+    expect(titles(asOutsider.rows)).toEqual(["Shared row"]);
+    // "Showing 1 of 2" would disclose exactly what was just withheld.
+    expect(asOutsider.total).toBe(1);
+
+    const asMember = await queryDatabaseRows(prisma, hub.id, {
+      userId,
+      filters: [],
+      sorts: [],
+      limit: 100,
+    });
+    expect(titles(asMember.rows)).toEqual(["Shared row", "Secret row"]);
+    expect(asMember.total).toBe(2);
   });
 });
