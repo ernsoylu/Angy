@@ -3,7 +3,8 @@ import { PageListView } from "../../../../components/personal/PageListView";
 import { getMentionedPages, getSpaceByKey } from "../../../../lib/api";
 
 /**
- * Sidebar "Mentions" — pages naming this user, from `block_index` (V2 H1).
+ * Sidebar "Mentions" (frontend.pen frame 17) — pages naming this user, from
+ * `block_index` (V2 H1).
  *
  * Space-scoped like Recent and Starred, for the same reason: the sidebar that
  * reaches it is. The workspace-wide inbox the roadmap describes is a separate

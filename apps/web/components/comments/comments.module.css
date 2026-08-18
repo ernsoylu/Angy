@@ -1,6 +1,6 @@
-/* Comment rail and anchor highlights (V2 H5.2). No frontend.pen frame
-   specifies comments, so this borrows the rail's metrics the way "Linked from"
-   did — 13px on --text-2 — and adds only what a conversation needs. */
+/* Comment rail and anchor highlights (V2 H5.2), per frontend.pen frame 14.
+   It borrows the rail's metrics the way "Linked from" did — 13px on
+   --text-2 — and adds only what a conversation needs. */
 
 .thread {
   border-left: 2px solid var(--accent);

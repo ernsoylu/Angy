@@ -16,7 +16,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const POLL_MS = 60_000;
 
 /**
- * The bell menu (V2 H3) — the in-app inbox the roadmap wanted behind mentions.
+ * The bell menu (V2 H3), per frontend.pen frame 19 — the in-app inbox the
+ * roadmap wanted behind mentions.
  *
  * Polled rather than pushed. The realtime tier carries *document* traffic and
  * a socket is opened per page being edited; a reader who is not editing has no

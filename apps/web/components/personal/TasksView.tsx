@@ -12,8 +12,8 @@ import list from "./page-list.module.css";
 import styles from "./tasks.module.css";
 
 /**
- * The tasks board (V2 H1) — every to-do in the space, grouped by the page it
- * lives on.
+ * The tasks board (V2 H1), per frontend.pen frame 16 — every to-do in the
+ * space, grouped by the page it lives on.
  *
  * Read-only, deliberately. A checkbox here would have to write back into the
  * page's Y.Doc, and `block_index` is a projection: making it the thing an edit

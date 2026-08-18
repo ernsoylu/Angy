@@ -1,6 +1,9 @@
-/* Tasks board (V2 H1). No frontend.pen frame specifies it, so the metrics come
-   from the sibling list surfaces (Recent/Starred) and the design system's
-   segmented-control treatment. */
+/* Tasks board (V2 H1), per frontend.pen frame 16. The frame was drawn from
+   this code rather than the other way round, so it inherits the metrics of the
+   sibling list surfaces (Recent/Starred) and the design system's
+   segmented-control treatment. One deviation, and it is the frame's: Pencil
+   drops `strikethrough`, so a done row reads there through the sage checkbox
+   and muted text alone. `.textDone`'s line-through stays. */
 
 .filters {
   display: flex;

@@ -328,14 +328,38 @@ outrun it. H5's own surfaces have now caught up:
 - [x] **12 · Space Settings — Dark** — the render that was missing while its
   light twin existed.
 
-Still without frames, from earlier waves: the tasks board, mentions list,
-import screen, the bell inbox and the backlinks rail. Either they catch up the
-same way or the convention narrows to "frames govern the screens they cover";
-it should not stay ambiguous.
+The five from earlier waves, drawn from the shipped screens rather than the
+other way round — so they are a record of what exists, and from here they are
+the specification for what changes:
 
-**Working notes for the next person in the .pen file** (both cost an hour
+- [x] **16 · Tasks Board — Light/Dark** — the All open / Assigned to me
+  segmented control, to-dos grouped by their page, assignees on the right, and
+  done rows muted with a sage checkbox. Read-only, so there is nothing in the
+  frame that looks like it writes back.
+- [x] **17 · Mentions — Light/Dark** — the `PageListView` card the sidebar's
+  Recent and Starred already share, with "Updated" as the row's time verb.
+- [x] **18 · Import — Light/Dark** — the archive picker with a file chosen,
+  the one-way callout, and both result cards. **Not imported** carries the
+  reason per row, including the Confluence-HTML refusal, because the result is
+  what this screen is actually for.
+- [x] **19 · Inbox — Light/Dark** — the bell menu open over the reader: clay
+  unread badge, mention and comment rows, unread on `--accent-soft`, and
+  "Mark all read".
+- [x] **20 · Backlinks — Light/Dark** — "Linked from" in the rail between the
+  TOC and Page info, where the reader puts it, with a per-space chip on a
+  cross-space referrer, the ×N occurrence count and "and 4 more".
+
+The sidebar in all five carries the Mentions and Tasks nav rows, which the
+V1 frames predate.
+
+**Working notes for the next person in the .pen file** (each cost an hour
 here): a fresh `Insert` of a nested subtree computes bounds but renders
 nothing — build new UI by `Copy`ing an existing node into place and then
-`Replace`ing it, which does render. And never rewrite text by matching on
-content: `content === "Realtime Sync"` hit the breadcrumb *and* the sidebar
-row, and a follow-up "rename the last match" renamed the page title.
+`Replace`ing it, which does render. A `Copy`'s `descendants` overrides can
+silently not apply, leaving a copy that is renamed but otherwise identical to
+its source — re-`Update` the copied children by id and check the screenshot,
+because nothing errors. `strikethrough` on text is accepted and then dropped,
+which is why frame 16's done rows carry no line-through while `.textDone`
+still does. And never rewrite text by matching on content:
+`content === "Realtime Sync"` hit the breadcrumb *and* the sidebar row, and a
+follow-up "rename the last match" renamed the page title.

@@ -1,6 +1,6 @@
-/* "Linked from" rail group (V2 H1). No frontend.pen frame specifies backlinks,
-   so this borrows the rail's existing metrics — .railItem's 13px/--text-2 — and
-   adds only what a list of links needs over a list of facts. */
+/* "Linked from" rail group (V2 H1), per frontend.pen frame 20. It borrows the
+   rail's existing metrics — .railItem's 13px/--text-2 — and adds only what a
+   list of links needs over a list of facts. */
 
 .item {
   display: flex;

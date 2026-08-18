@@ -5,7 +5,8 @@ import shell from "../shell/shell.module.css";
 import styles from "./backlinks.module.css";
 
 /**
- * "Linked from" — the reader-side consumer of `block_index` (V2 H1).
+ * "Linked from" (frontend.pen frame 20) — the reader-side consumer of
+ * `block_index` (V2 H1).
  *
  * Server-rendered with the rest of the rail: the list is already resolved and
  * permission-filtered by the time this renders, so there is nothing to fetch

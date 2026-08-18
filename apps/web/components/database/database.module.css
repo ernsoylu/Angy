@@ -1,6 +1,6 @@
-/* Database view (V2 H5.3). No frontend.pen frame specifies a table view, so
-   this reuses the article's table metrics from globals.css and adds only the
-   horizontal scroll a wide view needs. */
+/* Database view (V2 H5.3), per frontend.pen frame 15. It reuses the article's
+   table metrics from globals.css and adds only the horizontal scroll a wide
+   view needs. */
 
 .wrap {
   margin: 28px 0 8px;

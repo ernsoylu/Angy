@@ -15,7 +15,8 @@ import styles from "./import.module.css";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 /**
- * Import a Notion or Confluence export into this space (V2 H2, ADR 0005).
+ * Import a Notion or Confluence export into this space (V2 H2, ADR 0005),
+ * per frontend.pen frame 18.
  *
  * The screen's real job is the *result*, not the upload. An import creates
  * dozens of pages in one action, and the only way it can be trusted is if it
