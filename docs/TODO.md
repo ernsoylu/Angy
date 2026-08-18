@@ -286,10 +286,12 @@ contact: [implementation-plan.md § H5](implementation-plan.md#h5--the-wave-that
   - [x] **Rotation is provable** — `infra/verify-secrets.sh` asks the running
     stack whether each secret still works, including whether api and realtime
     agree on `JWT_SECRET`.
-  - [ ] **Rotate the secrets.** Needs hands on the live deployment: run
-    `verify-secrets.sh` for a baseline, then one secret at a time per
-    runbooks/key-rotation.md, re-running it in between. **Oldest outstanding
-    item in the repo.**
+  - [ ] **Rotate the secrets.** Still outstanding, and still the oldest item in
+    the repo — but no longer blocked on an unproven tool. `verify-secrets.sh`
+    now actually runs end to end and reports **10 ok, 0 failed** against the
+    live stack *(2026-08-18)*, so there is a real baseline to rotate against:
+    one secret at a time per runbooks/key-rotation.md, re-running it between
+    each.
   - [x] **A copy that leaves the building — the mechanism.** `BACKUP_REMOTE`
     takes an rsync-over-ssh target, pushed from here (a pull would put
     production credentials on the backup host). Unset skips with a log line
@@ -298,24 +300,76 @@ contact: [implementation-plan.md § H5](implementation-plan.md#h5--the-wave-that
   - [ ] **Point it somewhere.** Still a decision — a box elsewhere, a bucket,
     or a disk that leaves the building — plus one restore drill *from that
     copy*, because a destination nobody has restored from is a hypothesis.
-- [ ] **Deploy H5 to the homelab.** The live stack still runs the pre-H5 build.
-  Procedure: runbooks/homelab.md §8, which is new — §4 only covered bringing up
-  an *empty* install. Two things it exists to say: the database moves before
-  the images, because new code against an old schema fails while old code
-  against a new one mostly does not; and rolling back is **not symmetric** —
-  `page.ord` is NOT NULL with no default, so old images against the new schema
-  keep serving reads and fail every page *creation*. The backfill itself is not
-  the risk (512 ms for 50,000 pages, measured).
+    **The NAS is not the answer to this one**, though it keeps being offered as
+    one: `//<nas>/Backup` is already what `BACKUP_OFFSITE` mounts at
+    `/mnt/Backups`, and it sits on the same subnet as the server. Pointing
+    `BACKUP_REMOTE` at it gives three copies in one building and closes the
+    ticket without closing the risk. The VPS that terminates the tunnel is the
+    only off-premises machine the deployment already has.
+- [ ] **The NAS replication is broken and has been since 14 Aug.**
+  `/mnt/Backups` is a **stale CIFS handle** — mounted, dead, `ls` returns
+  `Stale file handle`. Every nightly run since has logged
+  `[alert] OFFSITE MOUNT MISSING` and carried on, so production has had exactly
+  one copy of itself, on the same disk as production, for four days. Needs a
+  remount (sudo). It is also the argument for `alert-relay.sh`, which is still
+  not installed: the alert fired correctly four times and reached nobody.
+- [x] **Deploy H5 to the homelab** *(2026-08-18)*. Ran to
+  runbook §8: verified pre-upgrade snapshot (drilled, and pulled off-box
+  because the NAS was down), `verify-secrets.sh` baseline, images built for
+  this target, migrate, then `up -d`. All three migrations applied; `page.ord`
+  landed NOT NULL, `COLLATE "C"`, keys distinct per parent. Verified after:
+  10/10 secrets, all hostnames through the tunnel, and the idle WebSocket
+  closing at 60.08s with `4408` — Hocuspocus's own close, not a proxy `1006`.
+
+  **§8 was not sufficient on its own, and four things were wrong** — three of
+  them in H5.0 code that had never been run against a real deployment:
+
+  1. `verify-secrets.sh` read `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`, which
+     compose invents *inside the containers* from `MINIO_ROOT_*` and which are
+     therefore absent from `.env`. Under `set -u` that killed the script at
+     check 4, so the JWT api/realtime comparison — the check the script exists
+     for — had never once run. It also read `OIDC_ISSUER`, spelled
+     `OIDC_ISSUER_URL` everywhere else, and defaulted it to `http://localhost`.
+  2. **`walreceiver` could not authenticate.** Postgres needs an explicit
+     `pg_hba.conf` rule for `replication`; the stock catch-all does not cover
+     it. Fresh installs now get `postgres/10-replication-hba.sh`; existing ones
+     need the line appended by hand (§8 documents it).
+  3. **`--create-slot` is an exit-after action, not a flag.** The receiver
+     created the slot, exited 0, was restarted, no-op'd on `--if-not-exists`,
+     exited 0 — forever, while reading as "Restarting" rather than failed. So
+     PITR had never streamed a single segment, *and* left the undrained slot
+     that fills the server's disk. Now two invocations: create, then `exec` the
+     stream.
+  4. **A local `compose.override.yml` §8 knew nothing about.** This deployment
+     hosts Authentik for other products and keeps their OIDC credentials there,
+     with an `up.sh` that always passes both files. §8's literal
+     `docker compose -f compose.prod.yml up -d` would have dropped it and
+     broken Forgejo sign-in.
 
 **Not carried forward:** e2e `retries: 0` stays as it is. The flake that
 prompted the question turned out to be a real bug (the streaming-locator race),
 which silent retries would have hidden — so the policy is "re-run the commit,
 not the test", and it stays a visible manual act.
 
-### Design-file drift — H5's half closed
+### Design-file drift — closed *(2026-08-18)*
 
 `frontend.pen` is the source of truth for every screen, and the V2 surfaces had
-outrun it. H5's own surfaces have now caught up:
+outrun it. The ambiguity this section used to leave open — catch up, or narrow
+the convention to "frames govern the screens they cover" — was **settled by
+catching up**. Narrowing it was the cheaper answer and the wrong one: the five
+screens without frames were the five newest, so a convention that excused them
+would have excused every screen built from then on, and `frontend.pen` would
+have decayed into a record of V1. CLAUDE.md now says so in the stronger form —
+a screen without a frame is drift, not a convention, and a new screen gets its
+frame in the wave that builds it.
+
+The four CSS files that opened with "No frontend.pen frame specifies this, so
+the metrics come from…" now name their frame instead. Those comments were the
+drift's own paper trail: each one is a place where a designer's decision was
+inferred from a sibling component, and each was load-bearing enough that its
+author wrote it down.
+
+H5's own surfaces:
 
 - [x] **14 · Comments — Light/Dark** — the reader with an anchored range in the
   article (amber wash, accent underline) and the rail's thread list: anchor

@@ -48,9 +48,13 @@ check "api can reach its database" \
          curl -fsS -m 5 http://127.0.0.1:3001/health >/dev/null"
 
 echo "[verify] object storage"
+# `.env` holds MINIO_ROOT_*; compose is what renames them to S3_* for the apps
+# (`S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}`), so the S3_ names exist only inside
+# the containers. Reading them here found nothing and, under `set -u`, took the
+# whole script down at this line — so every check below never ran.
 check "S3 credentials list the bucket" \
   $COMPOSE exec -T minio sh -c \
-  "mc alias set check http://127.0.0.1:9000 '$S3_ACCESS_KEY_ID' '$S3_SECRET_ACCESS_KEY' >/dev/null &&
+  "mc alias set check http://127.0.0.1:9000 '$MINIO_ROOT_USER' '$MINIO_ROOT_PASSWORD' >/dev/null &&
    mc ls check/${S3_BUCKET:-angy-docs} >/dev/null"
 
 echo "[verify] search"
@@ -69,8 +73,14 @@ check "api and realtime agree on JWT_SECRET" \
          test \"\$($COMPOSE exec -T api printenv JWT_SECRET)\" = \"\$($COMPOSE exec -T realtime printenv JWT_SECRET)\""
 
 echo "[verify] identity"
+# The issuer is not in `.env` either — compose derives it as
+# `https://${ID_HOST}/application/o/angy/`. Ask the api for the value it is
+# actually running with rather than recomputing it here; a default of
+# `http://localhost` made this check test a URL no part of the stack uses.
 check "OIDC discovery is reachable" \
-  sh -c "curl -fsS -m 8 '${OIDC_ISSUER:-http://localhost}/.well-known/openid-configuration' >/dev/null"
+  sh -c "issuer=\$($COMPOSE exec -T api printenv OIDC_ISSUER_URL) &&
+         test -n \"\$issuer\" &&
+         curl -fsS -m 8 \"\${issuer%/}/.well-known/openid-configuration\" >/dev/null"
 check "OIDC_CLIENT_SECRET is set in the api" \
   sh -c "test -n \"\$($COMPOSE exec -T api printenv OIDC_CLIENT_SECRET)\""
 

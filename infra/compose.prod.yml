@@ -138,6 +138,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backup:/backup
+      # Fresh clusters only — see the script's own note, and § 8 of
+      # runbooks/homelab.md for what an existing install has to do instead.
+      - ./postgres/10-replication-hba.sh:/docker-entrypoint-initdb.d/10-replication-hba.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U angy -d angy"]
       interval: 10s
@@ -165,12 +168,21 @@ services:
     user: root
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
+    # Two invocations, and it must stay that way: `--create-slot` is one of
+    # pg_receivewal's *optional actions*, so it creates the slot and exits
+    # rather than going on to stream. Combined into one command it exited 0,
+    # `restart: unless-stopped` ran it again, `--if-not-exists` made the second
+    # run a no-op, and it looped forever — leaving a slot nothing ever drained,
+    # which is precisely the disk-filling failure this service exists to avoid.
+    # The loop is silent and the container reads as "Restarting", not "failed".
     command:
       - sh
       - -c
       - >
         pg_receivewal -h postgres -U angy -D /wal --slot angy_wal
-        --create-slot --if-not-exists --compress=gzip:6 --no-password
+        --create-slot --if-not-exists --no-password || true;
+        exec pg_receivewal -h postgres -U angy -D /wal --slot angy_wal
+        --compress=gzip:6 --no-password
     volumes:
       - walarchive:/wal
     depends_on:

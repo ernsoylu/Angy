@@ -129,7 +129,15 @@ const worker = new Worker<ProjectionJobData | Record<string, never>>(
           stale.map((pageId) => ({
             name: JOB_PROJECTION_REBUILD,
             data: { pageId },
-            opts: { jobId: `rebuild-${pageId}` },
+            // The jobId coalesces repeat sweeps while a rebuild is still
+            // pending — but BullMQ keeps completed jobs by default, and a
+            // retained id makes every later add for that page a *silent*
+            // no-op. Without these the reconciler repairs a given page once
+            // and never again: the sweep keeps reporting it stale, keeps
+            // enqueuing nothing, and eventually alerts that the worker is
+            // wedged when the worker is fine. Found live with six pages stale
+            // since the day their ids were first enqueued.
+            opts: { jobId: `rebuild-${pageId}`, removeOnComplete: true, removeOnFail: true },
           })),
         );
       }

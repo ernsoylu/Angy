@@ -20,7 +20,6 @@ import {
   syncCommentAnchors,
   type BlockRefInput,
   type BlockRefKind,
-  type Prisma,
   type PrismaClient,
 } from "@angy/db";
 import { getObject, putObject } from "./s3.js";
@@ -164,15 +163,31 @@ export async function rebuildProjection(pageId: string): Promise<ReferrerRefresh
   // rendered_html and text_extract show each target's current name.
   const resolved = resolveRefLabels(doc, await refLabels(prisma, extractRefs(doc)));
 
-  await prisma.page.update({
-    where: { id: pageId },
-    data: {
-      documentJson: doc as Prisma.InputJsonValue,
-      renderedHtml: renderDocumentToHtml(resolved),
-      textExtract: extractText(resolved),
-      projectionUpdatedAt: new Date(),
-    },
-  });
+  // Raw, and it has to be: `page.updatedAt` is `@updatedAt`, so *any*
+  // prisma.page.update stamps it at execution time — a beat after the
+  // `projectionUpdatedAt` value in the same statement. `findStalePageIds`
+  // compares the two, so every rebuild left the page marginally staler than
+  // when it started and the sweep re-flagged all of it, forever. Passing
+  // `updatedAt` explicitly would express it in Prisma but race a concurrent
+  // edit, clobbering a real write's timestamp with an older one.
+  //
+  // A projection rebuild is not an edit to the page, so it must not move the
+  // page's own clock: `updated_at` is what the reader shows as "Updated 3h
+  // ago" and what the Recent list sorts by.
+  //
+  // The timestamp is bound from JS rather than written as `now()` on purpose.
+  // `@updatedAt` is stamped by Prisma on the *application* clock, and
+  // `findStalePageIds` compares the two columns — so writing this one on the
+  // *database* clock would make staleness a question of how far the two hosts
+  // have drifted apart.
+  await prisma.$executeRaw`
+    UPDATE page
+       SET document_json = ${JSON.stringify(doc)}::jsonb,
+           rendered_html = ${renderDocumentToHtml(resolved)},
+           text_extract  = ${extractText(resolved)},
+           projection_updated_at = ${new Date()}
+     WHERE id = ${pageId}::uuid
+  `;
   // Indexed from the resolved document, so the recorded label is the one the
   // reader was served — which is what findStaleReferrers compares against.
   const refs = extractRefs(resolved);

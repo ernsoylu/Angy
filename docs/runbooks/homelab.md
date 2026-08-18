@@ -492,9 +492,51 @@ cd ~/angy
    recipe as §4.1, after re-extracting `prisma/` from the *new* api image.
 
 5. `docker compose -f compose.prod.yml up -d` — this also creates any new
-   service the compose file gained.
+   service the compose file gained. **If the deployment has its own wrapper or
+   extra compose files, use those instead.** A deployment that hosts Authentik
+   for other products keeps their OIDC credentials in a local
+   `compose.override.yml` and an `up.sh` that always passes both files; running
+   the line above verbatim drops that file, and the other products' Authentik
+   blueprints stop resolving. `ls ~/angy` before assuming this command is
+   complete.
 
 6. **Verify** in the order §5 gives, then `./verify-secrets.sh` again.
+
+### Upgrading onto a cluster that predates the WAL receiver
+
+`pg_hba.conf` lives inside the `pgdata` volume and is written once, at
+`initdb`. The rule the receiver needs therefore reaches a *new* install through
+`postgres/10-replication-hba.sh`, and an existing one not at all — so on any
+deployment created before H5.0 the receiver crash-loops with:
+
+```
+FATAL:  no pg_hba.conf entry for replication connection from host "…", user "angy"
+```
+
+The stock rules cover replication from localhost only, and the catch-all
+`host all all all scram-sha-256` does **not** extend to them: `all` in the
+database column deliberately does not match the `replication` keyword. Append
+the rule once and reload — no restart, no downtime:
+
+```bash
+PG=$(./up.sh ps -q postgres)
+docker exec "$PG" sh -c \
+  'printf "host replication angy all scram-sha-256\n" >> /var/lib/postgresql/data/pg_hba.conf'
+docker exec -e PGPASSWORD="$POSTGRES_PASSWORD" "$PG" \
+  psql -U angy -d angy -c 'select pg_reload_conf()'
+./up.sh restart walreceiver
+```
+
+Confirm with `pg_hba_file_rules` (it shows parse errors that a plain `grep`
+cannot) and then that the slot is being drained — `active` must be `t`:
+
+```sql
+select slot_name, active, wal_status from pg_replication_slots;
+```
+
+A slot sitting at `active=f` is the dangerous state, not a neutral one: the
+server retains WAL for a consumer that never arrives. See
+[pitr.md](pitr.md) for dropping it in a hurry.
 
 ### Rolling back is not symmetric
 
